@@ -39,3 +39,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# logs and temporary files
+*.log
+*.png
+scripts/check_signals*
+scripts/debug*
+scripts/analyze_requested_stocks.js
+dev_log.txt
+audit_ui.js
+final_check.js
+final_verify.js
+find_stock.js
+verify_*.js
+repro_crash.js
+test_*.js
+
