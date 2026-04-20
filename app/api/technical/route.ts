@@ -22,7 +22,9 @@ import {
   calculateVWAP,
   calculateVortex,
   calculateKDJ,
-  calculateSqueezeDeluxe
+  calculateSqueezeDeluxe,
+  calculateElliottFibonacci,
+  calculatePivots
 } from "@/lib/indicators";
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
@@ -326,6 +328,8 @@ export async function GET(req: Request) {
     const vortex = calculateVortex(quotes);
     const kdjResult = calculateKDJ(quotes);
     const squeezeDeluxe = calculateSqueezeDeluxe(quotes);
+    const elliott = calculateElliottFibonacci(quotes, 100);
+    const wavePivots = calculatePivots(quotes, 5);
     
     const prevDay = quotes[quotes.length - 2] || quotes[quotes.length - 1];
     const pivots = calculatePivotPoints(prevDay);
@@ -441,6 +445,8 @@ export async function GET(req: Request) {
       success: true, 
       data,
       pivots,
+      elliott,
+      wavePivots,
       unifiedAnalysis,
       ticker: symbol
     });

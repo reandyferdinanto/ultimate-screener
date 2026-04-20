@@ -18,6 +18,8 @@ import {
 interface AdvancedChartProps {
   data: any[];
   pivots: any;
+  elliott?: any;
+  wavePivots?: any[];
   ticker: string;
   onLogicalRangeChange?: (range: LogicalRange | null) => void;
   syncLogicalRange?: LogicalRange | null;
@@ -39,6 +41,8 @@ interface AdvancedChartProps {
 export default function AdvancedChart({ 
   data, 
   pivots, 
+  elliott,
+  wavePivots,
   ticker, 
   onLogicalRangeChange,
   syncLogicalRange,
@@ -252,6 +256,100 @@ export default function AdvancedChart({
       drawPivot(pivots.p, "rgba(255,255,255,0.15)", "P");
       drawPivot(pivots.r1, "rgba(34, 197, 94, 0.15)", "R1");
       drawPivot(pivots.s1, "rgba(239, 68, 68, 0.15)", "S1");
+    }
+
+    // --- 8. ELLIOTT ZIGZAG & FIBONACCI ---
+    if (wavePivots && wavePivots.length > 0) {
+      const zigzagSeries = chart.addSeries(LineSeries, {
+        color: "rgba(255, 235, 59, 0.6)",
+        lineWidth: 2 as LineWidth,
+        lineStyle: 0,
+        title: "Elliott ZigZag",
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+
+      const zigzagData = wavePivots.map(p => ({
+        time: data[p.index].time as UTCTimestamp,
+        value: p.price
+      }));
+      zigzagSeries.setData(zigzagData);
+
+      // Markers for Waves (1, 2, 3, 4, 5)
+      const waveMarkers = wavePivots.slice(-5).map((p, i) => ({
+        time: data[p.index].time as UTCTimestamp,
+        position: p.type === 'high' ? 'aboveBar' as const : 'belowBar' as const,
+        color: "#FFEB3B",
+        shape: 'circle' as const,
+        text: `${i + 1}`,
+      }));
+      createSeriesMarkers(zigzagSeries, waveMarkers);
+    }
+
+    if (elliott && elliott.retracement) {
+      const lastTime = data[data.length - 1].time;
+      const startTime = data[data.length - 50].time;
+      
+      const drawFibo = (val: number, color: string, title: string, style = 2) => {
+        const series = chart.addSeries(LineSeries, { 
+          color, lineWidth: 1 as LineWidth, title, lineStyle: style as any, 
+          lastValueVisible: true, priceLineVisible: false 
+        });
+        series.setData([{ time: startTime as UTCTimestamp, value: val }, { time: lastTime as UTCTimestamp, value: val }]);
+      };
+
+      // Support Levels (Retracement)
+      drawFibo(elliott.retracement.h618, "rgba(239, 83, 80, 0.4)", "FIB 0.618");
+      drawFibo(elliott.retracement.h382, "rgba(38, 166, 154, 0.4)", "FIB 0.382");
+
+      // Target Levels (Extension & Retracement Projection)
+      if (elliott.trend === 'BULLISH' && elliott.extension.h1618) {
+        drawFibo(elliott.extension.h1618, "rgba(130, 255, 160, 0.6)", "TARGET W3 (1.618)", 0);
+        
+        // --- 9. PREDICTION WAVE (UP) ---
+        const predictionSeries = chart.addSeries(LineSeries, {
+            color: "rgba(130, 255, 160, 0.4)",
+            lineWidth: 2 as LineWidth,
+            lineStyle: 2,
+            title: "Prediction",
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+
+        const lastPrice = data[data.length - 1].close;
+        const lastTimeVal = data[data.length - 1].time as number;
+        const timeStep = (data[1].time as number) - (data[0].time as number);
+
+        const predictionData = [
+            { time: lastTimeVal as UTCTimestamp, value: lastPrice },
+            { time: (lastTimeVal + timeStep * 5) as UTCTimestamp, value: elliott.extension.h1618 },
+            { time: (lastTimeVal + timeStep * 10) as UTCTimestamp, value: (elliott.extension.h1618 + (elliott.extension.h1618 - lastPrice) * 0.5) }
+        ];
+        predictionSeries.setData(predictionData);
+      } else if (elliott.trend === 'BEARISH') {
+        // --- 9. PREDICTION WAVE (DOWN / A-B-C) ---
+        const predictionSeries = chart.addSeries(LineSeries, {
+            color: "rgba(239, 83, 80, 0.4)",
+            lineWidth: 2 as LineWidth,
+            lineStyle: 2,
+            title: "Correction",
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+
+        const lastPrice = data[data.length - 1].close;
+        const lastTimeVal = data[data.length - 1].time as number;
+        const timeStep = (data[1].time as number) - (data[0].time as number);
+
+        // Prediction for A-B-C Correction
+        const predictionData = [
+            { time: lastTimeVal as UTCTimestamp, value: lastPrice },
+            { time: (lastTimeVal + timeStep * 4) as UTCTimestamp, value: elliott.retracement.h618 }, // Wave A
+            { time: (lastTimeVal + timeStep * 7) as UTCTimestamp, value: elliott.retracement.h382 }, // Wave B bounce
+            { time: (lastTimeVal + timeStep * 12) as UTCTimestamp, value: elliott.retracement.h100 }  // Wave C bottom
+        ];
+        predictionSeries.setData(predictionData);
+      }
     }
 
     const handleResize = () => {

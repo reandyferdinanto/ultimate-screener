@@ -487,6 +487,8 @@ function SearchContent() {
                     key={`main-${symbol}-${interval}-${showEMA10}-${showEMA20}-${showEMA50}-${showEMA200}-${showSqueezeDeluxe}-${showBB}-${showMFI}-${showVWAP}-${showOBV}-${showCMF}`}
                     data={data.data} 
                     pivots={data.pivots} 
+                    elliott={data.elliott}
+                    wavePivots={data.wavePivots}
                     ticker={data.ticker} 
                     onLogicalRangeChange={syncCharts}
                     syncLogicalRange={logicalRange}

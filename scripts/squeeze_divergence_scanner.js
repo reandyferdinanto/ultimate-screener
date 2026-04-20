@@ -82,16 +82,19 @@ async function analyzeSqueeze(stock, interval = "1d") {
         const quoteAtSignal = quotes[idx];
         const currentPrice = quotes[quotes.length - 1].close;
 
-        // Divergence Condition
+        // Squeeze & Divergence Condition
         const isDivergence = s.isBullDiv;
         const inSqueeze = s.squeeze.low || s.squeeze.mid || s.squeeze.high;
+        const isFired = !inSqueeze && (results[idx-1].squeeze.low || results[idx-1].squeeze.mid);
+        const isHighConviction = s.isHighConviction || (isDivergence && isFired);
+        
         const momImproving = s.momentum > p.momentum;
 
-        if (isDivergence && inSqueeze && momImproving) {
-            // Price Check: If signal is old, ensure price hasn't "run away"
+        if ((isDivergence && inSqueeze) || isHighConviction) {
+            // Price Check
             const priceDev = Math.abs((currentPrice - quoteAtSignal.close) / quoteAtSignal.close) * 100;
 
-            if (j === 0 || priceDev <= 2.5) {
+            if (j === 0 || priceDev <= 3.0) {
                 foundSignal = {
                     ticker: stock.ticker,
                     sector: stock.sector || "Unknown",
@@ -99,23 +102,23 @@ async function analyzeSqueeze(stock, interval = "1d") {
                     entryDate: quoteAtSignal.date,
                     entryPrice: quoteAtSignal.close,
                     currentPrice: currentPrice,
-                    targetPrice: Math.round(currentPrice * 1.12),
-                    stopLossPrice: Math.round(currentPrice * 0.94),
+                    targetPrice: Math.round(currentPrice * 1.15),
+                    stopLossPrice: Math.round(currentPrice * 0.93),
                     status: 'pending',
-                    daysHeld: j * (interval === "4h" ? 4 : 24), // Approx hours
+                    daysHeld: j * (interval === "4h" ? 4 : 24),
                     priceHistory: [{ date: quoteAtSignal.date, price: quoteAtSignal.close }],
                     metadata: {
-                        strategyRank: 600,
+                        strategyRank: isHighConviction ? 800 : 600,
                         momentum: s.momentum.toFixed(2),
                         flux: s.flux.toFixed(2),
-                        squeezeLevel: s.squeeze.high ? "HIGH" : (s.squeeze.mid ? "NORMAL" : "LOW"),
-                        inSqueeze: inSqueeze,
+                        squeezeLevel: s.squeeze.high ? "EXTREME" : (s.squeeze.mid ? "TIGHT" : "STANDARD"),
+                        isHighConviction: isHighConviction,
                         divergence: "Bullish Momentum",
-                        age: j === 0 ? "TODAY" : `${j}D_AGO`,
-                        priceDev: priceDev.toFixed(1) + "%"
+                        status: isHighConviction ? "SQUEEZE_RELEASE_DIV" : "SQUEEZE_PREP_DIV",
+                        age: j === 0 ? "TODAY" : `${j}D_AGO`
                     }
                 };
-                break; // Take the most recent one
+                break;
             }
         }
     }

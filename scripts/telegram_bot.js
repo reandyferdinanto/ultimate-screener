@@ -48,6 +48,7 @@ async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
         const prev = techRes.data[techRes.data.length - 2];
         const analysis = techRes.unifiedAnalysis;
         const sqz = last.squeezeDeluxe;
+        const elliott = techRes.elliott;
 
         const price = quote.regularMarketPrice;
         const change = quote.regularMarketChangePercent.toFixed(2);
@@ -106,6 +107,17 @@ async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
         if (analysis.squeezeInsight) {
             md += `## COMPRESSION_INSIGHT\n`;
             md += `${analysis.squeezeInsight}\n\n`;
+        }
+
+        if (elliott) {
+            md += `## ELLIOTT_WAVE_PROJECT\n`;
+            md += `- Trend       : ${elliott.trend}\n`;
+            if (elliott.trend === 'BULLISH') {
+                md += `- Target W3   : ${elliott.extension.h1618?.toFixed(0)}\n`;
+                md += `- Ext Target  : ${elliott.extension.h2618?.toFixed(0)}\n`;
+            }
+            md += `- Support 61.8: ${elliott.retracement.h618?.toFixed(0)}\n`;
+            md += `- Interpretation: ${elliott.interpretation}\n\n`;
         }
 
         md += `## FLOW_METRICS\n`;
