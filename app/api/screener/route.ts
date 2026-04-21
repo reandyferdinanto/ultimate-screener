@@ -12,6 +12,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const getAll = searchParams.get("all") === "true";
   const priceRange = searchParams.get("priceRange") || "all";
+  const dateFilter = searchParams.get("dateFilter") || "all";
 
   try {
     await connectToDatabase();
@@ -27,10 +28,27 @@ export async function GET(req: Request) {
     else if (priceRange === "under500") priceFilter = { entryPrice: { $lt: 500 } };
     else if (priceRange === "above500") priceFilter = { entryPrice: { $gte: 500 } };
 
-    // Get all pending signals with price filter
+    // Build Date Filter
+    let dateFilterQuery = {};
+    if (dateFilter === "today") {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      dateFilterQuery = { createdAt: { $gte: startOfDay } };
+    } else if (dateFilter === "3d") {
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      dateFilterQuery = { createdAt: { $gte: threeDaysAgo } };
+    } else if (dateFilter === "7d") {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      dateFilterQuery = { createdAt: { $gte: sevenDaysAgo } };
+    }
+
+    // Get all pending signals with price + date filter
     const activeSignals = await StockSignalModel.find({ 
         status: "pending",
-        ...priceFilter
+        ...priceFilter,
+        ...dateFilterQuery
     }).lean();
 
     const results = await Promise.all(activeSignals.map(async (signal: any) => {

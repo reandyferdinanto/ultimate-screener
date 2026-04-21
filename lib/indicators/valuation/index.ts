@@ -59,15 +59,30 @@ export function calculateElliottFibonacci(quotes: OHLCV[], lookback = 100) {
     h786: minPrice + (diff * 0.786),
   };
 
+    // Generate text interpretations calculating realistic w5 target as per Elliott rules
+    const lastPrice = quotes[quotes.length - 1].close;
+
+    // Find nearest authentic Fibo support below lastPrice
+    let w4FiboRatio = "38.2%";
+    let w4TargetValue = retracement.h382;
+    if (lastPrice <= retracement.h382) { w4TargetValue = retracement.h500; w4FiboRatio = "50.0%"; }
+    if (lastPrice <= retracement.h500) { w4TargetValue = retracement.h618; w4FiboRatio = "61.8%"; }
+    if (lastPrice <= retracement.h618) { w4TargetValue = retracement.h786; w4FiboRatio = "78.6%"; }
+
+    const w4TargetText = w4TargetValue.toFixed(0);
+    const w5TargetText = Math.max(maxPrice * 1.02, w4TargetValue + (diff * 0.618)).toFixed(0);
+
+    const interpretation = isUpTrend 
+      ? `Terdeteksi fase Akselerasi Bullish (Potensi rentang target Wave 5). Jika terjadi gelombang pullback/koreksi sehat sebagai penanda Wave 4, pantau ketat resiliensi harga di ambang support Fibo ${w4FiboRatio} (${w4TargetText}). Dari titik pantulan tersebut, proyeksi ekstensi agresif Wave 5 (mengamplifikasi 0.618x energi gelombang sebelumnya) dapat menyapu area puncak baru di sekitar level ${w5TargetText} dalam estimasi 10-15 bar ke depan.`
+      : `Terdeteksi fase Korektif (A-B-C) pasca-puncak. Struktur harga berpotensi anjlok menembus support terdekat (Wave A) menuju area pijakan Fibo ${w4FiboRatio} (${w4TargetText}). Jika pantulan ke atas (potensi Wave B semu) terjadi hingga resistance Fibo 61.8% (${retracement.h618.toFixed(0)}), bersiaplah untuk menghadapi terjunan lebih dalam menuju dasar Wave C di kisaran support ekstrim ${retracement.h100.toFixed(0)}.`;
+
   return {
     trend: isUpTrend ? 'BULLISH' : 'BEARISH',
     range: { maxPrice, minPrice, diff },
     retracement,
     extension,
     // Elliott Wave Interpretation
-    interpretation: isUpTrend 
-      ? `Strong move detected. Support at ${retracement.h618.toFixed(2)} (61.8%). Target Wave 3 at ${extension.h1618?.toFixed(2)}.`
-      : `Corrective phase (A-B-C) or Bearish trend. Major support at ${minPrice.toFixed(2)}. Resistance at ${retracement.h618.toFixed(2)}.`
+    interpretation
   };
 }
 

@@ -1,0 +1,29 @@
+{
+  "verdict": "tighten",
+  "why": "The current formula is too loose compared with the historical pre-breakout fingerprint. It allows weak candle quality and overly wide EMA20 distance.",
+  "thresholdChanges": [
+    {
+      "field": "minRvol",
+      "current": 1.11,
+      "proposed": 1.3,
+      "reason": "Historical winners show stronger volume support than the current threshold requires."
+    },
+    {
+      "field": "maxDistEma20Pct",
+      "current": 8.594,
+      "proposed": 5.5,
+      "reason": "The current distance band is too wide and may admit stocks that are already extended."
+    },
+    {
+      "field": "minCloseNearHighPct",
+      "current": 40.178,
+      "proposed": 52,
+      "reason": "Breakout candidates should show stronger closing pressure near the high."
+    }
+  ],
+  "addFilters": [
+    "Consider a future filter for avoiding abnormal last-candle range expansion before entry."
+  ],
+  "removeFilters": [],
+  "notes": "This is only an example file to show the expected shape for manual AI revisions."
+}

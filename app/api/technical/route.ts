@@ -7,6 +7,7 @@ export const revalidate = 0;
 import { 
   calculateEMA, 
   calculateSMA,
+  calculateRSI,
   calculateMACD, 
   calculatePivotPoints, 
   calculateBollingerBands, 
@@ -164,7 +165,7 @@ function generateUnifiedAnalysis(quotes: any[]) {
     verdict = "HIGH CONVICTION: ELITE BOUNCE";
     color = "oklch(0.85 0.25 200)";
     riskLevel = "LOW";
-    suggestion = "Sinyal Pantulan ELITE terdeteksi dengan aliran dana (Flux) POSITIF & MENGUAT. Konfluensi antara Reclaim EMA20 dan Momentum Squeeze. Peluang entry probabilitas tinggi.";
+    suggestion = "Sinyal Pantulan ELITE terdeteksi dengan aliran dana (Flux) POSITIF & MENGUAT. Konfirmasi kuat dari reclaim EMA20. Peluang entry probabilitas tinggi.";
   } else if (isSilentAccumulation) {
     verdict = "SILENT ACCUMULATION: BULLISH DIVERGENCE";
     color = "oklch(0.85 0.2 180)"; // Bright Cyan-Green
@@ -185,11 +186,11 @@ function generateUnifiedAnalysis(quotes: any[]) {
     color = "oklch(0.7 0.2 40)";
     riskLevel = "MEDIUM";
     suggestion = "Terdeteksi pantulan teknikal (EMA Bounce), namun aliran dana (Flux) masih menunjukkan fase DISTRIBUSI atau melemah. Sebaiknya WAIT & SEE sampai Flux berubah positif untuk konfirmasi yang lebih aman.";
-  } else if (last.isEliteBounce || (isNearSupport && isStrongVolume && momRising)) {
+  } else if (last.isEliteBounce || (isNearSupport && isStrongVolume && momRising && fluxBullish)) {
     verdict = "HIGH CONVICTION: BUY ON DIP";
     color = "oklch(0.85 0.25 200)";
     riskLevel = "LOW";
-    suggestion = "Sinyal Pantulan terdeteksi. Konfluensi antara Reclaim EMA20, Momentum Squeeze yang naik, dan Flow Volume yang masif. Peluang entry probabilitas tinggi.";
+    suggestion = "Sinyal Buy On Dip terdeteksi di area support struktural. Didukung oleh volume yang kuat dan momentum yang mulai pulih. Peluang entry probabilitas tinggi dengan risiko terukur.";
   } else if (dist20 < -5) {
     verdict = "BEARISH STRUCTURE";
     color = "oklch(0.6 0.2 20)"; // Deep Red
@@ -216,6 +217,14 @@ function generateUnifiedAnalysis(quotes: any[]) {
   else if (mfiAvg < mfiPrevAvg - 0.5) mfiStatus = "Falling";
   else mfiStatus = mfiAvg > 50 ? "Healthy" : "Neutral";
 
+  let setupScore = 50;
+  if (dist20 < -5) setupScore = 10;
+  else if (isOverextended) setupScore = 25 + Math.max(0, 15 - dist20); 
+  else if (isTight && isNearSupport) setupScore = 95 + (fluxBullish ? 5 : 0);
+  else if (isNearSupport && fluxImproving) setupScore = 85;
+  else if (isNearSupport) setupScore = 75;
+  else if (dist20 > 0 && dist20 <= 10) setupScore = 65;
+
   return {
     verdict,
     color,
@@ -225,7 +234,7 @@ function generateUnifiedAnalysis(quotes: any[]) {
     squeezeDuration,
     volDetails,
     score: {
-      setup: Math.round(isTight && isNearSupport ? 100 : (isOverextended ? 30 : 60)),
+      setup: Math.round(setupScore),
       volume: Math.round(volumeStrength)
     },
     details: {
@@ -328,6 +337,7 @@ export async function GET(req: Request) {
     const vortex = calculateVortex(quotes);
     const kdjResult = calculateKDJ(quotes);
     const squeezeDeluxe = calculateSqueezeDeluxe(quotes);
+    const RSI_ARR = calculateRSI(closes, 14);  // [NEW] RSI array for Elite Bounce guard
     const elliott = calculateElliottFibonacci(quotes, 100);
     const wavePivots = calculatePivots(quotes, 5);
     
@@ -382,16 +392,30 @@ export async function GET(req: Request) {
       if (a > prevA) volumeScore++;
       if (f > 0) volumeScore++;
 
-      const isEliteBounce = isUndercutBounce && volumeScore >= 4;
+      const isEliteBounce = isUndercutBounce && volumeScore >= 4 && 
+                            q.close > 50;  // basic price filter
 
-      // --- CONVICTION SCORE (0-100%) ---
+      // [NEW] RSI guard for Elite Bounce — reject overbought bounces
+      const currentRsi = RSI_ARR ? RSI_ARR[i] : null;
+      const rsiValidForBounce = currentRsi == null || (currentRsi >= 40 && currentRsi <= 68);
+      const isEliteBounceQualified = isEliteBounce && rsiValidForBounce;
+
+      // [NEW] Squeeze + Bounce Confluence Detection
+      const sqzState = squeezeDeluxe[i];
+      const prevSqz = i > 0 ? squeezeDeluxe[i - 1] : null;
+      const isInSqueeze = sqzState && (sqzState.squeeze.low || sqzState.squeeze.mid || sqzState.squeeze.high);
+      const isMomRising = sqzState && prevSqz ? sqzState.momentum > prevSqz.momentum : false;
+      const isSqueezeBounce = isEliteBounceQualified && isInSqueeze && isMomRising;
+
+      // --- CONVICTION SCORE (0-100%) --- Enhanced with squeeze confluence
       const volumeComp = (volumeScore / 6) * 40;
       const dist20 = ((q.close - e20) / e20) * 100;
       const proximityComp = Math.max(0, 30 - Math.abs(dist20 - 1.5) * 5); 
       const range = ((q.high - q.low) / q.close) * 100;
       const tightnessComp = Math.max(0, 30 - range * 6);
+      const squeezeBonus = isSqueezeBounce ? 15 : 0;  // [NEW] Squeeze+bounce bonus
 
-      const convictionScore = Math.min(100, Math.round(volumeComp + proximityComp + tightnessComp));
+      const convictionScore = Math.min(100, Math.round(volumeComp + proximityComp + tightnessComp + squeezeBonus));
 
       return {
         ...q,
@@ -400,7 +424,8 @@ export async function GET(req: Request) {
         sma50: s50,
         sma200: s200,
         isUndercutBounce,
-        isEliteBounce,
+        isEliteBounce: isEliteBounceQualified,
+        isSqueezeBounce,
         volumeScore,
         convictionScore,
         bb: {

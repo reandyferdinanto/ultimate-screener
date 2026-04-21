@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-const MONGODB_URI = "mongodb+srv://reandy:XuISHforC8mWVEKd@cluster0.ybmffcl.mongodb.net/ultimate_screener?retryWrites=true&w=majority&appName=Cluster0";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://reandy:XuISHforC8mWVEKd@ac-pfdd5xf-shard-00-00.ybmffcl.mongodb.net:27017,ac-pfdd5xf-shard-00-01.ybmffcl.mongodb.net:27017,ac-pfdd5xf-shard-00-02.ybmffcl.mongodb.net:27017/ultimate_screener?ssl=true&authSource=admin&replicaSet=atlas-lnuwmi-shard-0&retryWrites=true&w=majority&appName=Cluster0";
 
 // Schemas
 const stockSignalSchema = new mongoose.Schema({
@@ -27,7 +27,7 @@ const indonesiaStockSchema = new mongoose.Schema({
 const IndonesiaStock = mongoose.models.IndonesiaStock || mongoose.model("IndonesiaStock", indonesiaStockSchema);
 
 async function runScreener() {
-    console.log("Starting Sync Screener (Conviction Engine)...");
+    console.log("Starting Sync Screener (Conviction Engine v2)...");
     try {
         await mongoose.connect(MONGODB_URI);
         const stocks = await IndonesiaStock.find({ active: true });
@@ -44,12 +44,10 @@ async function runScreener() {
                     const res = await fetch(`http://localhost:3004/api/technical?symbol=${ticker}`).then(r => r.json());
                     
                     if (!res.success) {
-                        // console.log(`[ERROR] ${ticker}: ${res.error}`);
                         return;
                     }
 
                     if (!res.unifiedAnalysis) {
-                        // console.log(`[SKIP] ${ticker}: No analysis`);
                         return;
                     }
 
@@ -62,11 +60,23 @@ async function runScreener() {
                     
                     const v = analysis.verdict.toUpperCase();
                     
+                    // [NEW] Squeeze + Bounce Confluence (Super High Conviction)
+                    const isSqueezeBounce = last.isSqueezeBounce === true;
+                    
+                    // [NEW] SMA50 trend filter — skip downtrend stocks
+                    const isAboveSma50 = last.close > last.sma50;
+                    if (!isAboveSma50 && !v.includes("TURNAROUND") && !v.includes("SILENT")) {
+                        return; // Skip downtrend stocks (except turnaround/accumulation plays)
+                    }
+                    
                     // Categorization Logic
                     let finalCategory = "";
                     let extraScore = 0;
 
-                    if (v.includes("ELITE BOUNCE")) {
+                    if (isSqueezeBounce) {
+                        finalCategory = "ELITE BOUNCE";     // Squeeze+bounce = highest conviction
+                        extraScore = 130;
+                    } else if (v.includes("ELITE BOUNCE")) {
                         finalCategory = "ELITE BOUNCE";
                         extraScore = 100;
                     } else if (v.includes("BUY ON DIP")) {
@@ -83,13 +93,56 @@ async function runScreener() {
                         extraScore = 60;
                     }
 
+                    // ===== QUALITY GATES — Learned from Elite Bounce Postmortem =====
                     if (finalCategory) {
-                        console.log(`[FOUND] ${ticker}: ${finalCategory} (Setup: ${analysis.score.setup}, Vol: ${analysis.score.volume})`);
-                        
-                        // Calculate TP/SL
                         const price = last.close;
+                        const lastSqz = last.squeezeDeluxe;
+                        const momentum = lastSqz?.momentum || 0;
+                        const flux = lastSqz?.flux || 0;
+                        const volScore = last.volumeScore || 0;
+
+                        // Gate 1: ELITE BOUNCE requires positive momentum (reject MOM < 0)
+                        if (finalCategory === "ELITE BOUNCE" && momentum < 0) {
+                            console.log(`[REJECT] ${ticker}: ELITE BOUNCE rejected — Momentum ${momentum.toFixed(1)} < 0 (not ready)`);
+                            finalCategory = "";
+                        }
+
+                        // Gate 2: ELITE BOUNCE requires non-negative flux (reject distribution)
+                        if (finalCategory === "ELITE BOUNCE" && flux < -2) {
+                            console.log(`[REJECT] ${ticker}: ELITE BOUNCE rejected — Flux ${flux.toFixed(1)} (distribution phase)`);
+                            finalCategory = "";
+                        }
+
+                        // Gate 3: Minimum volume score (at least 3 of 6 volume indicators bullish)
+                        if ((finalCategory === "ELITE BOUNCE" || finalCategory === "BUY ON DIP") && volScore < 3) {
+                            console.log(`[REJECT] ${ticker}: ${finalCategory} rejected — Volume Score ${volScore}/6 too weak`);
+                            finalCategory = "";
+                        }
+
+                        // Gate 4: Minimum price filter (< 100 = too illiquid/spready)
+                        if (price < 100 && finalCategory) {
+                            console.log(`[REJECT] ${ticker}: Skipped — Price ${price} too low (min 100)`);
+                            finalCategory = "";
+                        }
+                    }
+
+                    if (finalCategory) {
+                        const price = last.close;
+                        const lastSqz = last.squeezeDeluxe;
+                        const momentum = lastSqz?.momentum || 0;
+                        const flux = lastSqz?.flux || 0;
+
+                        console.log(`[FOUND] ${ticker}: ${finalCategory} (Setup: ${analysis.score.setup}, Vol: ${analysis.score.volume}, MOM: ${momentum.toFixed(1)}, FLUX: ${flux.toFixed(1)})`);
+                        
+                        // [FIX] TP Calculation — Fallback to percentage if pivot <= price
+                        let tp = res.pivots.r1 > price ? res.pivots.r1 : res.pivots.r2;
+                        if (tp <= price) {
+                            const multiplier = finalCategory === "ELITE BOUNCE" ? 1.12 : 
+                                              (finalCategory === "VOLATILITY EXPLOSION" ? 1.15 : 1.10);
+                            tp = price * multiplier;
+                            console.log(`[TP_FIX] ${ticker}: Pivot TP below price, using ${((multiplier - 1) * 100).toFixed(0)}% fallback = ${Math.round(tp)}`);
+                        }
                         const sl = Math.floor(last.ema20 * 0.96); 
-                        const tp = res.pivots.r1 > price ? res.pivots.r1 : res.pivots.r2;
 
                         await StockSignal.findOneAndUpdate(
                             { ticker: ticker, status: "pending" },
@@ -109,6 +162,9 @@ async function runScreener() {
                                     volScore: analysis.score.volume,
                                     squeezeInsight: analysis.squeezeInsight,
                                     dist20: ((price - last.ema20) / last.ema20 * 100).toFixed(2),
+                                    momentum: momentum.toFixed(1),
+                                    flux: flux.toFixed(1),
+                                    volumeScore: last.volumeScore || 0,
                                     volDetails: analysis.volDetails,
                                     fluxTrend: fluxImproving ? "Improving" : "Stagnant"
                                 },

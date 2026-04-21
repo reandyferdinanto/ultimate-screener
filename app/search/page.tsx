@@ -566,6 +566,15 @@ function SearchContent() {
                         {data.unifiedAnalysis.suggestion}
                     </div>
 
+                    {data.elliott && data.elliott.interpretation && (
+                        <div style={{ marginTop: '16px', padding: '10px', background: 'rgba(38, 166, 154, 0.03)', border: '1px dashed oklch(0.5 0.2 180 / 0.3)', borderLeft: '3px solid oklch(0.5 0.2 180)' }}>
+                            <div style={{ fontSize: '0.6rem', color: 'oklch(0.5 0.2 180)', fontWeight: '900', marginBottom: '6px', letterSpacing: '0.1em' }}>ELLIOTT_WAVE_PROJECTION</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-primary)', lineHeight: '1.5', fontFamily: 'var(--font-mono)' }}>
+                                {data.elliott.interpretation}
+                            </div>
+                        </div>
+                    )}
+
                     <div style={{ marginTop: '20px' }}>
                         <div className="metric-row-container">
                             <div className="metric-label-container">

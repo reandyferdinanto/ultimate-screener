@@ -275,14 +275,44 @@ export default function AdvancedChart({
       }));
       zigzagSeries.setData(zigzagData);
 
-      // Markers for Waves (1, 2, 3, 4, 5)
-      const waveMarkers = wavePivots.slice(-5).map((p, i) => ({
-        time: data[p.index].time as UTCTimestamp,
-        position: p.type === 'high' ? 'aboveBar' as const : 'belowBar' as const,
-        color: "#FFEB3B",
-        shape: 'circle' as const,
-        text: `${i + 1}`,
-      }));
+      // Markers for Waves dynamically assigned so they tie seamlessly to predictions
+      let waveMarkers: any[] = [];
+      let validPivots = [...wavePivots];
+      
+      // Elliott structure requires the peak to be a HIGH pivot before we predict pullbacks.
+      if (validPivots.length > 0 && validPivots[validPivots.length - 1].type === 'low') {
+          validPivots.pop();
+      }
+
+      if (elliott && elliott.trend === 'BULLISH') {
+          // We need W0 (Low), W1 (High), W2 (Low), W3 (High)
+          const pts = validPivots.slice(-4);
+          waveMarkers = pts.map((p, i) => ({
+            time: data[p.index].time as UTCTimestamp,
+            position: p.type === 'high' ? 'aboveBar' as const : 'belowBar' as const,
+            color: "rgba(130, 255, 160, 1)",
+            shape: 'circle' as const,
+            text: `W${i}`,
+          }));
+      } else if (elliott && elliott.trend === 'BEARISH') {
+          // We need START (Low), 1 (High), 2 (Low), 3 (High), 4 (Low), 5 (High)
+          const pts = validPivots.slice(-6);
+          waveMarkers = pts.map((p, i) => ({
+            time: data[p.index].time as UTCTimestamp,
+            position: p.type === 'high' ? 'aboveBar' as const : 'belowBar' as const,
+            color: "#FFEB3B",
+            shape: 'circle' as const,
+            text: i === 0 ? 'START' : `${i}`,
+          }));
+      } else {
+          waveMarkers = wavePivots.slice(-5).map((p, i) => ({
+            time: data[p.index].time as UTCTimestamp,
+            position: p.type === 'high' ? 'aboveBar' as const : 'belowBar' as const,
+            color: "#FFEB3B",
+            shape: 'circle' as const,
+            text: `${i + 1}`,
+          }));
+      }
       createSeriesMarkers(zigzagSeries, waveMarkers);
     }
 
@@ -303,8 +333,23 @@ export default function AdvancedChart({
       drawFibo(elliott.retracement.h382, "rgba(38, 166, 154, 0.4)", "FIB 0.382");
 
       // Target Levels (Extension & Retracement Projection)
-      if (elliott.trend === 'BULLISH' && elliott.extension.h1618) {
-        drawFibo(elliott.extension.h1618, "rgba(130, 255, 160, 0.6)", "TARGET W3 (1.618)", 0);
+      if (elliott.trend === 'BULLISH') {
+        const lastPrice = data[data.length - 1].close;
+        const diff = elliott.retracement.h0 - elliott.retracement.h100;
+        
+        // Find nearest authentic Fibo support below lastPrice
+        let w4TargetFibo = elliott.retracement.h382;
+        if (lastPrice <= elliott.retracement.h382) w4TargetFibo = elliott.retracement.h500;
+        if (lastPrice <= elliott.retracement.h500) w4TargetFibo = elliott.retracement.h618;
+        if (lastPrice <= elliott.retracement.h618) w4TargetFibo = elliott.retracement.h786;
+        
+        // Ensure the line visually drops to target it
+        const w4Price = Math.min(lastPrice * 0.98, w4TargetFibo);
+        
+        // Realistic W5 Target based on Elliott Wave geometry (typically 0.618x the size of the whole W0-W3 impulse, mapped from W4)
+        const w5Target = Math.max(elliott.retracement.h0 * 1.02, w4Price + diff * 0.618);
+
+        drawFibo(w5Target, "rgba(130, 255, 160, 0.6)", "TARGET W5 (0.618 Ext)", 0);
         
         // --- 9. PREDICTION WAVE (UP) ---
         const predictionSeries = chart.addSeries(LineSeries, {
@@ -316,16 +361,20 @@ export default function AdvancedChart({
             priceLineVisible: false,
         });
 
-        const lastPrice = data[data.length - 1].close;
         const lastTimeVal = data[data.length - 1].time as number;
         const timeStep = (data[1].time as number) - (data[0].time as number);
 
         const predictionData = [
             { time: lastTimeVal as UTCTimestamp, value: lastPrice },
-            { time: (lastTimeVal + timeStep * 5) as UTCTimestamp, value: elliott.extension.h1618 },
-            { time: (lastTimeVal + timeStep * 10) as UTCTimestamp, value: (elliott.extension.h1618 + (elliott.extension.h1618 - lastPrice) * 0.5) }
+            { time: (lastTimeVal + timeStep * 6) as UTCTimestamp, value: w4Price }, // Pullback W4
+            { time: (lastTimeVal + timeStep * 16) as UTCTimestamp, value: w5Target } // Target W5
         ];
         predictionSeries.setData(predictionData);
+
+        createSeriesMarkers(predictionSeries, [
+            { time: predictionData[1].time, position: 'belowBar', color: 'rgba(130, 255, 160, 0.8)', shape: 'circle', text: 'W4' },
+            { time: predictionData[2].time, position: 'aboveBar', color: 'rgba(130, 255, 160, 1)', shape: 'circle', text: 'W5 Target' },
+        ]);
       } else if (elliott.trend === 'BEARISH') {
         // --- 9. PREDICTION WAVE (DOWN / A-B-C) ---
         const predictionSeries = chart.addSeries(LineSeries, {
@@ -342,13 +391,34 @@ export default function AdvancedChart({
         const timeStep = (data[1].time as number) - (data[0].time as number);
 
         // Prediction for A-B-C Correction
+        // Wave A hunts for next Fibo support
+        let wATargetFibo = elliott.retracement.h382;
+        if (lastPrice <= elliott.retracement.h382) wATargetFibo = elliott.retracement.h500;
+        if (lastPrice <= elliott.retracement.h500) wATargetFibo = elliott.retracement.h618;
+        if (lastPrice <= elliott.retracement.h618) wATargetFibo = elliott.retracement.h786;
+        const waveA = Math.min(lastPrice * 0.98, wATargetFibo);
+
+        // Wave B bounces up towards nearest Fibo resistance
+        let wBTargetFibo = elliott.retracement.h618;
+        if (waveA >= elliott.retracement.h618) wBTargetFibo = elliott.retracement.h500;
+        if (waveA >= elliott.retracement.h500) wBTargetFibo = elliott.retracement.h382;
+        const waveB = Math.max(waveA * 1.05, wBTargetFibo);
+
+        const waveC = Math.min(waveA * 0.90, elliott.retracement.h100);
+
         const predictionData = [
             { time: lastTimeVal as UTCTimestamp, value: lastPrice },
-            { time: (lastTimeVal + timeStep * 4) as UTCTimestamp, value: elliott.retracement.h618 }, // Wave A
-            { time: (lastTimeVal + timeStep * 7) as UTCTimestamp, value: elliott.retracement.h382 }, // Wave B bounce
-            { time: (lastTimeVal + timeStep * 12) as UTCTimestamp, value: elliott.retracement.h100 }  // Wave C bottom
+            { time: (lastTimeVal + timeStep * 5) as UTCTimestamp, value: waveA }, // Wave A down
+            { time: (lastTimeVal + timeStep * 9) as UTCTimestamp, value: waveB }, // Wave B bounce
+            { time: (lastTimeVal + timeStep * 16) as UTCTimestamp, value: waveC }  // Wave C bottom
         ];
         predictionSeries.setData(predictionData);
+
+        createSeriesMarkers(predictionSeries, [
+            { time: predictionData[1].time, position: 'belowBar', color: '#ef5350', shape: 'circle', text: 'A' },
+            { time: predictionData[2].time, position: 'aboveBar', color: '#ef5350', shape: 'circle', text: 'B' },
+            { time: predictionData[3].time, position: 'belowBar', color: '#ef5350', shape: 'circle', text: 'C' },
+        ]);
       }
     }
 

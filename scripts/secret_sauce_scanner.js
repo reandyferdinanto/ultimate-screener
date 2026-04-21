@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance();
-const { rsi, mfi, ema } = require('indicatorts');
+const { RSI, MFI, EMA } = require('technicalindicators');
 const { Client } = require('pg');
 
-const MONGODB_URI = "mongodb+srv://reandy:XuISHforC8mWVEKd@cluster0.ybmffcl.mongodb.net/ultimate_screener?retryWrites=true&w=majority&appName=Cluster0";
-const PG_CONN = 'postgresql://reandyapp:reandy123456@127.0.0.1:5432/cerita_saham';
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://reandy:XuISHforC8mWVEKd@ac-pfdd5xf-shard-00-00.ybmffcl.mongodb.net:27017,ac-pfdd5xf-shard-00-01.ybmffcl.mongodb.net:27017,ac-pfdd5xf-shard-00-02.ybmffcl.mongodb.net:27017/ultimate_screener?ssl=true&authSource=admin&replicaSet=atlas-lnuwmi-shard-0&retryWrites=true&w=majority&appName=Cluster0";
+const PG_CONN = process.env.AI_DATABASE_URL || 'postgresql://reandyapp:reandy123456@127.0.0.1:5433/cerita_saham';
 
 const indonesiaStockSchema = new mongoose.Schema({
   ticker: String,
@@ -15,29 +15,69 @@ const IndonesiaStock = mongoose.models.IndonesiaStock || mongoose.model("Indones
 
 const pgClient = new Client({ connectionString: PG_CONN });
 
-async function getPreBreakoutTechnicals(quotes, breakoutIdx) {
+function buildPreBreakoutWindow(quotes, breakoutIdx, windowSize = 10) {
     if (breakoutIdx < 20) return null;
+
     const subset = quotes.slice(0, breakoutIdx);
-    const closes = subset.map(q => q.close);
-    const highs = subset.map(q => q.high);
-    const lows = subset.map(q => q.low);
-    const volumes = subset.map(q => q.volume);
-    
-    const rsiArr = rsi(closes, { period: 14 });
-    const mfiArr = mfi(highs, lows, closes, volumes, { period: 14 });
-    const ema20Arr = ema(closes, { period: 20 });
-    
-    const lastPrice = closes[closes.length - 1];
-    const lastVol = volumes[volumes.length - 1];
-    const avgVol20 = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    const closes = subset.map(q => q.close).filter(value => value != null);
+    const highs = subset.map(q => q.high).filter(value => value != null);
+    const lows = subset.map(q => q.low).filter(value => value != null);
+    const volumes = subset.map(q => q.volume).filter(value => value != null);
+
+    if (closes.length < 20) return null;
+
+    const rsiArr = RSI.calculate({ period: 14, values: closes });
+    const mfiArr = MFI.calculate({ high: highs, low: lows, close: closes, volume: volumes, period: 14 });
+    const ema20Arr = EMA.calculate({ period: 20, values: closes });
+
+    const start = Math.max(19, subset.length - windowSize);
+    const window = [];
+
+    for (let i = start; i < subset.length; i++) {
+        const quote = subset[i];
+        const price = quote.close;
+        const ema20 = ema20Arr[i - 19];
+        const rsi = rsiArr[i - 14];
+        const mfi = mfiArr[i - 14];
+        const recentVolumes = volumes.slice(Math.max(0, i - 10), i);
+        const avgVol = recentVolumes.length > 0 ? recentVolumes.reduce((sum, value) => sum + value, 0) / recentVolumes.length : quote.volume;
+        const range = (quote.high || price) - (quote.low || price);
+
+        window.push({
+            date: quote.date.toISOString().split('T')[0],
+            close: price,
+            volume: quote.volume,
+            rsi: Number((rsi || 0).toFixed(2)),
+            mfi: Number((mfi || 0).toFixed(2)),
+            distEma20Pct: ema20 ? Number((((price - ema20) / ema20) * 100).toFixed(2)) : null,
+            volRatio: avgVol > 0 ? Number((quote.volume / avgVol).toFixed(2)) : 1,
+            rangePct: price > 0 ? Number(((range / price) * 100).toFixed(2)) : 0,
+            closeNearHighPct: range > 0 ? Number((((price - quote.low) / range) * 100).toFixed(2)) : 100,
+        });
+    }
+
+    return window;
+}
+
+function summarizeWindow(window) {
+    if (!window || window.length === 0) return null;
+
+    const closes = window.map(item => item.close);
+    const last3 = closes.slice(-3);
+
+    const avg = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
 
     return {
-        rsi: rsiArr[rsiArr.length - 1],
-        mfi: mfiArr[mfiArr.length - 1],
-        ema20: ema20Arr[ema20Arr.length - 1],
-        distEma20: ((lastPrice - ema20Arr[ema20Arr.length - 1]) / ema20Arr[ema20Arr.length - 1]) * 100,
-        volRatio: lastVol / avgVol20,
-        consolidation_score: Math.abs(closes[closes.length - 1] - closes[closes.length - 3]) / closes[closes.length - 1] * 100 // % variance last 3 days
+        windowCandles: window.length,
+        avgRsi: Number(avg(window.map(item => item.rsi)).toFixed(2)),
+        avgMfi: Number(avg(window.map(item => item.mfi)).toFixed(2)),
+        minDistEma20Pct: Number(Math.min(...window.map(item => item.distEma20Pct ?? 0)).toFixed(2)),
+        maxDistEma20Pct: Number(Math.max(...window.map(item => item.distEma20Pct ?? 0)).toFixed(2)),
+        avgVolRatio: Number(avg(window.map(item => item.volRatio)).toFixed(2)),
+        maxVolRatio: Number(Math.max(...window.map(item => item.volRatio)).toFixed(2)),
+        avgCompressionPct: Number(avg(window.map(item => item.rangePct)).toFixed(2)),
+        avgCloseNearHighPct: Number(avg(window.map(item => item.closeNearHighPct)).toFixed(2)),
+        last3TightnessPct: closes.length >= 3 ? Number((((Math.max(...last3) - Math.min(...last3)) / closes[closes.length - 1]) * 100).toFixed(2)) : null,
     };
 }
 
@@ -84,14 +124,21 @@ async function scan() {
               // Calculate pre-breakout technicals from d1_60
               const breakoutIdx = d1_60.quotes.findIndex(q => q.date.toISOString().split('T')[0] === current.date.toISOString().split('T')[0]);
               console.log(`[DEBUG] ${stock.ticker} breakoutIdx: ${breakoutIdx}`);
-              const preTech = await getPreBreakoutTechnicals(d1_60.quotes, breakoutIdx);
+              const preWindow = buildPreBreakoutWindow(d1_60.quotes, breakoutIdx, 10);
+              const preTech = summarizeWindow(preWindow);
 
-              if (preTech) {
+              if (preTech && preWindow) {
                   await pgClient.query(`
-                    INSERT INTO secret_sauce_samples (ticker, breakout_date, gain_percentage, data_1d, data_1h, data_15m, pre_breakout_technicals)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    INSERT INTO secret_sauce_samples (ticker, breakout_date, gain_percentage, data_1d, data_1h, data_15m, pre_breakout_technicals, pre_breakout_window, pre_breakout_summary)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                     ON CONFLICT (ticker, breakout_date) DO UPDATE 
-                    SET gain_percentage = EXCLUDED.gain_percentage, data_1d = EXCLUDED.data_1d, data_1h = EXCLUDED.data_1h, data_15m = EXCLUDED.data_15m, pre_breakout_technicals = EXCLUDED.pre_breakout_technicals
+                    SET gain_percentage = EXCLUDED.gain_percentage,
+                        data_1d = EXCLUDED.data_1d,
+                        data_1h = EXCLUDED.data_1h,
+                        data_15m = EXCLUDED.data_15m,
+                        pre_breakout_technicals = EXCLUDED.pre_breakout_technicals,
+                        pre_breakout_window = EXCLUDED.pre_breakout_window,
+                        pre_breakout_summary = EXCLUDED.pre_breakout_summary
                   `, [
                       stock.ticker, 
                       current.date.toISOString().split('T')[0], 
@@ -99,6 +146,8 @@ async function scan() {
                       JSON.stringify(d1_60.quotes), 
                       JSON.stringify(h1_5.quotes), 
                       JSON.stringify(m15_2.quotes), 
+                      JSON.stringify(preTech),
+                      JSON.stringify(preWindow),
                       JSON.stringify(preTech)
                   ]);
                   console.log(`[SAVED] ${stock.ticker} for ${current.date.toISOString().split('T')[0]}`);

@@ -21,6 +21,7 @@ export default function ScreenerPage() {
   const [data, setData] = useState<SignalData[]>([]);
   const [view, setView] = useState<'signals' | 'sauce' | 'divergence' | 'sqz_div' | 'arahunter'>('signals');
   const [priceRange, setPriceRange] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
   const [sqzTimeframe, setSqzTimeframe] = useState<'1d' | '4h'>('1d');
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -53,7 +54,7 @@ export default function ScreenerPage() {
   const loadCurrentData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/screener?priceRange=${priceRange}`);
+      const res = await fetch(`/api/screener?priceRange=${priceRange}&dateFilter=${dateFilter}`);
       const json = await res.json();
       if (json.success) setData(json.data);
     } catch {
@@ -61,7 +62,7 @@ export default function ScreenerPage() {
     } finally {
       setLoading(false);
     }
-  }, [priceRange]);
+  }, [priceRange, dateFilter]);
 
   useEffect(() => {
     const savedToken = localStorage.getItem("botToken");
@@ -72,7 +73,7 @@ export default function ScreenerPage() {
 
   useEffect(() => {
     loadCurrentData();
-  }, [priceRange, view, loadCurrentData]);
+  }, [priceRange, dateFilter, view, loadCurrentData]);
 
   const displayedSignals = data.filter(s => {
       if (view === 'sauce') return s.strategy?.includes('Secret');
@@ -205,6 +206,12 @@ export default function ScreenerPage() {
               <option value="under300">UNDER 300</option>
               <option value="under500">UNDER 500</option>
               <option value="above500">ABOVE 500</option>
+          </select>
+          <select className="input" style={{ width: '110px', height: '32px', fontSize: '0.75rem', padding: '0 8px', borderColor: dateFilter !== 'all' ? 'var(--accent-green)' : '' }} value={dateFilter} onChange={e => setDateFilter(e.target.value)}>
+              <option value="all">ALL TIME</option>
+              <option value="today">TODAY</option>
+              <option value="3d">3 DAYS</option>
+              <option value="7d">7 DAYS</option>
           </select>
           <button className="button" style={{ height: '32px' }} onClick={fetchData} disabled={loading || scanning}>
             <RefreshCw size={14} style={{ marginRight: '6px' }}/>
@@ -341,7 +348,7 @@ export default function ScreenerPage() {
                         </td>
                         <td className="mobile-hide" style={{ color: 'var(--accent-green)', fontSize: '0.75rem' }}>{row.riskPct}%</td>
                         <td style={{ fontWeight: '600' }}>{row.buyArea}</td>
-                        <td className="positive" style={{ fontWeight: '600' }}>{row.tp}</td>
+                        <td className="positive" style={{ fontWeight: '600' }}>{row.tp ? Number(row.tp).toFixed(Number(row.tp) % 1 !== 0 ? 2 : 0) : '-'}</td>
                         <td className="negative mobile-hide-col">{row.sl}</td>
                         <td>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -349,13 +356,13 @@ export default function ScreenerPage() {
                                 {currentProfit >= 0 ? '+' : ''}{currentProfit.toFixed(2)}%
                              </div>
                              <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>
-                                {row.daysHeld >= 24 ? `${Math.floor(row.daysHeld/24)}d ${row.daysHeld%24}h` : `${row.daysHeld}h`}
+                                {row.daysHeld !== undefined ? (row.daysHeld >= 24 ? `${Math.floor(row.daysHeld/24)}d ${row.daysHeld%24}h` : `${row.daysHeld}h`) : '0h'}
                              </div>
                           </div>
                         </td>
                         <td className="mobile-hide-col" style={{ padding: '12px 8px' }}>
                            {path.length > 0 ? (
-                             <div style={{ position: 'relative', width: '100px', height: '30px' }}>
+                             <div style={{ position: 'relative', width: '100px', height: '30px', margin: 'auto' }}>
                                <svg width="100" height="30" style={{ overflow: 'visible' }}>
                                   <path
                                     d={(() => {
@@ -379,15 +386,15 @@ export default function ScreenerPage() {
                                     })()}
                                     fill="none"
                                     stroke={currentProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}
-                                    strokeWidth="1.5"
+                                    strokeWidth="2"
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
-                                    style={{ filter: `drop-shadow(0 0 2px ${currentProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}44)` }}
+                                    style={{ filter: `drop-shadow(0 0 3px ${currentProfit >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}66)` }}
                                   />
                                </svg>
                              </div>
                            ) : (
-                              <div style={{ height: '1px', width: '100px', background: 'var(--border-color)', opacity: 0.5 }}></div>
+                              <div style={{ height: '2px', width: '100px', background: 'var(--border-color)', opacity: 0.3, margin: '14px auto' }}></div>
                            )}
                         </td>
                         <td>

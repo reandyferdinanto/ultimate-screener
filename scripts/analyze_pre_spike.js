@@ -6,7 +6,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AIzaSyA73HYqtjNgTBoi6RYXG6S-OI9YO9_rze0");
 
-const PG_URL = process.env.AI_DATABASE_URL || 'postgresql://reandyapp:reandy123456@127.0.0.1:5432/cerita_saham';
+const PG_URL = process.env.AI_DATABASE_URL || 'postgresql://reandyapp:reandy123456@127.0.0.1:5433/cerita_saham';
 
 const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
