@@ -30,7 +30,7 @@ import {
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-function generateUnifiedAnalysis(quotes: any[]) {
+function generateUnifiedAnalysis(quotes: any[], elliott?: any) {
   const last = quotes[quotes.length - 1];
   const prev = quotes[quotes.length - 2];
   const prev5 = quotes[quotes.length - 6] || quotes[0];
@@ -144,7 +144,12 @@ function generateUnifiedAnalysis(quotes: any[]) {
   }
 
   // Conclusion Synthesis
-  if (isOverextended) {
+  if (elliott?.trend === 'BOTTOMING') {
+    verdict = "POTENTIAL REVERSAL: BOTTOMING SQUEEZE";
+    color = "oklch(0.85 0.2 180)"; // Bright Cyan-Green
+    riskLevel = "LOW";
+    suggestion = "Meskipun tren jangka panjang bearish, terdeteksi akumulasi kuat (Flux Positif) saat harga berada di dasar disertai kondisi Squeeze. Ini adalah indikasi awal pembalikan arah (Trend Reversal). Pantau breakout Squeeze untuk konfirmasi entry.";
+  } else if (isOverextended) {
     verdict = "POWERFUL RUN (OVEREXTENDED)";
     color = "oklch(0.7 0.2 150)"; // Vibrant Emerald/Green for trend continuation
     riskLevel = "HIGH";
@@ -338,8 +343,8 @@ export async function GET(req: Request) {
     const kdjResult = calculateKDJ(quotes);
     const squeezeDeluxe = calculateSqueezeDeluxe(quotes);
     const RSI_ARR = calculateRSI(closes, 14);  // [NEW] RSI array for Elite Bounce guard
-    const elliott = calculateElliottFibonacci(quotes, 100);
     const wavePivots = calculatePivots(quotes, 5);
+    const elliott = calculateElliottFibonacci(quotes, 250, squeezeDeluxe, wavePivots);
     
     const prevDay = quotes[quotes.length - 2] || quotes[quotes.length - 1];
     const pivots = calculatePivotPoints(prevDay);
@@ -464,7 +469,27 @@ export async function GET(req: Request) {
       };
     });
 
-    const unifiedAnalysis = generateUnifiedAnalysis(data);
+    const unifiedAnalysis = generateUnifiedAnalysis(data, elliott);
+    
+    // Check if current setup is a SILENT FLYER
+    const isSilentFlyer = unifiedAnalysis.squeezeDuration > 10 && 
+                          elliott?.trend === 'BULLISH' && 
+                          data[data.length-1].squeezeDeluxe.flux > 0 &&
+                          data[data.length-1].close > data[data.length-1].ema20;
+
+    // Fetch historical signals for this ticker
+    let historicalSignals: any[] = [];
+    try {
+      const { connectToDatabase } = await import("@/lib/db");
+      const { StockSignalModel } = await import("@/lib/models/StockSignal");
+      await connectToDatabase();
+      historicalSignals = await StockSignalModel.find({ 
+        ticker: symbol,
+        signalSource: { $regex: "SILENT FLYER", $options: "i" }
+      }).sort({ createdAt: -1 }).lean();
+    } catch (e) {
+      console.error("Historical fetch failed", e);
+    }
 
     return NextResponse.json({ 
       success: true, 
@@ -472,7 +497,11 @@ export async function GET(req: Request) {
       pivots,
       elliott,
       wavePivots,
-      unifiedAnalysis,
+      unifiedAnalysis: {
+        ...unifiedAnalysis,
+        isSilentFlyer
+      },
+      historicalSignals,
       ticker: symbol
     });
   } catch (error: any) {

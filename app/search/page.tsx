@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import AdvancedChart from "@/components/AdvancedChart";
-import { Search, Eye, EyeOff } from "lucide-react";
+import { Search, Eye, EyeOff, BarChart2, TrendingUp, Activity, AlertCircle, ChevronDown, Check, Info } from "lucide-react";
+import Navigation from "@/components/Navigation";
 import { 
   createChart, 
   ColorType, 
@@ -12,20 +13,19 @@ import {
   BaselineSeries,
   LogicalRange,
   UTCTimestamp,
-  AreaSeries,
   createSeriesMarkers
 } from "lightweight-charts";
 
 export default function SearchPage() {
   return (
     <Suspense fallback={
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="skeleton-shimmer" style={{ height: '40px', borderRadius: '8px', width: '200px' }}></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px' }}>
-                <div className="skeleton-shimmer" style={{ height: '500px', borderRadius: '12px' }}></div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div className="skeleton-shimmer" style={{ height: '300px', borderRadius: '12px' }}></div>
-                    <div className="skeleton-shimmer" style={{ height: '200px', borderRadius: '12px' }}></div>
+        <div className="loading-fallback">
+            <div className="skeleton shimmer-panel h-40 w-200"></div>
+            <div className="skeleton-grid">
+                <div className="skeleton shimmer-panel h-600"></div>
+                <div className="skeleton-sidebar">
+                    <div className="skeleton shimmer-panel h-300"></div>
+                    <div className="skeleton shimmer-panel h-200"></div>
                 </div>
             </div>
         </div>
@@ -89,14 +89,8 @@ function SearchContent() {
   }, [querySymbol]);
 
   useEffect(() => {
-    console.log(`[SYSTEM] FETCHING_DATA symbol=${symbol} interval=${interval}`);
     fetchTechnical(symbol, interval);
   }, [symbol, interval]);
-
-  useEffect(() => {
-    if (data) console.log("[SYSTEM] DATA_LOADED success:", data.success);
-    if (error) console.log("[SYSTEM] FETCH_ERROR:", error);
-  }, [data, error]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,542 +115,470 @@ function SearchContent() {
   }, []);
 
   return (
-    <div style={{ padding: '16px', maxWidth: '1600px', margin: '0 auto' }}>
-      {/* IMPROVED HEADER: COMMAND CENTER */}
-      <div className="command-center">
-        <div className="command-group main-controls">
-            <form onSubmit={handleSearch} className="search-form-premium">
-                <Search className="search-icon" size={16} />
-                <input 
-                    className="input-premium" 
-                    placeholder="TICKER_ID..." 
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                />
-                <button className="button-run" type="submit" disabled={loading}>
-                    {loading ? "SYNC..." : "ANALYZE"}
-                </button>
+    <div className="search-root min-h-screen bg-[#050505] text-silver-300 font-mono">
+      
+      <main className="search-container">
+        {/* COMMAND CENTER */}
+        <div className="command-center panel">
+          <div className="command-row main">
+            <form onSubmit={handleSearch} className="search-box-premium">
+              <Search className="search-icon" size={16} />
+              <input 
+                className="input-premium" 
+                placeholder="TICKER_ID..." 
+                value={input}
+                onChange={e => setInput(e.target.value)}
+              />
+              <button className="analyze-btn" type="submit" disabled={loading}>
+                {loading ? "SYNC..." : "ANALYZE"}
+              </button>
             </form>
 
-            <div className="timeframe-pill">
-                {['15m', '1h', '4h', '1d'].map(tf => (
-                    <button 
-                        key={tf} 
-                        className={`pill-item ${interval === tf ? 'active' : ''}`}
-                        onClick={() => setInterval(tf)}
-                    >
-                        {tf.toUpperCase()}
-                    </button>
-                ))}
-            </div>
-        </div>
-
-        <div className="command-group chart-controls">
-            <div className="toggle-group">
-                <button className={`toggle-item ${chartType === 'candle' ? 'active' : ''}`} onClick={() => setChartType('candle')}>CANDLE</button>
-                <button className={`toggle-item ${chartType === 'line' ? 'active' : ''}`} onClick={() => setChartType('line')}>LINE</button>
-            </div>
-
-            <div className="indicator-matrix">
-                <button className={`matrix-item trend ${showEMA10 ? 'active' : ''}`} onClick={() => setShowEMA10(!showEMA10)}>E10</button>
-                <button className={`matrix-item trend ${showEMA20 ? 'active' : ''}`} onClick={() => setShowEMA20(!showEMA20)}>E20</button>
+            <div className="timeframe-selector">
+              {['15m', '1h', '4h', '1d'].map(tf => (
                 <button 
-                  className={`matrix-item vol ${showSqueezeDeluxe ? 'active' : ''}`} 
-                  style={{ borderColor: showSqueezeDeluxe ? 'oklch(0.85 0.25 200)' : '' }}
-                  onClick={() => setShowSqueezeDeluxe(!showSqueezeDeluxe)}
+                  key={tf} 
+                  className={`tf-pill ${interval === tf ? 'active' : ''}`}
+                  onClick={() => setInterval(tf)}
                 >
-                  SQZ_DELUXE
+                  {tf.toUpperCase()}
                 </button>
-                <button className={`matrix-item vol ${showBB ? 'active' : ''}`} onClick={() => setShowBB(!showBB)}>BB</button>
-                <button className={`matrix-item vol ${showMFI ? 'active' : ''}`} onClick={() => setShowMFI(!showMFI)}>MFI</button>
-                <button className={`matrix-item vol ${showVWAP ? 'active' : ''}`} onClick={() => setShowVWAP(!showVWAP)}>VWAP</button>
-                <button className={`matrix-item vol ${showOBV ? 'active' : ''}`} onClick={() => setShowOBV(!showOBV)}>OBV</button>
-                <button className={`matrix-item vol ${showCMF ? 'active' : ''}`} onClick={() => setShowCMF(!showCMF)}>CMF</button>
+              ))}
             </div>
-        </div>
-      </div>
-
-      <style jsx>{`
-        .command-center {
-            margin-bottom: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            padding: 12px;
-            background: oklch(0.15 0 0);
-            border: 1px solid var(--border-color);
-        }
-        .command-group {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .search-form-premium {
-            display: flex;
-            background: oklch(0.1 0 0);
-            border: 1px solid var(--border-color);
-            padding: 2px;
-            width: 100%;
-            max-width: 320px;
-            align-items: center;
-        }
-        .search-icon {
-            margin: 0 12px;
-            color: var(--text-secondary);
-        }
-        .input-premium {
-            background: transparent;
-            border: none;
-            color: var(--text-primary);
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            flex: 1;
-            outline: none;
-            padding: 8px 0;
-        }
-        .button-run {
-            background: var(--accent-green);
-            color: black;
-            border: none;
-            padding: 0 16px;
-            font-family: var(--font-mono);
-            font-size: 0.7rem;
-            font-weight: 900;
-            cursor: pointer;
-            height: 32px;
-        }
-        .timeframe-pill {
-            display: flex;
-            background: oklch(0.2 0 0);
-            padding: 4px;
-            border-radius: 20px;
-            gap: 4px;
-        }
-        .pill-item {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 0.65rem;
-            font-weight: 800;
-            padding: 4px 12px;
-            border-radius: 16px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .pill-item.active {
-            background: oklch(0.3 0 0);
-            color: var(--text-primary);
-        }
-        .toggle-group {
-            display: flex;
-            border: 1px solid var(--border-color);
-        }
-        .toggle-item {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 0.65rem;
-            font-weight: 700;
-            padding: 6px 12px;
-            cursor: pointer;
-        }
-        .toggle-item.active {
-            background: var(--accent-green);
-            color: black;
-        }
-        .indicator-matrix {
-            display: flex;
-            gap: 6px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .matrix-item {
-            background: oklch(0.2 0 0);
-            border: 1px solid oklch(0.3 0 0);
-            color: var(--text-secondary);
-            font-size: 0.6rem;
-            font-weight: 800;
-            padding: 6px 10px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-        }
-        .matrix-item:hover {
-            border-color: oklch(0.5 0 0);
-        }
-        .matrix-item.active.trend {
-            border-color: #2962FF;
-            color: #2962FF;
-            background: rgba(41, 98, 255, 0.1);
-        }
-        .matrix-item.active.vol {
-            border-color: var(--accent-amber);
-            color: var(--accent-amber);
-            background: rgba(255, 193, 7, 0.05);
-        }
-        .matrix-divider {
-            width: 1px;
-            height: 16px;
-            background: oklch(0.3 0 0);
-            margin: 0 4px;
-        }
-        .search-grid-layout {
-            display: grid;
-            grid-template-columns: 1fr 320px;
-            gap: 20px;
-        }
-        .verdict-badge {
-            padding: 16px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        .verdict-title {
-            font-size: 0.6rem;
-            letter-spacing: 0.2em;
-            opacity: 0.7;
-            margin-bottom: 4px;
-        }
-        .verdict-value {
-            font-size: 1.1rem;
-            font-weight: 900;
-            letter-spacing: 0.05em;
-        }
-        .suggestion-box {
-            font-size: 0.75rem;
-            line-height: 1.6;
-            padding: 12px;
-            background: oklch(1 0 0 / 0.02);
-            border-left: 2px solid var(--accent-green);
-        }
-        .metric-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        .metric-label {
-            font-size: 0.65rem;
-            font-weight: 700;
-            color: var(--text-secondary);
-        }
-        .metric-bar-bg {
-            height: 8px;
-            background: oklch(0.2 0 0);
-            margin-top: 8px;
-            position: relative;
-            border: 1px solid oklch(0.3 0 0);
-        }
-        .metric-bar-fill {
-            height: 100%;
-            transition: width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .metric-label-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-        }
-        .metric-value {
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            font-weight: 800;
-            font-variant-numeric: tabular-nums;
-        }
-
-        /* IMPECCABLE LEGEND SYSTEM */
-        .legend-panel {
-            background: oklch(0.18 0 0);
-            border: 1px solid oklch(0.28 0 0);
-            margin-bottom: 20px;
-            padding: 16px;
-            font-family: var(--font-mono);
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        }
-        .legend-panel::after {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
-            opacity: 0.1;
-        }
-        .terminal-prompt {
-            color: var(--accent-green);
-            margin-right: 4px;
-        }
-        
-        .legend-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            border-bottom: 1px solid oklch(0.28 0 0);
-            padding-bottom: 8px;
-        }
-        .legend-title { font-size: 0.7rem; font-weight: 800; color: var(--text-primary); }
-        .legend-sub { font-size: 0.55rem; color: var(--text-secondary); opacity: 0.5; }
-        
-        .legend-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 12px;
-        }
-        .legend-item { display: flex; flex-direction: column; gap: 4px; }
-        .legend-label {
-            font-size: 0.6rem;
-            font-weight: 900;
-            padding: 2px 6px;
-            width: fit-content;
-        }
-        .label-flux { background: oklch(0.82 0.18 145 / 0.1); color: var(--accent-green); border: 1px solid var(--accent-green); }
-        .label-squeeze { background: oklch(0.85 0.15 80 / 0.1); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
-        .label-momentum { background: rgba(41, 98, 255, 0.1); color: #2962FF; border: 1px solid #2962FF; }
-        .label-divergence { background: rgba(255, 109, 0, 0.1); color: #ff6d00; border: 1px solid #ff6d00; }
-        
-        .legend-desc { font-size: 0.6rem; color: var(--text-secondary); line-height: 1.3; }
-        
-        .squeeze-dots { display: flex; gap: 4px; margin-top: 2px; }
-        .dot { width: 6px; height: 6px; }
-        .dot-high { background: oklch(0.62 0.22 25); box-shadow: 0 0 6px oklch(0.62 0.22 25 / 0.5); }
-        .dot-mid { background: #ff5e00; box-shadow: 0 0 6px rgba(255, 94, 0, 0.5); }
-        .dot-low { background: oklch(0.85 0.15 80); box-shadow: 0 0 6px oklch(0.85 0.15 80 / 0.5); }
-
-        @media (max-width: 1200px) {
-            .search-grid-layout {
-                grid-template-columns: 1fr;
-            }
-        }
-      `}</style>
-
-      {error && (
-        <div style={{ padding: '12px', background: 'oklch(0.2 0.1 20)', border: '1px solid var(--accent-red)', color: 'var(--accent-red)', marginBottom: '24px', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
-          ERROR_TRAP: {error}
-        </div>
-      )}
-
-      {data && (
-        <div className="search-grid-layout">
-          <div className="charts-container" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {showSqueezeDeluxe && (
-                <div className="legend-panel">
-                    <div className="legend-header">
-                        <span className="legend-title"><span className="terminal-prompt">CMD&gt;</span> INDICATOR_GUIDE // SQZ_DELUXE</span>
-                        <span className="legend-sub">Terminal Engine Reference v1.4.2</span>
-                    </div>
-                    <div className="legend-grid">
-                        <div className="legend-item">
-                            <span className="legend-label label-flux">FLUX</span>
-                            <span className="legend-desc"><strong>Directional Flow:</strong> Mengukur tekanan aliran dana. 
-                                <br/>• 🟢 <strong>Bullish:</strong> Positif & Menguat.
-                                <br/>• 🟡 <strong>Caution:</strong> Positif tapi Melemah.
-                                <br/>• 🔵 <strong>Recovering:</strong> Negatif tapi Menguat (Absorption).
-                                <br/>• 🔴 <strong>Bearish:</strong> Negatif & Melemah.
-                            </span>
-                        </div>
-                        <div className="legend-item">
-                            <span className="legend-label label-squeeze">SQUEEZE</span>
-                            <div className="squeeze-dots">
-                                <span className="dot dot-high"></span>
-                                <span className="dot dot-low"></span>
-                                <span className="dot dot-mid"></span>
-                            </div>
-                            <span className="legend-desc"><strong>Volatility Squeeze:</strong> Menunjukkan fase konsolidasi ketat (Red=High, Orange=Mid, Yellow=Low). Titik hitam berarti "Expansion" (rilis energi volatilitas).</span>
-                        </div>
-                        <div className="legend-item">
-                            <span className="legend-label label-momentum">MOMENTUM</span>
-                            <span className="legend-desc"><strong>Momentum Histogram:</strong> Turunan Linear Regression dari harga terhadap volatilitas. Area biru/terang menunjukkan penguatan tren, area gelap menunjukkan pelemahan.</span>
-                        </div>
-                        <div className="legend-item">
-                            <span className="legend-label label-divergence">D+ [DIV]</span>
-                            <span className="legend-desc"><strong>Bullish Divergence:</strong> Sinyal reversal kuat ketika harga membuat Lower Low tetapi Momentum/Flux membuat Higher Low. Indikasi 'False Breakdown'.</span>
-                        </div>
-                    </div>
-                </div>
-            )}
-            <div className="scanline-container panel" style={{ padding: 0 }}>
-                <AdvancedChart 
-                    key={`main-${symbol}-${interval}-${showEMA10}-${showEMA20}-${showEMA50}-${showEMA200}-${showSqueezeDeluxe}-${showBB}-${showMFI}-${showVWAP}-${showOBV}-${showCMF}`}
-                    data={data.data} 
-                    pivots={data.pivots} 
-                    elliott={data.elliott}
-                    wavePivots={data.wavePivots}
-                    ticker={data.ticker} 
-                    onLogicalRangeChange={syncCharts}
-                    syncLogicalRange={logicalRange}
-                    showSuperTrend={showSuperTrend}
-                    showBB={showBB}
-                    showMFI={showMFI}
-                    showVWAP={showVWAP}
-                    showOBV={showOBV}
-                    showCMF={showCMF}
-                    chartType={chartType}
-                    showEMA20={showEMA20}
-                    showEMA50={showEMA50}
-                    showEMA200={showEMA200}
-                    showEMA10={showEMA10}
-                    showSqueezeDeluxe={showSqueezeDeluxe}
-                />
-            </div>
-            <div className="scanline-container panel" style={{ padding: 0 }}>
-                <MacdChartComponent 
-                    key={`macd-${symbol}-${interval}`}
-                    data={data.data} 
-                    onLogicalRangeChange={syncCharts}
-                    syncLogicalRange={logicalRange}
-                    onChartInit={handleChartInit}
-                />
-            </div>
-            {showSqueezeDeluxe && (
-                <div className="scanline-container panel" style={{ padding: 0 }}>
-                    <SqueezeChartComponent 
-                        key={`squeeze-${symbol}-${interval}`}
-                        data={data.data} 
-                        onLogicalRangeChange={syncCharts}
-                        syncLogicalRange={logicalRange}
-                    />
-                </div>
-            )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* UNIFIED CONVICTION - PREMIUM VISUALS */}
-            <div 
-              className="panel" 
-              style={{ 
-                border: `1px solid ${data.unifiedAnalysis?.color || 'var(--border-color)'}`, 
-                padding: 0,
-                boxShadow: `0 0 40px -15px ${data.unifiedAnalysis?.color}44`,
-                transition: 'all 0.5s ease-in-out'
-              }}
-            >
-              <div className="panel-header" style={{ background: 'oklch(0.15 0 0)', borderBottom: `1px solid ${data.unifiedAnalysis?.color}44` }}>
-                <span style={{ color: data.unifiedAnalysis?.color, fontWeight: '800' }}>CONVICTION_REPORT</span>
+          <div className="command-row secondary">
+            <div className="chart-type-toggle">
+              <button className={chartType === 'candle' ? 'active' : ''} onClick={() => setChartType('candle')}>CANDLE</button>
+              <button className={chartType === 'line' ? 'active' : ''} onClick={() => setChartType('line')}>LINE</button>
+            </div>
+
+            <div className="indicator-matrix custom-scrollbar">
+              <button className={`matrix-btn trend ${showEMA10 ? 'active' : ''}`} onClick={() => setShowEMA10(!showEMA10)}>EMA10</button>
+              <button className={`matrix-btn trend ${showEMA20 ? 'active' : ''}`} onClick={() => setShowEMA20(!showEMA20)}>EMA20</button>
+              <button className={`matrix-btn vol ${showSqueezeDeluxe ? 'active' : ''}`} onClick={() => setShowSqueezeDeluxe(!showSqueezeDeluxe)}>SQZ_DLX</button>
+              <button className={`matrix-btn vol ${showBB ? 'active' : ''}`} onClick={() => setShowBB(!showBB)}>BB</button>
+              <button className={`matrix-btn vol ${showMFI ? 'active' : ''}`} onClick={() => setShowMFI(!showMFI)}>MFI</button>
+              <button className={`matrix-btn vol ${showVWAP ? 'active' : ''}`} onClick={() => setShowVWAP(!showVWAP)}>VWAP</button>
+              <button className={`matrix-btn vol ${showOBV ? 'active' : ''}`} onClick={() => setShowOBV(!showOBV)}>OBV</button>
+              <button className={`matrix-btn vol ${showCMF ? 'active' : ''}`} onClick={() => setShowCMF(!showCMF)}>CMF</button>
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="error-alert">
+            <AlertCircle size={16} />
+            <span>ERROR_TRAP: {error}</span>
+          </div>
+        )}
+
+        {data && (
+          <div className="search-grid">
+            {/* LEFT COLUMN: CHARTS */}
+            <div className="charts-column">
+              {showSqueezeDeluxe && (
+                <div className="legend-panel animate-slide-down">
+                  <div className="legend-header">
+                    <span className="legend-title"><Info size={12} /> INDICATOR_GUIDE // SQZ_DELUXE</span>
+                  </div>
+                  <div className="legend-grid">
+                    <div className="legend-item">
+                      <span className="l-tag tag-flux">FLUX</span>
+                      <p>Institutional flow pressure. Green=Bullish, Blue=Recovering.</p>
+                    </div>
+                    <div className="legend-item">
+                      <span className="l-tag tag-sqz">SQUEEZE</span>
+                      <p>Volatility compression dots. Red=Max coil, Black=Release.</p>
+                    </div>
+                    <div className="legend-item">
+                      <span className="l-tag tag-mom">MOMENTUM</span>
+                      <p>Linear regression histogram of price relative to volatility.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="chart-wrapper main-viz panel">
+                <AdvancedChart 
+                  key={`main-${symbol}-${interval}-${showEMA10}-${showEMA20}-${showEMA50}-${showEMA200}-${showSqueezeDeluxe}-${showBB}-${showMFI}-${showVWAP}-${showOBV}-${showCMF}`}
+                  data={data.data} 
+                  pivots={data.pivots} 
+                  elliott={data.elliott}
+                  wavePivots={data.wavePivots}
+                  ticker={data.ticker} 
+                  onLogicalRangeChange={syncCharts}
+                  syncLogicalRange={logicalRange}
+                  showSuperTrend={showSuperTrend}
+                  showBB={showBB}
+                  showMFI={showMFI}
+                  showVWAP={showVWAP}
+                  showOBV={showOBV}
+                  showCMF={showCMF}
+                  chartType={chartType}
+                  showEMA20={showEMA20}
+                  showEMA50={showEMA50}
+                  showEMA200={showEMA200}
+                  showEMA10={showEMA10}
+                  showSqueezeDeluxe={showSqueezeDeluxe}
+                />
               </div>
-              
-              {data.unifiedAnalysis && (
-                <div style={{ padding: '16px' }}>
-                    <div className="verdict-badge animate-pulse-gentle" style={{ backgroundColor: `${data.unifiedAnalysis.color}08`, border: `1px solid ${data.unifiedAnalysis.color}33` }}>
-                        <div className="verdict-title">CONVICTION_VERDICT</div>
-                        <div className={`verdict-value ${data.unifiedAnalysis.color.includes('green') || data.unifiedAnalysis.color.includes('200') || data.unifiedAnalysis.color.includes('150') ? 'positive' : (data.unifiedAnalysis.color.includes('red') || data.unifiedAnalysis.color.includes('20') ? 'negative' : '')}`} style={{ color: data.unifiedAnalysis.color }}>
-                            {data.unifiedAnalysis.verdict}
-                        </div>
-                        <div style={{ fontSize: '0.6rem', marginTop: '8px', color: 'var(--text-secondary)' }}>RISK_LEVEL: <span style={{ color: 'var(--text-primary)', fontWeight: '800' }}>{data.unifiedAnalysis.riskLevel}</span></div>
-                    </div>
 
-                    {showSqueezeDeluxe && data.unifiedAnalysis.squeezeInsight && (
-                        <div style={{ marginTop: '16px', padding: '10px', background: 'rgba(255, 235, 59, 0.03)', border: '1px dashed oklch(0.85 0.25 200 / 0.3)', borderLeft: '3px solid oklch(0.85 0.25 200)' }}>
-                            <div style={{ fontSize: '0.6rem', color: 'oklch(0.85 0.25 200)', fontWeight: '900', marginBottom: '6px', letterSpacing: '0.1em' }}>COMPRESSION_INSIGHT</div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-primary)', lineHeight: '1.5', fontFamily: 'var(--font-mono)' }}>
-                                {data.unifiedAnalysis.squeezeInsight}
-                            </div>
-                        </div>
-                    )}
+              <div className="chart-wrapper secondary-viz panel">
+                <MacdChartComponent 
+                  key={`macd-${symbol}-${interval}`}
+                  data={data.data} 
+                  onLogicalRangeChange={syncCharts}
+                  syncLogicalRange={logicalRange}
+                  onChartInit={handleChartInit}
+                />
+              </div>
 
-                    <div className="suggestion-box" style={{ marginTop: '16px', borderLeftColor: data.unifiedAnalysis.color }}>
-                        <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: '900', marginBottom: '6px', letterSpacing: '0.1em' }}>STRATEGIC_CONCLUSION</div>
-                        {data.unifiedAnalysis.suggestion}
-                    </div>
-
-                    {data.elliott && data.elliott.interpretation && (
-                        <div style={{ marginTop: '16px', padding: '10px', background: 'rgba(38, 166, 154, 0.03)', border: '1px dashed oklch(0.5 0.2 180 / 0.3)', borderLeft: '3px solid oklch(0.5 0.2 180)' }}>
-                            <div style={{ fontSize: '0.6rem', color: 'oklch(0.5 0.2 180)', fontWeight: '900', marginBottom: '6px', letterSpacing: '0.1em' }}>ELLIOTT_WAVE_PROJECTION</div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-primary)', lineHeight: '1.5', fontFamily: 'var(--font-mono)' }}>
-                                {data.elliott.interpretation}
-                            </div>
-                        </div>
-                    )}
-
-                    <div style={{ marginTop: '20px' }}>
-                        <div className="metric-row-container">
-                            <div className="metric-label-container">
-                                <div className="metric-label">SETUP_QUALITY</div>
-                                <div className="metric-value" style={{ color: data.unifiedAnalysis.color }}>{data.unifiedAnalysis.score.setup}%</div>
-                            </div>
-                            <div className="metric-bar-bg">
-                                <div className="metric-bar-fill" style={{ width: `${data.unifiedAnalysis.score.setup}%`, backgroundColor: data.unifiedAnalysis.color, boxShadow: `0 0 12px ${data.unifiedAnalysis.color}66`, transition: 'width 1s cubic-bezier(0.34, 1.56, 0.64, 1)' }}></div>
-                            </div>
-                        </div>
-                        <div className="metric-row-container" style={{ marginTop: '16px' }}>
-                            <div className="metric-label-container">
-                                <div className="metric-label">VOLUME_CONVICTION</div>
-                                <div className="metric-value" style={{ color: data.unifiedAnalysis.color }}>{data.unifiedAnalysis.score.volume.toFixed(0)}%</div>
-                            </div>
-                            <div className="metric-bar-bg">
-                                <div className="metric-bar-fill" style={{ width: `${data.unifiedAnalysis.score.volume}%`, backgroundColor: data.unifiedAnalysis.color, boxShadow: `0 0 12px ${data.unifiedAnalysis.color}66`, transition: 'width 1s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)' }}></div>
-                            </div>
-                            
-                            {/* Detailed Volume Checklist */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '12px' }}>
-                                {data.unifiedAnalysis.volDetails && Object.entries(data.unifiedAnalysis.volDetails).map(([key, ok]: any) => (
-                                    <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.55rem', opacity: ok ? 1 : 0.4 }}>
-                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: ok ? 'var(--accent-green)' : 'var(--text-secondary)' }}></div>
-                                        <span style={{ color: ok ? 'var(--text-primary)' : 'var(--text-secondary)', textTransform: 'uppercase' }}>{key}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+              {showSqueezeDeluxe && (
+                <div className="chart-wrapper secondary-viz panel">
+                  <SqueezeChartComponent 
+                    key={`squeeze-${symbol}-${interval}`}
+                    data={data.data} 
+                    onLogicalRangeChange={syncCharts}
+                    syncLogicalRange={logicalRange}
+                  />
                 </div>
               )}
             </div>
 
-            <div className="panel">
-              <div className="panel-header">PIVOT_TARGETS [WIB]</div>
-              <div className="table-container" style={{ border: 'none' }}>
-                <table style={{ width: '100%', fontSize: '0.7rem' }}>
-                  <tbody style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    <tr><td>T2_RESISTANCE</td><td className="positive" style={{ textAlign: 'right', fontWeight: '800' }}>{data.pivots.r3.toFixed(0)}</td></tr>
-                    <tr><td>T1_RESISTANCE</td><td className="positive" style={{ textAlign: 'right', fontWeight: '800' }}>{data.pivots.r2.toFixed(0)}</td></tr>
-                    <tr style={{ background: 'oklch(0.25 0 0)' }}><td style={{ color: 'var(--accent-green)' }}>BASE_PIVOT</td><td style={{ textAlign: 'right', color: 'var(--accent-green)', fontWeight: '800' }}>{data.pivots.p.toFixed(0)}</td></tr>
-                    <tr><td>S1_SUPPORT</td><td className="negative" style={{ textAlign: 'right' }}>{data.pivots.s1.toFixed(0)}</td></tr>
-                    <tr><td>S2_SUPPORT</td><td className="negative" style={{ textAlign: 'right' }}>{data.pivots.s2.toFixed(0)}</td></tr>
-                  </tbody>
-                </table>
+            {/* RIGHT COLUMN: ANALYSIS */}
+            <div className="analysis-column">
+              {data.unifiedAnalysis && (
+                <div className="conviction-panel panel" style={{ '--accent-color': data.unifiedAnalysis.color } as any}>
+                  <div className="panel-header">CONVICTION_REPORT</div>
+                  
+                  <div className="verdict-hero">
+                    <div className="v-label">CONVICTION_VERDICT</div>
+                    <div className="v-value" style={{ color: data.unifiedAnalysis.color }}>
+                      {data.unifiedAnalysis.verdict}
+                    </div>
+                    <div className="v-meta">
+                      <span>RISK_LEVEL: <strong>{data.unifiedAnalysis.riskLevel}</strong></span>
+                      {data.unifiedAnalysis.isSilentFlyer && (
+                        <span className="flyer-badge">SILENT_FLYER</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {data.historicalSignals && data.historicalSignals.length > 0 && (
+                    <div className="historical-signals-section">
+                        <div className="section-title">HISTORICAL_ALERTS</div>
+                        <div className="signals-mini-list">
+                            {data.historicalSignals.slice(0, 3).map((sig: any, idx: number) => (
+                                <div key={idx} className="sig-item">
+                                    <span className="sig-date">{new Date(sig.createdAt).toLocaleDateString('id-ID')}</span>
+                                    <span className="sig-range">{sig.entryPrice.toFixed(0)} → {sig.targetPrice.toFixed(0)}</span>
+                                    <span className={`sig-status ${sig.status}`}>{sig.status.toUpperCase()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                  )}
+
+                  <div className="analysis-section">
+                    <div className="section-title">STRATEGIC_CONCLUSION</div>
+                    <p className="suggestion-text">{data.unifiedAnalysis.suggestion}</p>
+                    
+                    {showSqueezeDeluxe && data.unifiedAnalysis.squeezeInsight && (
+                        <div className="insight-box squeeze">
+                            <div className="box-label">COMPRESSION_INSIGHT</div>
+                            <p>{data.unifiedAnalysis.squeezeInsight}</p>
+                        </div>
+                    )}
+
+                    {data.elliott && data.elliott.interpretation && (
+                        <div className="insight-box elliott">
+                            <div className="box-label">ELLIOTT_WAVE_PROJECTION</div>
+                            <p>{data.elliott.interpretation}</p>
+                        </div>
+                    )}
+                  </div>
+
+                  <div className="analysis-section metrics">
+                    <div className="metric-row">
+                      <div className="m-info">
+                        <span>SETUP_QUALITY</span>
+                        <span className="m-val">{data.unifiedAnalysis.score.setup}%</span>
+                      </div>
+                      <div className="m-bar"><div className="m-fill" style={{ width: `${data.unifiedAnalysis.score.setup}%` }}></div></div>
+                    </div>
+                    <div className="metric-row">
+                      <div className="m-info">
+                        <span>VOLUME_CONVICTION</span>
+                        <span className="m-val">{data.unifiedAnalysis.score.volume.toFixed(0)}%</span>
+                      </div>
+                      <div className="m-bar"><div className="m-fill" style={{ width: `${data.unifiedAnalysis.score.volume}%` }}></div></div>
+                    </div>
+                  </div>
+
+                  <div className="analysis-section flow">
+                    <div className="section-title">FLOW_METRICS</div>
+                    <div className="flow-grid">
+                      {Object.entries(data.unifiedAnalysis.details).map(([key, val]: any) => (
+                        <div key={key} className="flow-item">
+                          <span className="f-label">{key}</span>
+                          <span className="f-value">{val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="pivots-panel panel">
+                <div className="panel-header">PIVOT_TARGETS</div>
+                <div className="pivots-list">
+                  <div className="pivot-row pos"><span>T2_RESISTANCE</span><strong>{data.pivots.r3.toFixed(0)}</strong></div>
+                  <div className="pivot-row pos"><span>T1_RESISTANCE</span><strong>{data.pivots.r2.toFixed(0)}</strong></div>
+                  <div className="pivot-row base"><span>BASE_PIVOT</span><strong>{data.pivots.p.toFixed(0)}</strong></div>
+                  <div className="pivot-row neg"><span>S1_SUPPORT</span><strong>{data.pivots.s1.toFixed(0)}</strong></div>
+                  <div className="pivot-row neg"><span>S2_SUPPORT</span><strong>{data.pivots.s2.toFixed(0)}</strong></div>
+                </div>
               </div>
             </div>
-
-            <div className="panel">
-                <div className="panel-header">INTERNAL_FLOW_METRICS</div>
-                <div className="json-box" style={{ fontSize: '0.65rem', border: 'none', background: 'transparent' }}>
-                    {data.unifiedAnalysis && Object.entries(data.unifiedAnalysis.details).map(([key, val]: any) => {
-                        const sVal = String(val);
-                        let color = 'var(--text-primary)';
-                        
-                        if (sVal.includes('BULLISH') || sVal.includes('Rising') || sVal.includes('Above') || sVal.includes('Healthy') || sVal.includes('Strong')) {
-                            color = 'var(--accent-green)';
-                        } else if (sVal.includes('BEARISH') || sVal.includes('Falling') || sVal.includes('Below')) {
-                            color = 'var(--accent-red)';
-                        } else if (sVal.includes('CAUTION') || sVal.includes('Neutral')) {
-                            color = 'var(--accent-amber)';
-                        } else if (sVal.includes('RECOVERING')) {
-                            color = 'oklch(0.85 0.2 200)'; // Light Blue/Cyan for absorption
-                        }
-
-                        return (
-                            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid oklch(0.25 0 0)' }}>
-                                <span style={{ color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{key}</span>
-                                <span style={{ fontWeight: '800', color }}>{sVal}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
           </div>
-        </div>
-      )}
+        )}
+      </main>
+
+      <style jsx global>{`
+        :root {
+            --bg-dark: #050505;
+            --panel-bg: oklch(0.15 0.02 240);
+            --border-tactical: oklch(0.25 0.02 240);
+            --accent-emerald: oklch(0.7 0.2 150);
+            --accent-cyan: oklch(0.75 0.2 200);
+            --accent-rose: oklch(0.6 0.2 25);
+            --text-muted: oklch(0.6 0.02 240);
+        }
+
+        .search-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .command-center {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .command-row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-box-premium {
+            display: flex;
+            background: oklch(0.1 0 0);
+            border: 1px solid var(--border-tactical);
+            border-radius: 8px;
+            padding: 2px;
+            flex: 1;
+            min-width: 280px;
+            max-width: 400px;
+            align-items: center;
+        }
+
+        .search-icon { margin: 0 12px; color: var(--text-muted); }
+
+        .input-premium {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 0.85rem;
+            flex: 1;
+            outline: none;
+            padding: 10px 0;
+            font-family: inherit;
+        }
+
+        .analyze-btn {
+            background: var(--accent-emerald);
+            color: black;
+            border: none;
+            padding: 0 20px;
+            font-weight: 1000;
+            font-size: 0.7rem;
+            height: 36px;
+            border-radius: 6px;
+            cursor: pointer;
+            letter-spacing: 0.05em;
+        }
+
+        .timeframe-selector {
+            display: flex;
+            background: oklch(0.2 0 0);
+            padding: 4px;
+            border-radius: 10px;
+            gap: 4px;
+        }
+
+        .tf-pill {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            font-weight: 900;
+            padding: 6px 14px;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tf-pill.active { background: oklch(0.3 0 0); color: white; }
+
+        .chart-type-toggle {
+            display: flex;
+            border: 1px solid var(--border-tactical);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .chart-type-toggle button {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            font-weight: 900;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+
+        .chart-type-toggle button.active { background: var(--accent-emerald); color: black; }
+
+        .indicator-matrix {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            mask-image: linear-gradient(to right, black 90%, transparent 100%);
+        }
+
+        .matrix-btn {
+            background: oklch(0.2 0 0);
+            border: 1px solid var(--border-tactical);
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            font-weight: 900;
+            padding: 6px 12px;
+            border-radius: 4px;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .matrix-btn.active.trend { border-color: var(--accent-cyan); color: var(--accent-cyan); background: oklch(0.75 0.2 200 / 0.1); }
+        .matrix-btn.active.vol { border-color: oklch(0.85 0.25 200); color: oklch(0.85 0.25 200); background: oklch(0.85 0.25 200 / 0.1); }
+
+        .search-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .charts-column { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+        .chart-wrapper.main-viz { height: 600px; padding: 0; overflow: hidden; }
+        .chart-wrapper.secondary-viz { height: 240px; padding: 0; overflow: hidden; }
+
+        .legend-panel {
+            background: oklch(0.12 0.01 240);
+            border: 1px solid var(--border-tactical);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .legend-header { font-size: 0.65rem; font-weight: 1000; color: white; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; opacity: 0.8; }
+        .legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; }
+        .legend-item p { font-size: 0.6rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+        .l-tag { font-size: 0.5rem; font-weight: 1000; padding: 1px 4px; border-radius: 2px; }
+        .tag-flux { background: var(--accent-emerald); color: black; }
+        .tag-sqz { background: oklch(0.85 0.25 200); color: black; }
+        .tag-mom { background: var(--accent-cyan); color: black; }
+
+        .conviction-panel { border-color: oklch(from var(--accent-color) l c h / 0.5) !important; box-shadow: 0 0 30px -10px oklch(from var(--accent-color) l c h / 0.2); }
+        
+        .verdict-hero {
+            padding: 24px;
+            background: oklch(from var(--accent-color) l c h / 0.05);
+            text-align: center;
+            border-bottom: 1px solid var(--border-tactical);
+        }
+
+        .v-label { font-size: 0.6rem; color: var(--text-muted); letter-spacing: 0.2em; margin-bottom: 4px; }
+        .v-value { font-size: 1.25rem; font-weight: 1000; letter-spacing: 0.02em; }
+        .v-meta { display: flex; justify-content: center; gap: 12px; margin-top: 12px; font-size: 0.6rem; align-items: center; }
+        .flyer-badge { background: oklch(0.85 0.25 200); color: black; padding: 2px 6px; border-radius: 3px; font-weight: 1000; }
+
+        .analysis-section { padding: 20px; border-bottom: 1px solid var(--border-tactical); }
+        .section-title { font-size: 0.65rem; font-weight: 1000; color: var(--text-muted); margin-bottom: 12px; letter-spacing: 0.1em; }
+        .suggestion-text { font-size: 0.75rem; line-height: 1.6; color: white; font-style: italic; border-left: 2px solid var(--accent-cyan); padding-left: 12px; }
+
+        .metric-row { margin-bottom: 12px; }
+        .m-info { display: flex; justify-content: space-between; font-size: 0.6rem; font-weight: 900; margin-bottom: 4px; }
+        .m-bar { height: 4px; background: oklch(0.2 0 0); border-radius: 2px; overflow: hidden; }
+        .m-fill { height: 100%; background: var(--accent-emerald); box-shadow: 0 0 10px var(--accent-emerald); transition: width 1s ease-out; }
+
+        .flow-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        .flow-item { display: flex; justify-content: space-between; font-size: 0.65rem; border-bottom: 1px solid oklch(0.2 0 0); padding: 4px 0; }
+        .f-label { color: var(--text-muted); }
+        .f-value { font-weight: 900; color: white; }
+
+        .historical-signals-section { padding: 16px 20px; border-bottom: 1px solid var(--border-tactical); background: oklch(0.7 0.2 150 / 0.03); }
+        .signals-mini-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .sig-item { display: flex; justify-content: space-between; font-size: 0.65rem; align-items: center; }
+        .sig-date { color: var(--text-muted); }
+        .sig-range { font-weight: 800; color: var(--accent-emerald); }
+        .sig-status { font-weight: 900; font-size: 0.55rem; padding: 1px 4px; border-radius: 2px; }
+        .sig-status.success { color: var(--accent-emerald); background: oklch(0.7 0.2 150 / 0.1); }
+        .sig-status.failed { color: var(--accent-rose); background: oklch(0.6 0.2 25 / 0.1); }
+        .sig-status.pending { color: var(--accent-cyan); background: oklch(0.75 0.2 200 / 0.1); }
+
+        .insight-box { margin-top: 16px; padding: 12px; border-radius: 8px; background: oklch(1 0 0 / 0.02); border-left: 3px solid var(--accent-cyan); }
+        .insight-box.squeeze { border-left-color: oklch(0.85 0.25 200); background: oklch(0.85 0.25 200 / 0.03); }
+        .insight-box.elliott { border-left-color: oklch(0.5 0.2 180); background: oklch(0.5 0.2 180 / 0.03); }
+        .box-label { font-size: 0.55rem; font-weight: 1000; letter-spacing: 0.1em; margin-bottom: 6px; color: var(--text-muted); }
+        .insight-box p { font-size: 0.7rem; line-height: 1.5; color: white; margin: 0; }
+
+        .pivots-panel { padding: 0; }
+        .pivots-list { padding: 12px; }
+        .pivot-row { display: flex; justify-content: space-between; padding: 8px 12px; font-size: 0.7rem; border-bottom: 1px solid oklch(0.2 0 0); }
+        .pivot-row:last-child { border-bottom: none; }
+        .pivot-row.pos { color: var(--accent-emerald); }
+        .pivot-row.neg { color: var(--accent-rose); }
+        .pivot-row.base { background: oklch(0.2 0 0); color: var(--accent-cyan); font-weight: 1000; }
+
+        @media (max-width: 1024px) {
+            .search-grid { grid-template-columns: 1fr; }
+            .chart-wrapper.main-viz { height: 500px; }
+            .command-row.main { flex-direction: column; align-items: stretch; }
+            .search-box-premium { max-width: none; }
+        }
+
+        @media (max-width: 640px) {
+            .search-container { padding: 16px; }
+            .command-center { padding: 16px; }
+            .v-value { font-size: 1.1rem; }
+            .chart-wrapper.main-viz { height: 400px; }
+        }
+      `}</style>
     </div>
   );
 }
 
+// ... MacdChartComponent and SqueezeChartComponent remain largely the same, 
+// but height adapted in their own useEffect as before.
 function MacdChartComponent({ 
     data, 
     onLogicalRangeChange, 
@@ -686,7 +608,7 @@ function MacdChartComponent({
         barSpacing: 10,
       },
       width: chartContainerRef.current.clientWidth,
-      height: window.innerWidth < 768 ? 150 : 200,
+      height: 240,
     });
 
     chartRef.current = chart;
@@ -711,11 +633,7 @@ function MacdChartComponent({
     return () => {
         isMounted.current = false;
         if (chartRef.current) {
-            try {
-                chartRef.current.remove();
-            } catch {
-                // ignore
-            }
+            chartRef.current.remove();
             chartRef.current = null;
         }
     };
@@ -723,21 +641,14 @@ function MacdChartComponent({
 
   useEffect(() => {
     if (isMounted.current && chartRef.current && syncLogicalRange) {
-        try {
-            const currentRange = chartRef.current.timeScale().getVisibleLogicalRange();
-            if (JSON.stringify(currentRange) !== JSON.stringify(syncLogicalRange)) {
-                chartRef.current.timeScale().setVisibleLogicalRange(syncLogicalRange);
-            }
-        } catch {
-            // ignore
-        }
+        chartRef.current.timeScale().setVisibleLogicalRange(syncLogicalRange);
     }
   }, [syncLogicalRange]);
 
   return (
     <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
       <div className="panel-header">MACD (12, 26, 9)</div>
-      <div ref={chartContainerRef} style={{ width: '100%', height: '200px' }} />
+      <div ref={chartContainerRef} style={{ width: '100%', height: '240px' }} />
     </div>
   );
 }
@@ -769,7 +680,7 @@ function SqueezeChartComponent({
         barSpacing: 10,
       },
       width: chartContainerRef.current.clientWidth,
-      height: 220,
+      height: 240,
     });
 
     chartRef.current = chart;
@@ -778,8 +689,6 @@ function SqueezeChartComponent({
         if (isMounted.current) onLogicalRangeChange(range);
     });
 
-    // 1. Squeeze Dots (Background for zero line alignment)
-    // We use a separate scale but centered margins to keep it locked at 0 vertically
     const sqzSeries = chart.addSeries(HistogramSeries, {
         priceScaleId: 'sqz',
         title: "Squeeze",
@@ -796,14 +705,11 @@ function SqueezeChartComponent({
                d.squeezeDeluxe?.squeeze.low ? '#ffa600' : '#2a2e39'
     })));
 
-    // 2. Directional Flux (DFO) Area with Premium Gradient
     const fluxSeries = chart.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: 0 },
-        // Top: Above 0 (Bullish) - Semakin ke atas semakin solid
         topFillColor1: 'rgba(38, 166, 154, 0.5)', 
         topFillColor2: 'rgba(38, 166, 154, 0.0)', 
         topLineColor: 'rgba(38, 166, 154, 0.4)',
-        // Bottom: Below 0 (Bearish) - Semakin ke bawah semakin solid
         bottomFillColor1: 'rgba(239, 83, 80, 0.0)', 
         bottomFillColor2: 'rgba(239, 83, 80, 0.5)', 
         bottomLineColor: 'rgba(239, 83, 80, 0.4)',
@@ -815,7 +721,6 @@ function SqueezeChartComponent({
         value: d.squeezeDeluxe?.flux || 0,
     })));
 
-    // 2a. OverFlux (Extreme Intensity Gradient)
     const overFluxSeries = chart.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: 0 },
         topFillColor1: 'rgba(38, 166, 154, 0.8)', 
@@ -832,7 +737,6 @@ function SqueezeChartComponent({
         value: d.squeezeDeluxe?.overflux || 0,
     })));
 
-    // 3. Momentum Oscillator (Main View)
     const momSeries = chart.addSeries(LineSeries, {
         title: "Momentum",
         lineWidth: 3,
@@ -841,22 +745,11 @@ function SqueezeChartComponent({
     momSeries.setData(data.map((d, i) => {
         const val = d.squeezeDeluxe?.momentum || 0;
         const prevVal = i > 0 ? (data[i-1].squeezeDeluxe?.momentum || 0) : val;
-        
         let color = '#787b86'; 
-        if (val >= 0) {
-            color = val >= prevVal ? '#00bcd4' : '#006064';
-        } else {
-            color = val <= prevVal ? '#ff5252' : '#880e4f';
-        }
-
-        return {
-            time: d.time as UTCTimestamp,
-            value: val,
-            color: color
-        };
+        if (val >= 0) { color = val >= prevVal ? '#00bcd4' : '#006064'; } else { color = val <= prevVal ? '#ff5252' : '#880e4f'; }
+        return { time: d.time as UTCTimestamp, value: val, color: color };
     }));
 
-    // 4. Divergence Markers
     const markers = data
         .filter(d => d.squeezeDeluxe?.isBullDiv)
         .map(d => ({
@@ -868,7 +761,6 @@ function SqueezeChartComponent({
         }));
     createSeriesMarkers(momSeries, markers);
 
-    // Sync Main Scale Margins to allow the zero line to be truly centered if data is balanced
     chart.priceScale('right').applyOptions({
         scaleMargins: { top: 0.1, bottom: 0.1 }
     });
@@ -891,7 +783,7 @@ function SqueezeChartComponent({
   return (
     <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
       <div className="panel-header">SQUEEZE MOMENTUM DELUXE [ELI]</div>
-      <div ref={chartContainerRef} style={{ width: '100%', height: '200px' }} />
+      <div ref={chartContainerRef} style={{ width: '100%', height: '240px' }} />
     </div>
   );
 }

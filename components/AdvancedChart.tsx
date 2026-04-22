@@ -87,7 +87,7 @@ export default function AdvancedChart({
         barSpacing: 12
       },
       width: chartContainerRef.current.clientWidth,
-      height: window.innerWidth < 768 ? 400 : 600,
+      height: window.innerWidth < 768 ? 450 : 650,
     });
 
     chartRef.current = chart;
@@ -126,33 +126,19 @@ export default function AdvancedChart({
         (mainSeries as any).setData(data.map(d => ({ time: d.time as UTCTimestamp, value: d.close })));
     }
 
-    // --- 2.1 MARKERS (BOUNCE & DIVERGENCE) ---
-    if (showUndercutBounce || showSqueezeDeluxe) {
+    // --- 2.1 MARKERS (BOUNCE) ---
+    if (showUndercutBounce) {
         const markers: any[] = [];
         
-        if (showUndercutBounce) {
-            data.filter(d => d.isUndercutBounce || d.isEliteBounce).forEach(d => {
-                markers.push({
-                    time: d.time as UTCTimestamp,
-                    position: 'belowBar',
-                    color: d.isEliteBounce ? 'rgba(255, 215, 0, 1)' : 'rgba(130, 255, 160, 1)',
-                    shape: 'arrowUp',
-                    text: d.isEliteBounce ? `ELITE ${d.convictionScore}%` : `BOUNCE ${d.convictionScore}%`,
-                });
+        data.filter(d => d.isUndercutBounce || d.isEliteBounce).forEach(d => {
+            markers.push({
+                time: d.time as UTCTimestamp,
+                position: 'belowBar',
+                color: d.isEliteBounce ? 'rgba(255, 215, 0, 1)' : 'rgba(130, 255, 160, 1)',
+                shape: 'arrowUp',
+                text: d.isEliteBounce ? `ELITE ${d.convictionScore}%` : `BOUNCE ${d.convictionScore}%`,
             });
-        }
-        
-        if (showSqueezeDeluxe) {
-            data.filter(d => d.squeezeDeluxe?.isBullDiv).forEach(d => {
-                markers.push({
-                    time: d.time as UTCTimestamp,
-                    position: 'belowBar',
-                    color: '#ffa600',
-                    shape: 'arrowUp',
-                    text: 'D▴',
-                });
-            });
-        }
+        });
         
         // Sort markers by time to avoid render issues
         markers.sort((a, b) => (a.time as number) - (b.time as number));
@@ -286,13 +272,13 @@ export default function AdvancedChart({
 
       if (elliott && elliott.trend === 'BULLISH') {
           // We need W0 (Low), W1 (High), W2 (Low), W3 (High)
-          const pts = validPivots.slice(-4);
+          const pts = [...validPivots].filter(p => data[p.index].time >= data[data.length - 100].time).slice(-4);
           waveMarkers = pts.map((p, i) => ({
             time: data[p.index].time as UTCTimestamp,
             position: p.type === 'high' ? 'aboveBar' as const : 'belowBar' as const,
             color: "rgba(130, 255, 160, 1)",
             shape: 'circle' as const,
-            text: `W${i}`,
+            text: `W${i}`, // W0, W1, W2, W3
           }));
       } else if (elliott && elliott.trend === 'BEARISH') {
           // We need START (Low), 1 (High), 2 (Low), 3 (High), 4 (Low), 5 (High)
@@ -333,9 +319,9 @@ export default function AdvancedChart({
       drawFibo(elliott.retracement.h382, "rgba(38, 166, 154, 0.4)", "FIB 0.382");
 
       // Target Levels (Extension & Retracement Projection)
-      if (elliott.trend === 'BULLISH') {
+      if (elliott.trend === 'BULLISH' || elliott.trend === 'BOTTOMING') {
         const lastPrice = data[data.length - 1].close;
-        const diff = elliott.retracement.h0 - elliott.retracement.h100;
+        const diff = elliott.range.diff;
         
         // Find nearest authentic Fibo support below lastPrice
         let w4TargetFibo = elliott.retracement.h382;
@@ -346,17 +332,29 @@ export default function AdvancedChart({
         // Ensure the line visually drops to target it
         const w4Price = Math.min(lastPrice * 0.98, w4TargetFibo);
         
-        // Realistic W5 Target based on Elliott Wave geometry (typically 0.618x the size of the whole W0-W3 impulse, mapped from W4)
-        const w5Target = Math.max(elliott.retracement.h0 * 1.02, w4Price + diff * 0.618);
+        // REVERSAL LOGIC: If bottoming, target Fibo 38.2% and 61.8%
+        const w5Target = elliott.trend === 'BOTTOMING' 
+            ? elliott.retracement.h618 
+            : (elliott.w5Target?.current || Math.max(elliott.retracement.h0 * 1.02, w4Price + diff * 0.618));
+            
+        const stretchTarget = elliott.trend === 'BOTTOMING' ? elliott.retracement.h382 : (elliott.w5Target?.aggressive || w5Target);
 
-        drawFibo(w5Target, "rgba(130, 255, 160, 0.6)", "TARGET W5 (0.618 Ext)", 0);
+        if (elliott.trend === 'BOTTOMING') {
+            drawFibo(elliott.retracement.h618, "rgba(130, 255, 160, 0.6)", "REVERSAL TGT (61.8%)", 0);
+            drawFibo(elliott.retracement.h382, "rgba(255, 215, 0, 0.3)", "REVERSAL TGT (38.2%)", 2);
+        } else {
+            drawFibo(w5Target, "rgba(130, 255, 160, 0.6)", `TARGET W5 (${elliott.w5Target?.reachability.split(' ')[0] || 'Realistic'})`, 0);
+            if (stretchTarget > w5Target) {
+                drawFibo(stretchTarget, "rgba(255, 215, 0, 0.3)", "STRETCH TARGET (0.618)", 2);
+            }
+        }
         
         // --- 9. PREDICTION WAVE (UP) ---
         const predictionSeries = chart.addSeries(LineSeries, {
-            color: "rgba(130, 255, 160, 0.4)",
+            color: elliott.trend === 'BOTTOMING' ? "rgba(0, 255, 255, 0.4)" : "rgba(130, 255, 160, 0.4)",
             lineWidth: 2 as LineWidth,
             lineStyle: 2,
-            title: "Prediction",
+            title: elliott.trend === 'BOTTOMING' ? "Reversal" : "Prediction",
             lastValueVisible: false,
             priceLineVisible: false,
         });
@@ -364,17 +362,28 @@ export default function AdvancedChart({
         const lastTimeVal = data[data.length - 1].time as number;
         const timeStep = (data[1].time as number) - (data[0].time as number);
 
-        const predictionData = [
-            { time: lastTimeVal as UTCTimestamp, value: lastPrice },
-            { time: (lastTimeVal + timeStep * 6) as UTCTimestamp, value: w4Price }, // Pullback W4
-            { time: (lastTimeVal + timeStep * 16) as UTCTimestamp, value: w5Target } // Target W5
-        ];
+        const predictionData = elliott.trend === 'BOTTOMING' 
+            ? [
+                { time: lastTimeVal as UTCTimestamp, value: lastPrice },
+                { time: (lastTimeVal + timeStep * 10) as UTCTimestamp, value: elliott.retracement.h618 }, // Bounce to 61.8
+                { time: (lastTimeVal + timeStep * 25) as UTCTimestamp, value: elliott.retracement.h382 } // Reversal to 38.2
+              ]
+            : [
+                { time: lastTimeVal as UTCTimestamp, value: lastPrice },
+                { time: (lastTimeVal + timeStep * 12) as UTCTimestamp, value: w4Price }, // Pullback W4
+                { time: (lastTimeVal + timeStep * 30) as UTCTimestamp, value: w5Target } // Target W5
+              ];
         predictionSeries.setData(predictionData);
 
-        createSeriesMarkers(predictionSeries, [
-            { time: predictionData[1].time, position: 'belowBar', color: 'rgba(130, 255, 160, 0.8)', shape: 'circle', text: 'W4' },
-            { time: predictionData[2].time, position: 'aboveBar', color: 'rgba(130, 255, 160, 1)', shape: 'circle', text: 'W5 Target' },
-        ]);
+        createSeriesMarkers(predictionSeries, elliott.trend === 'BOTTOMING' 
+            ? [
+                { time: predictionData[1].time, position: 'aboveBar', color: 'rgba(0, 255, 255, 0.8)', shape: 'circle', text: 'R1' },
+                { time: predictionData[2].time, position: 'aboveBar', color: 'rgba(0, 255, 255, 1)', shape: 'circle', text: 'R2' },
+              ]
+            : [
+                { time: predictionData[1].time, position: 'belowBar', color: 'rgba(130, 255, 160, 0.8)', shape: 'circle', text: 'W4' },
+                { time: predictionData[2].time, position: 'aboveBar', color: 'rgba(130, 255, 160, 1)', shape: 'circle', text: `W5 ${elliott.w5Target?.reachability.split(' ')[0] || 'Target'}` },
+              ]);
       } else if (elliott.trend === 'BEARISH') {
         // --- 9. PREDICTION WAVE (DOWN / A-B-C) ---
         const predictionSeries = chart.addSeries(LineSeries, {
@@ -408,9 +417,9 @@ export default function AdvancedChart({
 
         const predictionData = [
             { time: lastTimeVal as UTCTimestamp, value: lastPrice },
-            { time: (lastTimeVal + timeStep * 5) as UTCTimestamp, value: waveA }, // Wave A down
-            { time: (lastTimeVal + timeStep * 9) as UTCTimestamp, value: waveB }, // Wave B bounce
-            { time: (lastTimeVal + timeStep * 16) as UTCTimestamp, value: waveC }  // Wave C bottom
+            { time: (lastTimeVal + timeStep * 10) as UTCTimestamp, value: waveA }, // Wave A down
+            { time: (lastTimeVal + timeStep * 22) as UTCTimestamp, value: waveB }, // Wave B bounce
+            { time: (lastTimeVal + timeStep * 35) as UTCTimestamp, value: waveC }  // Wave C bottom
         ];
         predictionSeries.setData(predictionData);
 
@@ -463,7 +472,7 @@ export default function AdvancedChart({
           {showEMA200 && <span style={{ color: '#FFEB3B' }}>● EMA 200</span>}
         </div>
       </div>
-      <div ref={chartContainerRef} style={{ width: '100%', height: '600px' }} />
+      <div ref={chartContainerRef} style={{ width: '100%', height: '650px' }} />
     </div>
   );
 }

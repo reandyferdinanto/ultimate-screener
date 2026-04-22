@@ -45,48 +45,64 @@ async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
         }
 
         const last = techRes.data[techRes.data.length - 1];
-        const prev = techRes.data[techRes.data.length - 2];
         const analysis = techRes.unifiedAnalysis;
-        const sqz = last.squeezeDeluxe;
         const elliott = techRes.elliott;
 
-        const price = quote.regularMarketPrice;
-        const change = quote.regularMarketChangePercent.toFixed(2);
+        const price = quote?.regularMarketPrice || last.close;
+        const change = quote?.regularMarketChangePercent ? quote.regularMarketChangePercent.toFixed(2) : "0.00";
 
-        // 2. Generate Screenshot (Technical Chart + MACD + Squeeze Deluxe)
+        // 2. Generate Screenshot (Technical Chart + Elliott Predictions)
         const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
         const page = await browser.newPage();
         await page.setViewportSize({ width: 1200, height: 1600 });
         const url = `https://ultimate-screener.ebite.biz.id/search?symbol=${ticker}&interval=${interval}`;
         await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
 
-        // Click Squeeze Deluxe Toggle to show all indicators
-        await page.click('button:has-text("SQZ_DELUXE")');
+        // Enable indicators via evaluating client-side buttons
+        await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const toClick = ["SQZ_DELUXE", "SUPERTREND", "BB", "MFI", "VWAP", "OBV", "CMF", "EMA10", "BOUNCE_MARKER"];
+            buttons.forEach(btn => {
+                if (toClick.some(txt => btn.innerText.includes(txt))) {
+                    btn.click();
+                }
+            });
+        });
+        
         await page.waitForTimeout(6000); // Wait for all charts to render
 
         // HIDE UNNECESSARY UI ELEMENTS FOR CLEAN CHART
         await page.evaluate(() => {
-            const header = document.querySelector('.command-center');
-            const legend = document.querySelector('.legend-panel');
-            const sidebar = document.querySelector('.search-grid-layout > div:last-child');
-            if (header) header.style.display = 'none';
-            if (legend) legend.style.display = 'none';
-            if (sidebar) sidebar.style.display = 'none';
+            const elementsToHide = [
+                '.command-center',
+                '.legend-panel',
+                '.search-grid > div:last-child',
+                'nav',
+                'footer'
+            ];            elementsToHide.forEach(selector => {
+                const el = document.querySelector(selector);
+                if (el) el.style.display = 'none';
+            });
 
-            const container = document.querySelector('.charts-container');
+            const container = document.querySelector('.charts-column');
             if (container) {
-                container.style.padding = '10px';
+                container.style.padding = '20px';
                 container.style.background = '#0a0a0a';
             }
-        });
 
-        const buffer = await page.locator('.charts-container').screenshot({
+            // Focus on the main chart area
+            const mainChart = document.querySelector('.chart-wrapper');
+            if (mainChart) {
+                mainChart.scrollIntoView();
+            }
+            });
+
+            const buffer = await page.locator('.charts-column').screenshot({
             type: 'png'
-        });
-
+            });
         await browser.close();
 
-        // 3. Compose MD Analysis
+        // 3. Compose MD Analysis (Refined Conviction Report)
         let md = "```md\n";
         md += `# CONVICTION_REPORT: ${rawTicker}${timeLabel}\n`;
         md += `Price   : ${price} (${change}%)\n`;
@@ -97,61 +113,94 @@ async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
         md += `- Setup Quality : ${analysis.score.setup}%\n`;
         md += `- Vol Conviction: ${analysis.score.volume}%\n\n`;
 
-        if (analysis.verdict.includes("POWERFUL RUN")) {
-            md += `## EXTENSION_WATCH\n`;
-            md += `- Peak Status   : ${analysis.details.peakStatus.replace('_', ' ')}\n`;
-            md += `- Vol Climax    : ${analysis.details.volClimax ? 'YES (High Risk)' : 'NO'}\n`;
-            md += `- MFI Extreme   : ${analysis.details.mfiExtreme ? 'YES (>85)' : 'NO'}\n\n`;
-        }
+        md += `## EXTENSION_WATCH\n`;
+        md += `- Peak Status   : ${analysis.details.peakStatus.replace('_', ' ')}\n`;
+        md += `- Vol Climax    : ${analysis.details.volClimax ? 'YES (High Risk)' : 'NO'}\n`;
+        md += `- MFI Extreme   : ${analysis.details.mfiExtreme ? 'YES (>85)' : 'NO'}\n\n`;
 
         if (analysis.squeezeInsight) {
-            md += `## COMPRESSION_INSIGHT\n`;
-            md += `${analysis.squeezeInsight}\n\n`;
+            md += `## VOLATILITY_ENGINE\n`;
+            md += `- Squeeze Life : ${analysis.squeezeDuration} Bars\n`;
+            md += `- Insight      : ${analysis.squeezeInsight}\n\n`;
         }
 
         if (elliott) {
             md += `## ELLIOTT_WAVE_PROJECT\n`;
             md += `- Trend       : ${elliott.trend}\n`;
-            if (elliott.trend === 'BULLISH') {
-                md += `- Target W3   : ${elliott.extension.h1618?.toFixed(0)}\n`;
-                md += `- Ext Target  : ${elliott.extension.h2618?.toFixed(0)}\n`;
+            if (elliott.trend === 'BULLISH' && elliott.w5Target) {
+                md += `- Reachability: ${elliott.w5Target.reachability}\n`;
+                md += `- Target W5   : ${elliott.w5Target.current.toFixed(0)} (Current)\n`;
+                if (elliott.w5Target.aggressive > elliott.w5Target.current) {
+                    md += `- Stretch Tgt : ${elliott.w5Target.aggressive.toFixed(0)} (0.618 Ext)\n`;
+                }
             }
             md += `- Support 61.8: ${elliott.retracement.h618?.toFixed(0)}\n`;
             md += `- Interpretation: ${elliott.interpretation}\n\n`;
         }
 
         md += `## FLOW_METRICS\n`;
-        md += `- MFI Status    : ${analysis.details.mfi}\n`;
+        md += `- Flux Status   : ${analysis.details.flux}\n`;
+        md += `- MFI Momentum  : ${analysis.details.mfi}\n`;
         md += `- OBV Trend     : ${analysis.details.obv}\n`;
         md += `- VWAP Position : ${analysis.details.vwap}\n`;
         md += `- KDJ J-Line    : ${analysis.details.kdj}\n`;
-        md += `- Squeeze Status: ${analysis.details.squeeze}\n`;
-        md += `- Money Flux    : ${analysis.details.flux}\n\n`;
+        md += `- Squeeze Status: ${analysis.details.squeeze}\n\n`;
 
         md += `## STRATEGIC_CONCLUSION\n`;
         md += `${analysis.suggestion}\n`;
         md += "```";
 
-        const opts = {
-            caption: `🟢 *${rawTicker}${timeLabel}:* \`${analysis.verdict}\`\n\n${md}`,
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        { text: '📊 View Chart', url: url },
-                        { text: '💸 Buy Plan', callback_data: `buyplan_${rawTicker}` },
-                        { text: '🔄 Refresh', callback_data: `refresh_${rawTicker}` }
-                    ]
-                ]
-            }
-        };
+        const caption = `🟢 *${rawTicker}${timeLabel}:* \`${analysis.verdict}\``;
+        const fullReport = `${caption}\n\n${md}`;
 
-        await bot.sendPhoto(chatId, buffer, opts);
+        if (fullReport.length > 1024) {
+            // Send photo with short caption
+            await bot.sendPhoto(chatId, buffer, {
+                caption: caption,
+                parse_mode: 'Markdown'
+            });
+
+            // Send full report as follow-up message
+            const opts = {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '📊 View Interactive Chart', url: url },
+                            { text: '🔄 Refresh', callback_data: `refresh_${rawTicker}` }
+                        ],
+                        [
+                            { text: '💸 Get Buy Plan', callback_data: `buyplan_${rawTicker}` }
+                        ]
+                    ]
+                }
+            };
+            await bot.sendMessage(chatId, fullReport, opts);
+        } else {
+            // Send together if within limits
+            const opts = {
+                caption: fullReport,
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '📊 View Interactive Chart', url: url },
+                            { text: '🔄 Refresh', callback_data: `refresh_${rawTicker}` }
+                        ],
+                        [
+                            { text: '💸 Get Buy Plan', callback_data: `buyplan_${rawTicker}` }
+                        ]
+                    ]
+                }
+            };
+            await bot.sendPhoto(chatId, buffer, opts);
+        }
+
         bot.deleteMessage(chatId, sentMsg.message_id).catch(() => {});
 
     } catch (_) {
         console.error(_);
-        bot.sendMessage(chatId, "```md\n# ERROR\nAnalysis failed.\n```", { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, "```md\n# ERROR\nAnalysis failed: " + _.message + "\n```", { parse_mode: 'Markdown' });
         bot.deleteMessage(chatId, sentMsg.message_id).catch(() => {});
     }
 }
@@ -311,7 +360,7 @@ async function initBot() {
 
                 signals.slice(0, 15).forEach(s => {
                     const rawTicker = s.ticker.replace(".JK", "").padEnd(6);
-                    const vol = (s.metadata?.volConviction || 0).toString().padEnd(3);
+                    const vol = (s.metadata?.volConviction || s.metadata?.volScore || 0).toString().padEnd(3);
                     const flow = (s.metadata?.fluxStatus || "N/A").split(' ')[0].padEnd(7);
                     const sqz = (s.metadata?.squeezeStatus || "N/A").replace(" COMPRESSION", "").padEnd(10);
                     text += `| ${rawTicker} | ${vol}% | ${flow} | ${sqz} |\n`;
@@ -354,12 +403,12 @@ async function initBot() {
             const json = await res.json();
 
             if (json.success) {
-                const signals = json.data.filter(s => s.strategy && s.strategy.startsWith('CONVICTION:'));
+                const signals = json.data.filter(s => s.strategy && (s.strategy.startsWith('CONVICTION:') || s.strategy.includes('ACCUMULATION')));
 
                 const elite = signals.filter(s => s.strategy.includes('ELITE')).sort((a,b) => b.relevanceScore - a.relevanceScore);
                 const explosion = signals.filter(s => s.strategy.includes('EXPLOSION')).sort((a,b) => b.relevanceScore - a.relevanceScore);
                 const dip = signals.filter(s => s.strategy.includes('DIP')).sort((a,b) => b.relevanceScore - a.relevanceScore);
-                const silent = signals.filter(s => s.strategy.includes('SILENT')).sort((a,b) => b.relevanceScore - a.relevanceScore);
+                const silent = signals.filter(s => s.strategy.includes('SILENT') || s.strategy.includes('ACCUMULATION')).sort((a,b) => b.relevanceScore - a.relevanceScore);
                 const turnaround = signals.filter(s => s.strategy.includes('TURNAROUND')).sort((a,b) => b.relevanceScore - a.relevanceScore);
 
                 let text = "```md\n# EMA BOUNCE SUMMARY (WEB_SYNC)\n\n";
@@ -371,7 +420,7 @@ async function initBot() {
                         const rawTicker = s.ticker.replace(".JK", "").padEnd(5);
                         const score = (s.relevanceScore || 0).toString().padEnd(3);
                         const flux = (s.metadata?.fluxStatus || "N/A").split(' ')[0];
-                        const vol = (s.metadata?.volConviction || 0);
+                        const vol = (s.metadata?.volConviction || s.metadata?.volScore || 0);
                         section += `${rawTicker} | Vol:${vol}% | ${flux} | Sqz:${s.metadata?.squeezeStatus || 'N/A'}\n`;
                     });
                     return section + "\n";
