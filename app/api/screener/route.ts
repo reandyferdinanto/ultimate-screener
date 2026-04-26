@@ -123,18 +123,32 @@ export async function GET(req: Request) {
     // Sort by relevance score descending
     const sortedResults = results.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-    // DIVERSIFY RESULTS: Ensure we see a mix of categories, not just the highest scoring Turnarounds
-    const categories = ["ARAHunter", "SCALP", "ELITE BOUNCE", "VOLATILITY EXPLOSION", "BUY ON DIP", "SILENT ACCUMULATION", "TURNAROUND", "EMA BOUNCE", "CVD DIVERGENCE"];
+    // DIVERSIFY RESULTS: Ensure we see a mix of categories
+    const categories = [
+        "SILENT FLYER", 
+        "ARAHunter", 
+        "SCALP", 
+        "ELITE BOUNCE", 
+        "VOLATILITY EXPLOSION", 
+        "BUY ON DIP", 
+        "SILENT ACCUMULATION", 
+        "TURNAROUND", 
+        "EMA BOUNCE", 
+        "CVD DIVERGENCE",
+        "Squeeze Divergence",
+        "Squeeze Explosion",
+        "The Perfect Retest",
+        "Secret Sauce"
+    ];
     const diversified: any[] = [];
     const seen = new Set();
 
-    // Pick top 15 from each category to ensure visibility
+    // Pick top 20 from each category to ensure visibility
     categories.forEach(cat => {
-        const catResults = sortedResults.filter(r => r.strategy.includes(cat)).slice(0, 15);
+        const catResults = sortedResults.filter(r => r.strategy.toUpperCase().includes(cat.toUpperCase())).slice(0, 20);
         catResults.forEach(r => {
             if (!seen.has(r.ticker)) {
                 diversified.push(r);
-                seen.has(r.ticker);
                 seen.add(r.ticker);
             }
         });

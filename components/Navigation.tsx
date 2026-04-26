@@ -2,11 +2,12 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Terminal, Activity, Zap, BarChart3, Search, Info, FileText } from "lucide-react";
+import { Terminal, Activity, Zap, BarChart3, Search, Info, FileText, TrendingUp } from "lucide-react";
 
 const NAV_ITEMS = [
   { label: "DASHBOARD", href: "/", icon: Terminal },
   { label: "SCREENER", href: "/screener", icon: Zap },
+  { label: "FLYER_RADAR", href: "/silent-flyer", icon: TrendingUp },
   { label: "REPORTS", href: "/ai-analyze", icon: FileText },
   { label: "SUMMARY", href: "/summary", icon: Activity },
   { label: "ANALYSIS", href: "/search", icon: Search },

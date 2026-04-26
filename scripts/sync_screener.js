@@ -73,7 +73,15 @@ async function runScreener() {
                     let finalCategory = "";
                     let extraScore = 0;
 
-                    if (isSqueezeBounce) {
+                    const isSilentFlyer = (analysis.squeezeDuration > 10 || (isSqueezeBounce && analysis.squeezeDuration > 5)) && 
+                                          res.elliott?.trend === 'BULLISH' && 
+                                          last.squeezeDeluxe.flux > 0 &&
+                                          last.close > last.ema20;
+
+                    if (isSilentFlyer) {
+                        finalCategory = "SILENT FLYER";     // The "BNBR/KOTA/LAND" DNA
+                        extraScore = 150;
+                    } else if (isSqueezeBounce) {
                         finalCategory = "ELITE BOUNCE";     // Squeeze+bounce = highest conviction
                         extraScore = 130;
                     } else if (v.includes("ELITE BOUNCE")) {
@@ -119,9 +127,9 @@ async function runScreener() {
                             finalCategory = "";
                         }
 
-                        // Gate 4: Minimum price filter (< 100 = too illiquid/spready)
-                        if (price < 100 && finalCategory) {
-                            console.log(`[REJECT] ${ticker}: Skipped — Price ${price} too low (min 100)`);
+                        // Gate 4: Minimum price filter (< 50 = too illiquid/spready)
+                        if (price < 50 && finalCategory) {
+                            console.log(`[REJECT] ${ticker}: Skipped — Price ${price} too low (min 50)`);
                             finalCategory = "";
                         }
                     }
@@ -137,15 +145,17 @@ async function runScreener() {
                         // [FIX] TP Calculation — Fallback to percentage if pivot <= price
                         let tp = res.pivots.r1 > price ? res.pivots.r1 : res.pivots.r2;
                         if (tp <= price) {
-                            const multiplier = finalCategory === "ELITE BOUNCE" ? 1.12 : 
-                                              (finalCategory === "VOLATILITY EXPLOSION" ? 1.15 : 1.10);
+                            const multiplier = finalCategory === "SILENT FLYER" ? 1.20 :
+                                              (finalCategory === "ELITE BOUNCE" ? 1.12 : 
+                                              (finalCategory === "VOLATILITY EXPLOSION" ? 1.15 : 1.10));
                             tp = price * multiplier;
                             console.log(`[TP_FIX] ${ticker}: Pivot TP below price, using ${((multiplier - 1) * 100).toFixed(0)}% fallback = ${Math.round(tp)}`);
                         }
-                        const sl = Math.floor(last.ema20 * 0.96); 
+                        // [FIX] Always use "pending" status and allow re-activation of archived signals if it's a SILENT FLYER
+                        const query = finalCategory === "SILENT FLYER" ? { ticker: ticker } : { ticker: ticker, status: "pending" };
 
                         await StockSignal.findOneAndUpdate(
-                            { ticker: ticker, status: "pending" },
+                            query,
                             {
                                 ticker: ticker,
                                 status: "pending",
@@ -157,10 +167,12 @@ async function runScreener() {
                                 relevanceScore: analysis.score.setup + analysis.score.volume + extraScore,
                                 metadata: {
                                     verdict: analysis.verdict,
-                                    riskLevel: finalCategory === "TURNAROUND" ? "MEDIUM" : analysis.riskLevel,
+                                    riskLevel: (finalCategory === "TURNAROUND" || finalCategory === "SILENT FLYER") ? "MEDIUM" : analysis.riskLevel,
                                     setupScore: analysis.score.setup,
                                     volScore: analysis.score.volume,
                                     squeezeInsight: analysis.squeezeInsight,
+                                    squeezeDuration: analysis.squeezeDuration,
+                                    elliottTrend: res.elliott?.trend || "NEUTRAL",
                                     dist20: ((price - last.ema20) / last.ema20 * 100).toFixed(2),
                                     momentum: momentum.toFixed(1),
                                     flux: flux.toFixed(1),
