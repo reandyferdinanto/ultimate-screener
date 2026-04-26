@@ -1,20 +1,8 @@
 "use client";
-import React, { useState, useEffect, useRef, Suspense, useCallback } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AdvancedChart from "@/components/AdvancedChart";
-import { Search, Eye, EyeOff } from "lucide-react";
-import { 
-  createChart, 
-  ColorType, 
-  IChartApi, 
-  LineSeries, 
-  HistogramSeries,
-  BaselineSeries,
-  LogicalRange,
-  UTCTimestamp,
-  AreaSeries,
-  createSeriesMarkers
-} from "lightweight-charts";
+import { Search } from "lucide-react";
 
 export default function SearchPage() {
   return (
@@ -55,14 +43,13 @@ function SearchContent() {
   const [showCMF, setShowCMF] = useState(false);
   
   const [chartType, setChartType] = useState<'candle' | 'line'>('candle');
+  const [showEMA9, setShowEMA9] = useState(true);
   const [showEMA10, setShowEMA10] = useState(false);
   const [showEMA20, setShowEMA20] = useState(true);
   const [showEMA50, setShowEMA50] = useState(false);
+  const [showEMA60, setShowEMA60] = useState(true);
   const [showEMA200, setShowEMA200] = useState(false);
   const [showSqueezeDeluxe, setShowSqueezeDeluxe] = useState(false);
-
-  const [logicalRange, setLogicalRange] = useState<LogicalRange | null>(null);
-  const macdChartRef = useRef<IChartApi | null>(null);
 
   const fetchTechnical = async (ticker: string, timeframe: string) => {
     setLoading(true);
@@ -109,17 +96,6 @@ function SearchContent() {
     }
   };
 
-  const syncCharts = useCallback((range: any) => {
-    setLogicalRange(range);
-    if (macdChartRef.current && range) {
-        macdChartRef.current.timeScale().setVisibleLogicalRange(range);
-    }
-  }, []);
-
-  const handleChartInit = useCallback((chart: IChartApi) => {
-    macdChartRef.current = chart;
-  }, []);
-
   return (
     <div style={{ padding: '16px', maxWidth: '1600px', margin: '0 auto' }}>
       {/* IMPROVED HEADER: COMMAND CENTER */}
@@ -158,8 +134,12 @@ function SearchContent() {
             </div>
 
             <div className="indicator-matrix">
+                <button className={`matrix-item trend ${showEMA9 ? 'active' : ''}`} onClick={() => setShowEMA9(!showEMA9)}>E9</button>
                 <button className={`matrix-item trend ${showEMA10 ? 'active' : ''}`} onClick={() => setShowEMA10(!showEMA10)}>E10</button>
                 <button className={`matrix-item trend ${showEMA20 ? 'active' : ''}`} onClick={() => setShowEMA20(!showEMA20)}>E20</button>
+                <button className={`matrix-item trend ${showEMA60 ? 'active' : ''}`} onClick={() => setShowEMA60(!showEMA60)}>E60</button>
+                <button className={`matrix-item trend ${showEMA50 ? 'active' : ''}`} onClick={() => setShowEMA50(!showEMA50)}>E50</button>
+                <button className={`matrix-item trend ${showEMA200 ? 'active' : ''}`} onClick={() => setShowEMA200(!showEMA200)}>E200</button>
                 <button 
                   className={`matrix-item vol ${showSqueezeDeluxe ? 'active' : ''}`} 
                   style={{ borderColor: showSqueezeDeluxe ? 'oklch(0.85 0.25 200)' : '' }}
@@ -469,29 +449,27 @@ function SearchContent() {
                                 <span className="dot dot-low"></span>
                                 <span className="dot dot-mid"></span>
                             </div>
-                            <span className="legend-desc"><strong>Volatility Squeeze:</strong> Menunjukkan fase konsolidasi ketat (Red=High, Orange=Mid, Yellow=Low). Titik hitam berarti "Expansion" (rilis energi volatilitas).</span>
+                            <span className="legend-desc"><strong>Volatility Squeeze:</strong> Menunjukkan fase konsolidasi ketat sesuai rumus EliCobra (Red=High, Orange=Mid, Yellow=Low). Saat tidak ada titik, volatilitas sedang ekspansi atau netral.</span>
                         </div>
                         <div className="legend-item">
                             <span className="legend-label label-momentum">MOMENTUM</span>
                             <span className="legend-desc"><strong>Momentum Histogram:</strong> Turunan Linear Regression dari harga terhadap volatilitas. Area biru/terang menunjukkan penguatan tren, area gelap menunjukkan pelemahan.</span>
                         </div>
                         <div className="legend-item">
-                            <span className="legend-label label-divergence">D+ [DIV]</span>
-                            <span className="legend-desc"><strong>Bullish Divergence:</strong> Sinyal reversal kuat ketika harga membuat Lower Low tetapi Momentum/Flux membuat Higher Low. Indikasi 'False Breakdown'.</span>
+                            <span className="legend-label label-divergence">D +/- [DIV]</span>
+                            <span className="legend-desc"><strong>Divergence:</strong> D+ menandai bullish divergence, D- menandai bearish divergence dari cross Momentum terhadap Signal.</span>
                         </div>
                     </div>
                 </div>
             )}
             <div className="scanline-container panel" style={{ padding: 0 }}>
                 <AdvancedChart 
-                    key={`main-${symbol}-${interval}-${showEMA10}-${showEMA20}-${showEMA50}-${showEMA200}-${showSqueezeDeluxe}-${showBB}-${showMFI}-${showVWAP}-${showOBV}-${showCMF}`}
+                    key={`main-${symbol}-${interval}-${showEMA9}-${showEMA10}-${showEMA20}-${showEMA50}-${showEMA60}-${showEMA200}-${showSqueezeDeluxe}-${showBB}-${showMFI}-${showVWAP}-${showOBV}-${showCMF}`}
                     data={data.data} 
                     pivots={data.pivots} 
                     elliott={data.elliott}
                     wavePivots={data.wavePivots}
                     ticker={data.ticker} 
-                    onLogicalRangeChange={syncCharts}
-                    syncLogicalRange={logicalRange}
                     showSuperTrend={showSuperTrend}
                     showBB={showBB}
                     showMFI={showMFI}
@@ -499,32 +477,15 @@ function SearchContent() {
                     showOBV={showOBV}
                     showCMF={showCMF}
                     chartType={chartType}
+                    showEMA9={showEMA9}
                     showEMA20={showEMA20}
                     showEMA50={showEMA50}
+                    showEMA60={showEMA60}
                     showEMA200={showEMA200}
                     showEMA10={showEMA10}
                     showSqueezeDeluxe={showSqueezeDeluxe}
                 />
             </div>
-            <div className="scanline-container panel" style={{ padding: 0 }}>
-                <MacdChartComponent 
-                    key={`macd-${symbol}-${interval}`}
-                    data={data.data} 
-                    onLogicalRangeChange={syncCharts}
-                    syncLogicalRange={logicalRange}
-                    onChartInit={handleChartInit}
-                />
-            </div>
-            {showSqueezeDeluxe && (
-                <div className="scanline-container panel" style={{ padding: 0 }}>
-                    <SqueezeChartComponent 
-                        key={`squeeze-${symbol}-${interval}`}
-                        data={data.data} 
-                        onLogicalRangeChange={syncCharts}
-                        syncLogicalRange={logicalRange}
-                    />
-                </div>
-            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -551,6 +512,51 @@ function SearchContent() {
                         </div>
                         <div style={{ fontSize: '0.6rem', marginTop: '8px', color: 'var(--text-secondary)' }}>RISK_LEVEL: <span style={{ color: 'var(--text-primary)', fontWeight: '800' }}>{data.unifiedAnalysis.riskLevel}</span></div>
                     </div>
+
+                    {data.unifiedAnalysis.tradePlan && (() => {
+                        const plan = data.unifiedAnalysis.tradePlan;
+                        const actionColor = plan.action.includes('BUY')
+                            ? 'var(--accent-green)'
+                            : plan.action.includes('SELL')
+                                ? 'var(--accent-red)'
+                                : 'var(--accent-amber)';
+
+                        return (
+                            <div style={{ marginTop: '16px', padding: '12px', background: `${actionColor}08`, border: `1px solid ${actionColor}55`, borderLeft: `3px solid ${actionColor}` }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
+                                    <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: '900', letterSpacing: '0.1em' }}>EXECUTION_TIMING</div>
+                                    <div style={{ color: actionColor, fontSize: '0.72rem', fontWeight: '900', textAlign: 'right' }}>{plan.action}</div>
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-primary)', lineHeight: '1.55', fontFamily: 'var(--font-mono)', marginBottom: '12px' }}>
+                                    {plan.timing}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px', marginBottom: '12px' }}>
+                                    {[
+                                        ['ENTRY_ZONE', plan.entryZone],
+                                        ['IDEAL_BUY', plan.idealBuy ?? '-'],
+                                        ['STOP_LOSS', plan.stopLoss],
+                                        ['TAKE_PROFIT', plan.takeProfit],
+                                    ].map(([label, value]) => (
+                                        <div key={label} style={{ padding: '8px', background: 'oklch(0.12 0 0)', border: '1px solid oklch(0.25 0 0)', minWidth: 0 }}>
+                                            <div style={{ fontSize: '0.52rem', color: 'var(--text-secondary)', fontWeight: '900', marginBottom: '4px' }}>{label}</div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-primary)', fontWeight: '900', wordBreak: 'break-word' }}>{String(value)}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', lineHeight: '1.5', fontFamily: 'var(--font-mono)' }}>
+                                    <div><span style={{ color: actionColor, fontWeight: '900' }}>REASON:</span> {plan.reason}</div>
+                                    <div style={{ marginTop: '6px' }}><span style={{ color: 'var(--accent-red)', fontWeight: '900' }}>INVALID:</span> {plan.invalidation}</div>
+                                    {plan.waitReasons?.length > 0 && (
+                                        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            {plan.waitReasons.map((reason: string, idx: number) => (
+                                                <div key={`${idx}-${reason}`} style={{ paddingLeft: '8px', borderLeft: `1px solid ${actionColor}66` }}>{idx + 1}. {reason}</div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {showSqueezeDeluxe && data.unifiedAnalysis.squeezeInsight && (
                         <div style={{ marginTop: '16px', padding: '10px', background: 'rgba(255, 235, 59, 0.03)', border: '1px dashed oklch(0.85 0.25 200 / 0.3)', borderLeft: '3px solid oklch(0.85 0.25 200)' }}>
@@ -653,245 +659,6 @@ function SearchContent() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function MacdChartComponent({ 
-    data, 
-    onLogicalRangeChange, 
-    syncLogicalRange,
-    onChartInit
-}: { 
-    data: any[], 
-    onLogicalRangeChange: (range: LogicalRange | null) => void, 
-    syncLogicalRange: LogicalRange | null,
-    onChartInit: (chart: IChartApi) => void
-}) {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const isMounted = useRef(true);
-
-  useEffect(() => {
-    isMounted.current = true;
-    if (!chartContainerRef.current || data.length === 0) return;
-
-    const chart = createChart(chartContainerRef.current, {
-      layout: { background: { type: ColorType.Solid, color: "#0a0a0a" }, textColor: "#d1d4dc" },
-      grid: { vertLines: { color: "transparent" }, horzLines: { color: "rgba(42, 46, 57, 0.1)" } },
-      timeScale: { 
-        visible: true, 
-        borderColor: "rgba(197, 203, 206, 0.2)",
-        rightOffset: 12,
-        barSpacing: 10,
-      },
-      width: chartContainerRef.current.clientWidth,
-      height: window.innerWidth < 768 ? 150 : 200,
-    });
-
-    chartRef.current = chart;
-    onChartInit(chart);
-
-    chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (isMounted.current) onLogicalRangeChange(range);
-    });
-
-    const macdSeries = chart.addSeries(LineSeries, { color: "#2962FF", lineWidth: 2, title: "MACD" });
-    const signalSeries = chart.addSeries(LineSeries, { color: "#FF6D00", lineWidth: 2, title: "Signal" });
-    const histSeries = chart.addSeries(HistogramSeries, { color: "#26a69a" });
-
-    macdSeries.setData(data.map(d => ({ time: d.time as UTCTimestamp, value: d.macd.macd })));
-    signalSeries.setData(data.map(d => ({ time: d.time as UTCTimestamp, value: d.macd.signal })));
-    histSeries.setData(data.map(d => ({ 
-      time: d.time as UTCTimestamp, 
-      value: d.macd.histogram,
-      color: d.macd.histogram >= 0 ? "rgba(38, 166, 154, 0.5)" : "rgba(239, 83, 80, 0.5)"
-    })));
-
-    return () => {
-        isMounted.current = false;
-        if (chartRef.current) {
-            try {
-                chartRef.current.remove();
-            } catch {
-                // ignore
-            }
-            chartRef.current = null;
-        }
-    };
-  }, [data, onChartInit, onLogicalRangeChange]);
-
-  useEffect(() => {
-    if (isMounted.current && chartRef.current && syncLogicalRange) {
-        try {
-            const currentRange = chartRef.current.timeScale().getVisibleLogicalRange();
-            if (JSON.stringify(currentRange) !== JSON.stringify(syncLogicalRange)) {
-                chartRef.current.timeScale().setVisibleLogicalRange(syncLogicalRange);
-            }
-        } catch {
-            // ignore
-        }
-    }
-  }, [syncLogicalRange]);
-
-  return (
-    <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="panel-header">MACD (12, 26, 9)</div>
-      <div ref={chartContainerRef} style={{ width: '100%', height: '200px' }} />
-    </div>
-  );
-}
-
-function SqueezeChartComponent({ 
-    data, 
-    onLogicalRangeChange, 
-    syncLogicalRange 
-}: { 
-    data: any[], 
-    onLogicalRangeChange: (range: LogicalRange | null) => void, 
-    syncLogicalRange: LogicalRange | null 
-}) {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const isMounted = useRef(true);
-
-  useEffect(() => {
-    isMounted.current = true;
-    if (!chartContainerRef.current || data.length === 0) return;
-
-    const chart = createChart(chartContainerRef.current, {
-      layout: { background: { type: ColorType.Solid, color: "#0a0a0a" }, textColor: "#d1d4dc" },
-      grid: { vertLines: { color: "transparent" }, horzLines: { color: "rgba(42, 46, 57, 0.05)" } },
-      timeScale: { 
-        visible: true, 
-        borderColor: "rgba(197, 203, 206, 0.2)",
-        rightOffset: 12,
-        barSpacing: 10,
-      },
-      width: chartContainerRef.current.clientWidth,
-      height: 220,
-    });
-
-    chartRef.current = chart;
-
-    chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-        if (isMounted.current) onLogicalRangeChange(range);
-    });
-
-    // 1. Squeeze Dots (Background for zero line alignment)
-    // We use a separate scale but centered margins to keep it locked at 0 vertically
-    const sqzSeries = chart.addSeries(HistogramSeries, {
-        priceScaleId: 'sqz',
-        title: "Squeeze",
-    });
-    chart.priceScale('sqz').applyOptions({ 
-        scaleMargins: { top: 0.49, bottom: 0.49 },
-        visible: false 
-    });
-    sqzSeries.setData(data.map(d => ({
-        time: d.time as UTCTimestamp,
-        value: 1,
-        color: d.squeezeDeluxe?.squeeze.high ? '#ff1100' : 
-               d.squeezeDeluxe?.squeeze.mid ? '#ff5e00' : 
-               d.squeezeDeluxe?.squeeze.low ? '#ffa600' : '#2a2e39'
-    })));
-
-    // 2. Directional Flux (DFO) Area with Premium Gradient
-    const fluxSeries = chart.addSeries(BaselineSeries, {
-        baseValue: { type: 'price', price: 0 },
-        // Top: Above 0 (Bullish) - Semakin ke atas semakin solid
-        topFillColor1: 'rgba(38, 166, 154, 0.5)', 
-        topFillColor2: 'rgba(38, 166, 154, 0.0)', 
-        topLineColor: 'rgba(38, 166, 154, 0.4)',
-        // Bottom: Below 0 (Bearish) - Semakin ke bawah semakin solid
-        bottomFillColor1: 'rgba(239, 83, 80, 0.0)', 
-        bottomFillColor2: 'rgba(239, 83, 80, 0.5)', 
-        bottomLineColor: 'rgba(239, 83, 80, 0.4)',
-        lineWidth: 1,
-        title: "Flux",
-    });
-    fluxSeries.setData(data.map(d => ({
-        time: d.time as UTCTimestamp,
-        value: d.squeezeDeluxe?.flux || 0,
-    })));
-
-    // 2a. OverFlux (Extreme Intensity Gradient)
-    const overFluxSeries = chart.addSeries(BaselineSeries, {
-        baseValue: { type: 'price', price: 0 },
-        topFillColor1: 'rgba(38, 166, 154, 0.8)', 
-        topFillColor2: 'rgba(38, 166, 154, 0.1)', 
-        topLineColor: 'rgba(38, 166, 154, 0.9)',
-        bottomFillColor1: 'rgba(239, 83, 80, 0.1)', 
-        bottomFillColor2: 'rgba(239, 83, 80, 0.8)', 
-        bottomLineColor: 'rgba(239, 83, 80, 0.9)',
-        lineWidth: 1,
-        title: "OverFlux",
-    });
-    overFluxSeries.setData(data.map(d => ({
-        time: d.time as UTCTimestamp,
-        value: d.squeezeDeluxe?.overflux || 0,
-    })));
-
-    // 3. Momentum Oscillator (Main View)
-    const momSeries = chart.addSeries(LineSeries, {
-        title: "Momentum",
-        lineWidth: 3,
-    });
-
-    momSeries.setData(data.map((d, i) => {
-        const val = d.squeezeDeluxe?.momentum || 0;
-        const prevVal = i > 0 ? (data[i-1].squeezeDeluxe?.momentum || 0) : val;
-        
-        let color = '#787b86'; 
-        if (val >= 0) {
-            color = val >= prevVal ? '#00bcd4' : '#006064';
-        } else {
-            color = val <= prevVal ? '#ff5252' : '#880e4f';
-        }
-
-        return {
-            time: d.time as UTCTimestamp,
-            value: val,
-            color: color
-        };
-    }));
-
-    // 4. Divergence Markers
-    const markers = data
-        .filter(d => d.squeezeDeluxe?.isBullDiv)
-        .map(d => ({
-            time: d.time as UTCTimestamp,
-            position: 'belowBar' as const,
-            color: '#ffa600',
-            shape: 'arrowUp' as const,
-            text: 'D▴',
-        }));
-    createSeriesMarkers(momSeries, markers);
-
-    // Sync Main Scale Margins to allow the zero line to be truly centered if data is balanced
-    chart.priceScale('right').applyOptions({
-        scaleMargins: { top: 0.1, bottom: 0.1 }
-    });
-
-    return () => {
-        isMounted.current = false;
-        if (chartRef.current) {
-            chartRef.current.remove();
-            chartRef.current = null;
-        }
-    };
-  }, [data, onLogicalRangeChange]);
-
-  useEffect(() => {
-    if (isMounted.current && chartRef.current && syncLogicalRange) {
-        chartRef.current.timeScale().setVisibleLogicalRange(syncLogicalRange);
-    }
-  }, [syncLogicalRange]);
-
-  return (
-    <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="panel-header">SQUEEZE MOMENTUM DELUXE [ELI]</div>
-      <div ref={chartContainerRef} style={{ width: '100%', height: '200px' }} />
     </div>
   );
 }

@@ -43,6 +43,7 @@ next-env.d.ts
 # logs and temporary files
 *.log
 *.png
+.postgres-data/
 scripts/check_signals*
 scripts/debug*
 scripts/analyze_requested_stocks.js
@@ -54,4 +55,9 @@ find_stock.js
 verify_*.js
 repro_crash.js
 test_*.js
+
+# local research artifacts
+artifacts/secret-sauce-review/secret-sauce-review-*.json
+artifacts/secret-sauce-review/secret-sauce-walkforward-review-*.json
+artifacts/secret-sauce-walkforward/*.json
 

@@ -98,6 +98,7 @@ export async function GET(req: Request) {
       return {
         ticker: signal.ticker,
         strategy: signal.signalSource,
+        signalSource: signal.signalSource,
         winRate: winRate,
         totalSignals: stat.totalSignals,
         successfulSignals: stat.successfulSignals,

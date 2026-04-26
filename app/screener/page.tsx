@@ -76,15 +76,17 @@ export default function ScreenerPage() {
   }, [priceRange, dateFilter, view, loadCurrentData]);
 
   const displayedSignals = data.filter(s => {
-      if (view === 'sauce') return s.strategy?.includes('Secret');
-      if (view === 'divergence') return s.strategy?.includes('CVD');
+      const source = s.signalSource || s.strategy || "";
+      if (view === 'sauce') return source.includes('Secret');
+      if (view === 'divergence') return source.includes('CVD');
       if (view === 'sqz_div') {
-          const isSqz = s.strategy?.includes('Squeeze');
+          const sourceLower = source.toLowerCase();
+          const isSqz = sourceLower.includes('squeeze');
           // Squeeze Divergence (1D) or Squeeze Divergence (4H)
-          const isRightTF = s.signalSource?.includes(sqzTimeframe.toUpperCase());
+          const isRightTF = sourceLower.includes(sqzTimeframe.toLowerCase());
           return isSqz && isRightTF;
       }
-      return !s.strategy?.includes('Secret') && !s.strategy?.includes('CVD') && !s.strategy?.includes('Squeeze');
+      return !source.includes('Secret') && !source.includes('CVD') && !source.includes('Squeeze');
   });
 
   const saveSettings = () => {

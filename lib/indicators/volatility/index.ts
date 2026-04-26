@@ -1,6 +1,5 @@
 import { bb as i_bb, rma as i_rma } from 'indicatorts';
 import { OHLCV } from '../types';
-import { calculateSMA, calculateRMA } from '../trend';
 
 /**
  * Bollinger Bands
@@ -44,21 +43,69 @@ function calculateTR(quotes: OHLCV[]): number[] {
   return tr;
 }
 
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+const nz = (value: number | undefined) => isFiniteNumber(value) ? value : 0;
+
 /**
  * Standard Deviation
  */
 export function calculateStdev(data: number[], period: number): number[] {
+  return data.map((_, i) => {
+    let sq = 0;
+    let previousSq = 0;
+    let sum = 0;
+
+    for (let k = 0; k < period; k++) {
+      const value = nz(data[i - k]);
+      previousSq = sq;
+      sq += (value - sq) / (1 + k);
+      sum += (value - sq) * (value - previousSq);
+    }
+
+    return period > 1 ? Math.sqrt(sum / (period - 1)) : 0;
+  });
+}
+
+function calculatePineSMA(data: number[], period: number): number[] {
+  return data.map((_, i) => {
+    if (i < period - 1) return Number.NaN;
+
+    const window = data.slice(i - period + 1, i + 1);
+    if (window.some(value => !isFiniteNumber(value))) return Number.NaN;
+
+    return window.reduce((sum, value) => sum + value, 0) / period;
+  });
+}
+
+function calculatePineRMA(data: number[], period: number): number[] {
   const result: number[] = [];
-  for (let i = 0; i < data.length; i++) {
-    if (i < period - 1) {
-      result.push(0);
+  const seedValues: number[] = [];
+  let previous = Number.NaN;
+
+  for (const value of data) {
+    if (!isFiniteNumber(value)) {
+      result.push(Number.NaN);
       continue;
     }
-    const window = data.slice(i - period + 1, i + 1);
-    const mean = window.reduce((a, b) => a + b, 0) / period;
-    const variance = window.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / period;
-    result.push(Math.sqrt(variance));
+
+    if (isFiniteNumber(previous)) {
+      previous = (value + (period - 1) * previous) / period;
+      result.push(previous);
+      continue;
+    }
+
+    seedValues.push(value);
+    if (seedValues.length < period) {
+      result.push(Number.NaN);
+      continue;
+    }
+
+    previous = seedValues.slice(-period).reduce((sum, item) => sum + item, 0) / period;
+    result.push(previous);
   }
+
   return result;
 }
 
@@ -71,114 +118,27 @@ export function calculateLinreg(data: number[], period: number): number[] {
   const x2Sum = (period * (period - 1) * (2 * period - 1)) / 6;
 
   for (let i = 0; i < data.length; i++) {
-    if (i < period - 1 || data.slice(i - period + 1, i + 1).some(v => isNaN(v))) {
-      result.push(0);
+    const window = data.slice(i - period + 1, i + 1);
+    if (i < period - 1 || window.some(value => !isFiniteNumber(value))) {
+      result.push(Number.NaN);
       continue;
     }
+
     let ySum = 0;
     let xySum = 0;
     for (let j = 0; j < period; j++) {
-      const val = data[i - (period - 1) + j];
-      ySum += val;
-      xySum += j * val;
+      const value = window[j];
+      ySum += value;
+      xySum += j * value;
     }
-    const divisor = (period * x2Sum - xSum * xSum);
-    const b = divisor === 0 ? 0 : (period * xySum - xSum * ySum) / divisor;
-    const a = (ySum - b * xSum) / period;
-    result.push(a + b * (period - 1));
+
+    const divisor = period * x2Sum - xSum * xSum;
+    const slope = divisor === 0 ? 0 : (period * xySum - xSum * ySum) / divisor;
+    const intercept = (ySum - slope * xSum) / period;
+    result.push(intercept + slope * (period - 1));
   }
+
   return result;
-}
-
-/**
- * Squeeze Pro / Deluxe Indicator with 3 Levels of Compression
- * and Bullish Divergence detection.
- */
-export function calculateSqueezeDeluxe(quotes: OHLCV[], len = 20, sig = 3, dfl = 30) {
-  const highs = quotes.map(q => q.high);
-  const lows = quotes.map(q => q.low);
-  const closes = quotes.map(q => q.close);
-  const hl2 = quotes.map(q => (q.high + q.low) / 2);
-  
-  const smaHl2 = calculateSMA(hl2, len);
-  const atrVal = calculateATR(quotes, len);
-  
-  // 1. Momentum Oscillator (TTM Style)
-  const rawOsc = closes.map((c, i) => {
-    const av = smaHl2[i] || hl2[i];
-    const syntheticAvgVal = (hl2[i] + av) / 2;
-    const denom = atrVal[i] || 1;
-    return ((c - syntheticAvgVal) / denom) * 100;
-  });
-  const momentum = calculateLinreg(rawOsc, len);
-  const signal = calculateSMA(momentum, sig);
-
-  // 2. Squeeze Pro Logic (3 Levels)
-  // Level 1 (Black): BB 2.0 / KC 1.5
-  // Level 2 (Red): BB 2.0 / KC 1.0
-  // Level 3 (Orange): BB 2.0 / KC 0.5 (Extreme)
-  const dev = calculateStdev(closes, len);
-  const sqzItems = dev.map((d, i) => {
-    const a = atrVal[i] || 1;
-    return {
-      low: d < a * 1.5,      // Black: Standard
-      mid: d < a * 1.0,      // Red: Tight
-      high: d < a * 0.5      // Orange: Extreme
-    };
-  });
-
-  // 3. Directional Flux (DFO)
-  const changeH = highs.map((h, i) => i === 0 ? 0 : Math.max(0, h - highs[i-1]));
-  const changeL = lows.map((l, i) => i === 0 ? 0 : Math.max(0, lows[i-1] - l));
-  
-  const up = calculateRMA(changeH, dfl).map((v, i) => v / (atrVal[i] || 1));
-  const dn = calculateRMA(changeL, dfl).map((v, i) => v / (atrVal[i] || 1));
-  
-  const fluxRatio = up.map((u, i) => {
-    const sum = u + dn[i];
-    return sum === 0 ? 0 : (u - dn[i]) / sum;
-  });
-  
-  const flux = calculateRMA(fluxRatio, Math.floor(dfl / 2)).map(v => v * 100);
-
-  // 4. Bullish Divergence Detection
-  // Rule: Price makes Lower Low, Momentum makes Higher Low
-  const isBullDiv = momentum.map((m, i) => {
-    if (i < 20) return false;
-    
-    // Check if current momentum is a local pivot low
-    const isMomPivotLow = m > momentum[i-1] && momentum[i-2] > momentum[i-1];
-    if (!isMomPivotLow) return false;
-
-    // Search for a previous momentum pivot low within 20 candles
-    let prevMomLowIdx = -1;
-    for (let j = i - 2; j > i - 20; j--) {
-        if (momentum[j] < momentum[j-1] && momentum[j] < momentum[j+1]) {
-            prevMomLowIdx = j;
-            break;
-        }
-    }
-    if (prevMomLowIdx === -1) return false;
-
-    const currentMomLow = momentum[i-1];
-    const prevMomLow = momentum[prevMomLowIdx];
-    const currentPriceLow = lows[i-1];
-    const prevPriceLow = lows[prevMomLowIdx];
-
-    // Bullish Divergence: Lower price low BUT higher momentum low
-    // Only valid if momentum is deep (below -10)
-    return currentPriceLow < prevPriceLow && currentMomLow > prevMomLow && currentMomLow < -10;
-  });
-
-  return momentum.map((m, i) => ({
-    momentum: m,
-    signal: signal[i],
-    flux: flux[i],
-    squeeze: sqzItems[i],
-    isBullDiv: isBullDiv[i],
-    // High Conviction Entry: Squeeze fired (black/red gone) + Bullish Divergence + Momentum improving
-    isHighConviction: isBullDiv[i] && (sqzItems[i-1].low || sqzItems[i-1].mid) && m > momentum[i-1]
-  }));
 }
 
 function calculateHighest(data: number[], period: number): number[] {
@@ -197,4 +157,204 @@ function calculateLowest(data: number[], period: number): number[] {
     result.push(Math.min(...data.slice(start, i + 1)));
   }
   return result;
+}
+
+function calculateTrueRangeFromSeries(highs: number[], lows: number[], closes: number[]): number[] {
+  return highs.map((high, i) => {
+    const low = lows[i];
+    if (i === 0) return high - low;
+
+    const previousClose = closes[i - 1];
+    return Math.max(
+      high - low,
+      Math.abs(high - previousClose),
+      Math.abs(low - previousClose)
+    );
+  });
+}
+
+function calculateAtrFromSeries(highs: number[], lows: number[], closes: number[], period = 1): number[] {
+  const trueRange = calculateTrueRangeFromSeries(highs, lows, closes);
+  return period === 1 ? trueRange : calculatePineRMA(trueRange, period);
+}
+
+function calculateHeikinAshiQuotes(quotes: OHLCV[]): OHLCV[] {
+  const result: OHLCV[] = [];
+
+  for (const quote of quotes) {
+    const close = (quote.open + quote.high + quote.low + quote.close) / 4;
+    const previous = result[result.length - 1];
+    const open = previous
+      ? (previous.open + previous.close) / 2
+      : (quote.open + quote.close) / 2;
+
+    result.push({
+      ...quote,
+      open,
+      high: Math.max(quote.high, open, close),
+      low: Math.min(quote.low, open, close),
+      close
+    });
+  }
+
+  return result;
+}
+
+function isCrossover(source: number[], target: number[], index: number) {
+  return index > 0 &&
+    isFiniteNumber(source[index]) &&
+    isFiniteNumber(target[index]) &&
+    isFiniteNumber(source[index - 1]) &&
+    isFiniteNumber(target[index - 1]) &&
+    source[index] > target[index] &&
+    source[index - 1] <= target[index - 1];
+}
+
+function isCrossunder(source: number[], target: number[], index: number) {
+  return index > 0 &&
+    isFiniteNumber(source[index]) &&
+    isFiniteNumber(target[index]) &&
+    isFiniteNumber(source[index - 1]) &&
+    isFiniteNumber(target[index - 1]) &&
+    source[index] < target[index] &&
+    source[index - 1] >= target[index - 1];
+}
+
+function detectSqueezeDivergences(quotes: OHLCV[], momentum: number[], signal: number[], threshold: number) {
+  const isBullDiv = Array(quotes.length).fill(false);
+  const isBearDiv = Array(quotes.length).fill(false);
+  let divergencePrice = Number.NaN;
+  let divergenceSignal = Number.NaN;
+
+  for (let i = 1; i < quotes.length; i++) {
+    const signalValue = signal[i];
+    if (!isFiniteNumber(signalValue)) continue;
+
+    if (momentum[i] > threshold && isCrossunder(momentum, signal, i)) {
+      if (!isFiniteNumber(divergencePrice)) {
+        divergencePrice = quotes[i].high;
+        divergenceSignal = signalValue;
+      } else if (quotes[i].high > divergencePrice && signalValue < divergenceSignal) {
+        isBearDiv[i] = true;
+        divergencePrice = Number.NaN;
+        divergenceSignal = Number.NaN;
+      } else {
+        divergencePrice = quotes[i].high;
+        divergenceSignal = signalValue;
+      }
+    } else if (momentum[i] < -threshold && isCrossover(momentum, signal, i)) {
+      if (!isFiniteNumber(divergencePrice)) {
+        divergencePrice = quotes[i].low;
+        divergenceSignal = signalValue;
+      } else if (quotes[i].low < divergencePrice && signalValue > divergenceSignal) {
+        isBullDiv[i] = true;
+        divergencePrice = Number.NaN;
+        divergenceSignal = Number.NaN;
+      } else {
+        divergencePrice = quotes[i].low;
+        divergenceSignal = signalValue;
+      }
+    }
+  }
+
+  return { isBullDiv, isBearDiv };
+}
+
+/**
+ * EliCobra Squeeze Momentum Deluxe parity implementation.
+ */
+export function calculateSqueezeDeluxe(quotes: OHLCV[], len = 20, sig = 3, dfl = 30, dfh = false, trs = 25) {
+  const highs = quotes.map(q => q.high);
+  const lows = quotes.map(q => q.low);
+  const closes = quotes.map(q => q.close);
+  const hl2 = quotes.map(q => (q.high + q.low) / 2);
+
+  const smaHl2 = calculatePineSMA(hl2, len);
+  const highestHigh = calculateHighest(highs, len);
+  const lowestLow = calculateLowest(lows, len);
+  const syntheticHl2 = highestHigh.map((high, i) => (high + lowestLow[i]) / 2);
+  const syntheticAtr = calculateAtrFromSeries(highestHigh, lowestLow, closes, 1);
+
+  const rawOsc = closes.map((close, i) => {
+    const baseline = (syntheticHl2[i] + smaHl2[i]) / 2;
+    const range = syntheticAtr[i];
+    return isFiniteNumber(baseline) && isFiniteNumber(range) && range !== 0
+      ? ((close - baseline) / range) * 100
+      : Number.NaN;
+  });
+
+  const momentum = calculateLinreg(rawOsc, len);
+  const signal = calculatePineSMA(momentum, sig);
+
+  const atrLen = calculateAtrFromSeries(highs, lows, closes, len);
+  const stdev = calculateStdev(closes, len);
+  const squeeze = stdev.map((deviation, i) => {
+    const atr = atrLen[i];
+    return {
+      high: isFiniteNumber(atr) && deviation < atr * 0.5,
+      mid: isFiniteNumber(atr) && deviation < atr * 0.75,
+      low: isFiniteNumber(atr) && deviation < atr
+    };
+  });
+
+  const fluxQuotes = dfh ? calculateHeikinAshiQuotes(quotes) : quotes;
+  const fluxHighs = fluxQuotes.map(q => q.high);
+  const fluxLows = fluxQuotes.map(q => q.low);
+  const fluxCloses = fluxQuotes.map(q => q.close);
+  const fluxAtr = calculateAtrFromSeries(fluxHighs, fluxLows, fluxCloses, dfl);
+  const highChange = fluxHighs.map((high, i) => i === 0 ? 0 : Math.max(high - fluxHighs[i - 1], 0));
+  const lowChange = fluxLows.map((low, i) => i === 0 ? 0 : Math.max((low - fluxLows[i - 1]) * -1, 0));
+  const up = calculatePineRMA(highChange, dfl).map((value, i) =>
+    isFiniteNumber(value) && isFiniteNumber(fluxAtr[i]) && fluxAtr[i] !== 0 ? value / fluxAtr[i] : Number.NaN
+  );
+  const down = calculatePineRMA(lowChange, dfl).map((value, i) =>
+    isFiniteNumber(value) && isFiniteNumber(fluxAtr[i]) && fluxAtr[i] !== 0 ? value / fluxAtr[i] : Number.NaN
+  );
+  const fluxRatio = up.map((value, i) => {
+    const total = value + down[i];
+    return isFiniteNumber(value) && isFiniteNumber(down[i]) && total !== 0
+      ? (value - down[i]) / total
+      : Number.NaN;
+  });
+  const flux = calculatePineRMA(fluxRatio, Math.floor(dfl / 2)).map(value =>
+    isFiniteNumber(value) ? value * 100 : Number.NaN
+  );
+  const overflux = flux.map(value => {
+    if (!isFiniteNumber(value)) return Number.NaN;
+    if (value > 25) return value - 25;
+    if (value < -25) return value + 25;
+    return Number.NaN;
+  });
+
+  const { isBullDiv, isBearDiv } = detectSqueezeDivergences(quotes, momentum, signal, trs);
+  const zeroLine = quotes.map(() => 0);
+
+  return momentum.map((value, i) => {
+    const previousSqueeze = squeeze[i - 1];
+    const previousMomentum = momentum[i - 1];
+    const swingBullish = isCrossover(momentum, signal, i);
+    const swingBearish = isCrossunder(momentum, signal, i);
+
+    return {
+      momentum: value,
+      signal: signal[i],
+      flux: flux[i],
+      overflux: overflux[i],
+      squeeze: squeeze[i],
+      isBullDiv: isBullDiv[i],
+      isBearDiv: isBearDiv[i],
+      buySignal: swingBullish && value < -40 && flux[i] < 0,
+      sellSignal: swingBearish && value > 40 && flux[i] > 0,
+      momentumBullish: isCrossover(momentum, zeroLine, i),
+      momentumBearish: isCrossunder(momentum, zeroLine, i),
+      fluxBullish: isCrossover(flux, zeroLine, i),
+      fluxBearish: isCrossunder(flux, zeroLine, i),
+      swingBullish,
+      swingBearish,
+      isHighConviction: isBullDiv[i] &&
+        Boolean(previousSqueeze?.low || previousSqueeze?.mid) &&
+        isFiniteNumber(previousMomentum) &&
+        value > previousMomentum
+    };
+  });
 }

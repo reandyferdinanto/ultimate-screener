@@ -30,7 +30,190 @@ import {
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-function generateUnifiedAnalysis(quotes: any[]) {
+function formatIdxPrice(value: number) {
+  return Number.isFinite(value) ? Math.round(value) : 0;
+}
+
+function formatPct(value: number) {
+  return Number.isFinite(value) ? value.toFixed(1) : "0.0";
+}
+
+function getSwingLow(quotes: any[], lookback = 5) {
+  return Math.min(...quotes.slice(-lookback).map(q => q.low).filter(Number.isFinite));
+}
+
+function getSwingHigh(quotes: any[], lookback = 5) {
+  return Math.max(...quotes.slice(-lookback).map(q => q.high).filter(Number.isFinite));
+}
+
+function pickTarget(entry: number, stopLoss: number, pivots?: any) {
+  const risk = Math.max(entry - stopLoss, entry * 0.015);
+  const rrTarget = entry + risk * 1.5;
+  const pivotTargets = [pivots?.r1, pivots?.r2, pivots?.r3]
+    .filter((value): value is number => Number.isFinite(value) && value > entry)
+    .sort((a, b) => a - b);
+  const pivotTarget = pivotTargets.find(value => value >= rrTarget * 0.98) || pivotTargets[pivotTargets.length - 1];
+  return formatIdxPrice(Math.max(rrTarget, pivotTarget || rrTarget));
+}
+
+function buildTradePlan(quotes: any[], pivots: any, context: {
+  dist20: number;
+  squeezeIntensity: number;
+  squeezeDuration: number;
+  squeezeState: string;
+  fluxStatus: string;
+  fluxBullish: boolean;
+  fluxImproving: boolean;
+  momRising: boolean;
+  isOverextended: boolean;
+  isMomentumPeaking: boolean;
+  isVolumeClimax: boolean;
+  isMfiExtreme: boolean;
+}) {
+  const last = quotes[quotes.length - 1];
+  const prev = quotes[quotes.length - 2] || last;
+  const sqz = last.squeezeDeluxe;
+  const prevSqz = prev.squeezeDeluxe || sqz;
+  const currentPrice = Number(last.close);
+  const ema9 = Number(last.ema9);
+  const ema20 = Number(last.ema20);
+  const ema10 = Number(last.ema10);
+  const ema60 = Number(last.ema60);
+  const sma50 = Number(last.sma50);
+  const sma200 = Number(last.sma200);
+  const rsi = Number(last.rsi);
+  const prevRsi = Number(prev.rsi);
+  const swingLow = getSwingLow(quotes, 6);
+  const swingHigh = getSwingHigh(quotes, 6);
+  const priceAboveEma20 = currentPrice > ema20;
+  const reclaimedEma20 = prev.close <= prev.ema20 && priceAboveEma20;
+  const brokeEma20 = prev.close >= prev.ema20 && currentPrice < ema20;
+  const ema20Rising = ema20 >= Number(prev.ema20);
+  const fastEmaBullish = ema9 > ema20;
+  const fastEmaCrossover = Number(prev.ema9) <= Number(prev.ema20) && fastEmaBullish;
+  const swingEmaBullish = ema20 > ema60;
+  const emaStackBullish = fastEmaBullish &&
+    (swingEmaBullish || !Number.isFinite(ema60)) &&
+    (!Number.isFinite(sma50) || currentPrice > sma50) &&
+    (!Number.isFinite(ema60) || currentPrice > ema60);
+  const longTrendHealthy = (!Number.isFinite(ema60) || currentPrice > ema60) && (!Number.isFinite(sma200) || currentPrice > sma200);
+  const pullbackZone = context.dist20 >= -1.2 && context.dist20 <= 3.5;
+  const squeezeActive = context.squeezeIntensity > 0;
+  const previousSqueezeActive = Boolean(prevSqz.squeeze?.high || prevSqz.squeeze?.mid || prevSqz.squeeze?.low);
+  const squeezeRelease = !squeezeActive && previousSqueezeActive;
+  const momentumImproving = context.momRising && sqz.momentum > prevSqz.momentum;
+  const bearishMomentum = sqz.momentum < sqz.signal || sqz.momentum < prevSqz.momentum;
+  const rsiOverbought = Number.isFinite(rsi) && rsi >= 70;
+  const rsiRecovering = Number.isFinite(rsi) && (rsi <= 45 || (rsi <= 55 && rsi > prevRsi));
+  const bullishSqueezeTrigger = sqz.buySignal || sqz.isBullDiv || (momentumImproving && context.fluxBullish && (squeezeActive || squeezeRelease || context.fluxImproving));
+  const bearishSqueezeTrigger = sqz.sellSignal || sqz.isBearDiv || (bearishMomentum && !context.fluxImproving);
+  const stopLoss = formatIdxPrice(Math.min(swingLow * 0.99, ema20 * 0.985));
+  const idealEntry = pullbackZone || reclaimedEma20 ? currentPrice : ema20 * 1.01;
+  const entryLow = formatIdxPrice(ema20 * 0.995);
+  const entryHigh = formatIdxPrice(Math.min(ema20 * 1.035, Math.max(currentPrice, ema20 * 1.01)));
+  const target = pickTarget(idealEntry, stopLoss, pivots);
+  const waitReasons: string[] = [];
+
+  if (!priceAboveEma20) waitReasons.push(`Harga masih di bawah EMA20 (${formatPct(context.dist20)}%); strategi 20 EMA menunggu close/reclaim di atas EMA20.`);
+  if (!ema20Rising) waitReasons.push("EMA20 belum menanjak, jadi trend pendek belum memberi tailwind yang bersih.");
+  if (!fastEmaBullish) waitReasons.push("EMA9 masih di bawah EMA20; timing cepat belum mengonfirmasi buyer kembali dominan.");
+  if (Number.isFinite(ema60) && !swingEmaBullish) waitReasons.push("EMA20 masih di bawah EMA60; trend swing belum bullish menurut setup 20/60 EMA.");
+  if (!context.fluxBullish || !context.fluxImproving) waitReasons.push(`Flux belum kompak bullish (${context.fluxStatus}); tunggu akumulasi menguat.`);
+  if (!context.momRising) waitReasons.push("Momentum Squeeze masih di bawah/menurun terhadap signal.");
+  if (context.isOverextended) waitReasons.push(`Harga terlalu jauh dari EMA20 (${formatPct(context.dist20)}%); entry terbaik menunggu pullback ke EMA20.`);
+  if (rsiOverbought) waitReasons.push(`RSI ${formatPct(rsi)} sudah overbought; strategi 20 EMA lebih aman menunggu pullback/retest.`);
+  if (Number.isFinite(rsi) && rsi <= 35 && !priceAboveEma20) waitReasons.push(`RSI ${formatPct(rsi)} oversold, tetapi PDF 20 EMA tetap menunggu close konfirmasi di atas EMA20.`);
+  if (squeezeActive && !bullishSqueezeTrigger) waitReasons.push(`${context.squeezeState.replace('_', ' ')} masih menyimpan energi, tetapi belum ada trigger release bullish.`);
+
+  if (bearishSqueezeTrigger || (brokeEma20 && bearishMomentum) || (context.isOverextended && context.isMomentumPeaking && (context.isVolumeClimax || context.isMfiExtreme || rsiOverbought))) {
+    return {
+      action: "SELL / REDUCE",
+      bias: "BEARISH_REVERSAL",
+      timing: brokeEma20
+        ? "Jual/kurangi saat candle gagal bertahan di atas EMA20."
+        : "Ambil profit bertahap saat momentum Squeeze melemah atau muncul divergence bearish.",
+      entryZone: "-",
+      idealBuy: null,
+      stopLoss: formatIdxPrice(Math.max(swingHigh * 1.01, ema20 * 1.015)),
+      takeProfit: formatIdxPrice(Math.max(currentPrice, pivots?.r1 || currentPrice)),
+      invalidation: `Bullish lagi jika close kembali di atas EMA20 (${formatIdxPrice(ema20)}) dengan Momentum > Signal dan Flux membaik.`,
+      reason: `Squeeze/EMA memberi sinyal distribusi: ${bearishSqueezeTrigger ? "bearish trigger aktif" : "EMA20 ditembus"} sementara momentum tidak menguat.`,
+      waitReasons: []
+    };
+  }
+
+  if (
+    priceAboveEma20 &&
+    ema20Rising &&
+    longTrendHealthy &&
+    fastEmaBullish &&
+    (swingEmaBullish || !Number.isFinite(ema60)) &&
+    (pullbackZone || reclaimedEma20 || last.isEliteBounce) &&
+    bullishSqueezeTrigger &&
+    !rsiOverbought &&
+    !context.isOverextended
+  ) {
+    return {
+      action: "BUY",
+      bias: fastEmaCrossover ? "EMA9_20_RECLAIM" : "EMA20_SQUEEZE_BOUNCE",
+      timing: reclaimedEma20
+        ? "Buy valid setelah candle reclaim/close di atas EMA20, dengan EMA9 di atas EMA20."
+        : "Buy terbaik di area pullback EMA20 selama EMA9 > EMA20, EMA20 > EMA60, Momentum > Signal, dan Flux tetap positif.",
+      entryZone: `${entryLow} - ${entryHigh}`,
+      idealBuy: formatIdxPrice(idealEntry),
+      stopLoss,
+      takeProfit: target,
+      invalidation: `Cut jika close kembali di bawah EMA20 atau tembus swing low ${formatIdxPrice(swingLow)}.`,
+      reason: `Harga berada di zona 20 EMA, EMA9 > EMA20${Number.isFinite(ema60) ? ", EMA20 > EMA60" : ""}, ${context.squeezeState.replace('_', ' ')} didukung trigger Squeeze bullish, RSI ${Number.isFinite(rsi) ? formatPct(rsi) : "N/A"}, dan Flux ${context.fluxStatus}.`,
+      waitReasons: []
+    };
+  }
+
+  if (
+    priceAboveEma20 &&
+    ema20Rising &&
+    emaStackBullish &&
+    context.fluxBullish &&
+    momentumImproving &&
+    !rsiOverbought &&
+    context.dist20 <= 6 &&
+    !context.isOverextended
+  ) {
+    return {
+      action: "BUY",
+      bias: "TREND_PULLBACK",
+      timing: "Buy on pullback, jangan kejar candle hijau jauh dari EMA20.",
+      entryZone: `${entryLow} - ${entryHigh}`,
+      idealBuy: formatIdxPrice(idealEntry),
+      stopLoss,
+      takeProfit: target,
+      invalidation: `Setup batal jika close di bawah EMA20 (${formatIdxPrice(ema20)}) atau Flux turun lagi.`,
+      reason: `Trend pendek${Number.isFinite(ema60) ? " dan swing" : ""} sehat: EMA9 > EMA20${Number.isFinite(ema60) ? ", EMA20 > EMA60" : ""}, momentum membaik, Flux positif, dan RSI ${rsiRecovering ? "mendukung recovery" : "belum overbought"}.`,
+      waitReasons: []
+    };
+  }
+
+  if (waitReasons.length === 0) {
+    waitReasons.push("Belum ada kombinasi ideal antara EMA9/20 timing, EMA20/60 swing trend, pullback EMA20, trigger Squeeze bullish, dan risk/reward yang rapi.");
+  }
+
+  return {
+    action: "WAIT AND SEE",
+    bias: "NO_CLEAN_TRIGGER",
+    timing: Number.isFinite(ema60)
+      ? `Tunggu close di atas EMA20 (${formatIdxPrice(ema20)}) atau pullback rapi ke ${entryLow} - ${entryHigh} dengan EMA9 > EMA20, EMA20 > EMA60, dan Momentum > Signal.`
+      : `Tunggu close di atas EMA20 (${formatIdxPrice(ema20)}) atau pullback rapi ke ${entryLow} - ${entryHigh} dengan EMA9 > EMA20 dan Momentum > Signal.`,
+    entryZone: `${entryLow} - ${entryHigh}`,
+    idealBuy: formatIdxPrice(ema20 * 1.01),
+    stopLoss,
+    takeProfit: target,
+    invalidation: `Abaikan setup jika harga breakdown di bawah swing low ${formatIdxPrice(swingLow)}.`,
+    reason: waitReasons[0],
+    waitReasons
+  };
+}
+
+function generateUnifiedAnalysis(quotes: any[], pivots?: any) {
   const last = quotes[quotes.length - 1];
   const prev = quotes[quotes.length - 2];
   const prev5 = quotes[quotes.length - 6] || quotes[0];
@@ -160,7 +343,7 @@ function generateUnifiedAnalysis(quotes: any[]) {
         peakAnalysis = "Risiko 'Mean Reversion' meningkat. Momentum mulai jenuh, namun trend belum patah.";
     }
 
-    suggestion = `Harga sudah berada di atas rata-rata (${dist20.toFixed(1)}% dari EMA20). ${peakAnalysis} Strategi: Jika sudah punya, HOLD dengan Trailing Stop di Low bar sebelumnya. Jika belum punya, tunggu pullback sehat ke area EMA10/EMA20.`;
+    suggestion = `Harga sudah berada di atas rata-rata (${dist20.toFixed(1)}% dari EMA20). ${peakAnalysis} Strategi: Jika sudah punya, HOLD dengan Trailing Stop di Low bar sebelumnya. Jika belum punya, tunggu pullback sehat ke area EMA9/EMA20.`;
   } else if (last.isEliteBounce && fluxConviction) {
     verdict = "HIGH CONVICTION: ELITE BOUNCE";
     color = "oklch(0.85 0.25 200)";
@@ -203,7 +386,26 @@ function generateUnifiedAnalysis(quotes: any[]) {
     suggestion = "Harga bergerak sideways dalam range sempit. Belum ada trigger volume atau momentum yang cukup untuk breakout. Tetap pantau indikator Flux untuk tanda-tanda akumulasi awal.";
   }
 
+  const tradePlan = buildTradePlan(quotes, pivots, {
+    dist20,
+    squeezeIntensity,
+    squeezeDuration,
+    squeezeState,
+    fluxStatus,
+    fluxBullish,
+    fluxImproving,
+    momRising,
+    isOverextended,
+    isMomentumPeaking,
+    isVolumeClimax,
+    isMfiExtreme
+  });
+
   const kdjVal = parseFloat(last.kdj.j);
+  const emaFastTrend = last.ema9 > last.ema20 ? "BULLISH (EMA9 > EMA20)" : "BEARISH (EMA9 < EMA20)";
+  const emaSwingTrend = Number.isFinite(last.ema60)
+    ? (last.ema20 > last.ema60 ? "BULLISH (EMA20 > EMA60)" : "BEARISH (EMA20 < EMA60)")
+    : "WARMING_UP";
 
   // MFI Precision Trend (3-candle smoothed)
   const mfiLast3 = quotes.slice(-3).map(q => q.mfi);
@@ -230,6 +432,7 @@ function generateUnifiedAnalysis(quotes: any[]) {
     color,
     riskLevel,
     suggestion,
+    tradePlan,
     squeezeInsight,
     squeezeDuration,
     volDetails,
@@ -243,8 +446,12 @@ function generateUnifiedAnalysis(quotes: any[]) {
       vwap: last.close > last.vwap ? "Above" : "Below",
       vortex: last.vortex.plus > last.vortex.minus ? "Bullish" : "Bearish",
       kdj: isNaN(kdjVal) ? "0.0" : kdjVal.toFixed(1),
+      rsi: Number.isFinite(last.rsi) ? last.rsi.toFixed(1) : "N/A",
+      emaFast: emaFastTrend,
+      emaSwing: emaSwingTrend,
       squeeze: squeezeState.replace('_', ' '),
       flux: fluxStatus,
+      action: tradePlan.action,
       volClimax: isVolumeClimax,
       mfiExtreme: isMfiExtreme,
       peakStatus: isVolumeClimax || (isMfiExtreme && isMomentumPeaking) ? "PEAK_POTENTIAL" : (hasTrendStrength && !isMomentumPeaking ? "STRONG_INERTIA" : "MEAN_REVERSION")
@@ -318,8 +525,10 @@ export async function GET(req: Request) {
 
     const closes = quotes.map((q: any) => q.close);
     
+    const ema9 = calculateEMA(closes, 9);
     const ema10 = calculateEMA(closes, 10);
     const ema20 = calculateEMA(closes, 20);
+    const ema60 = calculateEMA(closes, 60);
     const sma50 = calculateSMA(closes, 50);
     const sma200 = calculateSMA(closes, 200);
     const macd = calculateMACD(closes);
@@ -345,8 +554,10 @@ export async function GET(req: Request) {
     const pivots = calculatePivotPoints(prevDay);
 
     const data = quotes.map((q: any, i: number) => {
+      const e9 = ema9[i];
       const e10 = ema10[i];
       const e20 = ema20[i];
+      const e60 = ema60[i];
       const s50 = sma50[i];
       const s200 = sma200[i];
       
@@ -419,8 +630,10 @@ export async function GET(req: Request) {
 
       return {
         ...q,
+        ema9: e9,
         ema10: e10,
         ema20: e20,
+        ema60: e60,
         sma50: s50,
         sma200: s200,
         isUndercutBounce,
@@ -455,6 +668,7 @@ export async function GET(req: Request) {
           d: kdjResult.d[i],
           j: kdjResult.j[i]
         },
+        rsi: currentRsi,
         macd: {
           macd: macd.macdLine[i],
           signal: macd.signalLine[i],
@@ -464,7 +678,7 @@ export async function GET(req: Request) {
       };
     });
 
-    const unifiedAnalysis = generateUnifiedAnalysis(data);
+    const unifiedAnalysis = generateUnifiedAnalysis(data, pivots);
 
     return NextResponse.json({ 
       success: true, 

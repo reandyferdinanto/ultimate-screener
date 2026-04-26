@@ -11,9 +11,17 @@ import {
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
+  BaselineSeries,
   AreaSeries,
   createSeriesMarkers
 } from "lightweight-charts";
+import type { BaselineData, HistogramData, LineData, SeriesMarker, Time } from "lightweight-charts";
+
+const asChartTime = (time: number | string) => time as Time;
+const compactChartData = <T,>(values: (T | null)[]): T[] =>
+  values.filter((value): value is T => value !== null);
+const finiteChartNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
 
 interface AdvancedChartProps {
   data: any[];
@@ -30,9 +38,11 @@ interface AdvancedChartProps {
   showOBV?: boolean;
   showCMF?: boolean;
   chartType?: 'candle' | 'line';
+  showEMA9?: boolean;
   showEMA10?: boolean;
   showEMA20?: boolean;
   showEMA50?: boolean;
+  showEMA60?: boolean;
   showEMA200?: boolean;
   showUndercutBounce?: boolean;
   showSqueezeDeluxe?: boolean;
@@ -53,9 +63,11 @@ export default function AdvancedChart({
   showOBV = false,
   showCMF = false,
   chartType = 'candle',
+  showEMA9 = false,
   showEMA10 = false,
   showEMA20 = true,
   showEMA50 = true,
+  showEMA60 = false,
   showEMA200 = true,
   showUndercutBounce = false,
   showSqueezeDeluxe = false
@@ -71,6 +83,20 @@ export default function AdvancedChart({
     const bgColor = "#0a0a0a";
     const textColor = "#d1d4dc";
     const gridColor = "rgba(42, 46, 57, 0.1)";
+    const isMobile = window.innerWidth < 768;
+    const hasSqueezePane = showSqueezeDeluxe;
+    const macdPaneRatio = hasSqueezePane ? 0.2 : 0.26;
+    const squeezePaneRatio = hasSqueezePane ? 0.22 : 0;
+    const lowerGap = hasSqueezePane ? 0.03 : 0.02;
+    const lowerReserved = macdPaneRatio + squeezePaneRatio + lowerGap;
+    const priceBottomMargin = Math.min(0.52, lowerReserved);
+    const volumeTopMargin = Math.max(0.48, 1 - priceBottomMargin - 0.08);
+    const macdTopMargin = hasSqueezePane ? 1 - squeezePaneRatio - lowerGap - macdPaneRatio : 1 - macdPaneRatio;
+    const macdBottomMargin = hasSqueezePane ? squeezePaneRatio + lowerGap : 0;
+    const squeezeTopMargin = 1 - squeezePaneRatio;
+    const chartHeight = isMobile
+      ? (hasSqueezePane ? 560 : 460)
+      : (hasSqueezePane ? 760 : 660);
 
     // Clear container
     chartContainerRef.current.innerHTML = '';
@@ -87,10 +113,13 @@ export default function AdvancedChart({
         barSpacing: 12
       },
       width: chartContainerRef.current.clientWidth,
-      height: window.innerWidth < 768 ? 400 : 600,
+      height: chartHeight,
     });
 
     chartRef.current = chart;
+    chart.priceScale("right").applyOptions({
+      scaleMargins: { top: 0.02, bottom: priceBottomMargin },
+    });
 
     if (onLogicalRangeChange) {
       chart.timeScale().subscribeVisibleLogicalRangeChange(onLogicalRangeChange);
@@ -100,7 +129,7 @@ export default function AdvancedChart({
     const volumeSeries = chart.addSeries(HistogramSeries, { 
       color: "#26a69a", priceFormat: { type: "volume" }, priceScaleId: "volume" 
     });
-    chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
+    chart.priceScale("volume").applyOptions({ scaleMargins: { top: volumeTopMargin, bottom: priceBottomMargin } });
     volumeSeries.setData(data.map(d => ({
       time: d.time as UTCTimestamp,
       value: d.volume,
@@ -164,6 +193,10 @@ export default function AdvancedChart({
         arr.map(d => ({ time: d.time as UTCTimestamp, value: d[key] }))
            .filter(v => v.value !== undefined && v.value !== null && !isNaN(v.value));
 
+    if (showEMA9) {
+        chart.addSeries(LineSeries, { color: "#ffcfa6", lineWidth: 1.5 as LineWidth, title: "EMA 9", lastValueVisible: false, priceLineVisible: false })
+             .setData(sanitizeData(data, 'ema9'));
+    }
     if (showEMA10) {
         chart.addSeries(LineSeries, { color: "rgba(130, 255, 160, 0.5)", lineWidth: 1.5 as LineWidth, title: "EMA 10", lastValueVisible: false, priceLineVisible: false })
              .setData(sanitizeData(data, 'ema10'));
@@ -175,6 +208,10 @@ export default function AdvancedChart({
     if (showEMA50) {
         chart.addSeries(LineSeries, { color: "#FF6D00", lineWidth: 1.5 as LineWidth, title: "EMA 50", lastValueVisible: false, priceLineVisible: false })
              .setData(sanitizeData(data, 'ema50'));
+    }
+    if (showEMA60) {
+        chart.addSeries(LineSeries, { color: "rgba(255, 160, 64, 0.75)", lineWidth: 1.5 as LineWidth, title: "EMA 60", lastValueVisible: false, priceLineVisible: false })
+             .setData(sanitizeData(data, 'ema60'));
     }
     if (showEMA200) {
         chart.addSeries(LineSeries, { color: "rgba(255, 235, 59, 0.5)", lineWidth: 1.5 as LineWidth, title: "EMA 200", lastValueVisible: false, priceLineVisible: false, lineStyle: 2 })
@@ -243,6 +280,224 @@ export default function AdvancedChart({
             lastValueVisible: false, 
             priceLineVisible: false 
         }).setData(sanitizeData(data, 'vwap'));
+    }
+
+    // --- 6.1 MACD LOWER PANE ---
+    const macdScaleOptions = {
+      priceScaleId: "macd",
+      lastValueVisible: false,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+    };
+    const macdHistSeries = chart.addSeries(HistogramSeries, { ...macdScaleOptions });
+    chart.priceScale("macd").applyOptions({
+      scaleMargins: { top: macdTopMargin, bottom: macdBottomMargin },
+      borderColor: "rgba(197, 203, 206, 0.12)",
+    });
+    macdHistSeries.setData(
+      compactChartData<HistogramData<Time>>(
+        data.map((d) => {
+          const value = Number(d.macd?.histogram);
+          if (!Number.isFinite(value)) return null;
+          return {
+            time: asChartTime(d.time),
+            value,
+            color: value >= 0 ? "rgba(38, 166, 154, 0.55)" : "rgba(239, 83, 80, 0.55)",
+          };
+        })
+      )
+    );
+    chart.addSeries(LineSeries, { color: "#2962FF", lineWidth: 1.5 as LineWidth, ...macdScaleOptions })
+      .setData(
+        compactChartData<LineData<Time>>(
+          data.map((d) => {
+            const value = Number(d.macd?.macd);
+            return Number.isFinite(value) ? { time: asChartTime(d.time), value } : null;
+          })
+        )
+      );
+    chart.addSeries(LineSeries, { color: "#FF6D00", lineWidth: 1.5 as LineWidth, ...macdScaleOptions })
+      .setData(
+        compactChartData<LineData<Time>>(
+          data.map((d) => {
+            const value = Number(d.macd?.signal);
+            return Number.isFinite(value) ? { time: asChartTime(d.time), value } : null;
+          })
+        )
+      );
+
+    // --- 6.2 SQUEEZE DELUXE LOWER PANE ---
+    if (showSqueezeDeluxe) {
+      const squeezeScaleOptions = {
+        priceScaleId: "squeeze",
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      };
+
+      const gaugeBandData = (
+        predicate: (momentum: number, flux: number) => boolean,
+        value: number
+      ) =>
+        compactChartData<BaselineData<Time>>(
+          data.map((d) => {
+            const momentum = finiteChartNumber(d.squeezeDeluxe?.momentum);
+            const flux = finiteChartNumber(d.squeezeDeluxe?.flux);
+            return momentum !== null && flux !== null && predicate(momentum, flux)
+              ? { time: asChartTime(d.time), value }
+              : null;
+          })
+        );
+
+      const addUpperGaugeBand = (predicate: (momentum: number, flux: number) => boolean, color: string) => {
+        chart.addSeries(BaselineSeries, {
+          baseValue: { type: "price", price: 70 },
+          topFillColor1: color,
+          topFillColor2: color,
+          topLineColor: "transparent",
+          bottomFillColor1: "transparent",
+          bottomFillColor2: "transparent",
+          bottomLineColor: "transparent",
+          lineWidth: 1,
+          ...squeezeScaleOptions,
+        }).setData(gaugeBandData(predicate, 75));
+      };
+
+      const addLowerGaugeBand = (predicate: (momentum: number, flux: number) => boolean, color: string) => {
+        chart.addSeries(BaselineSeries, {
+          baseValue: { type: "price", price: -70 },
+          topFillColor1: "transparent",
+          topFillColor2: "transparent",
+          topLineColor: "transparent",
+          bottomFillColor1: color,
+          bottomFillColor2: color,
+          bottomLineColor: "transparent",
+          lineWidth: 1,
+          ...squeezeScaleOptions,
+        }).setData(gaugeBandData(predicate, -75));
+      };
+
+      addUpperGaugeBand((momentum, flux) => momentum > 0 && flux > 0, "rgba(22, 155, 93, 0.42)");
+      addUpperGaugeBand((momentum, flux) => !(momentum > 0 && flux > 0) && (momentum > 0 || flux > 0), "rgba(22, 155, 93, 0.22)");
+      addUpperGaugeBand((momentum, flux) => momentum <= 0 && flux <= 0, "rgba(120, 123, 134, 0.12)");
+      addLowerGaugeBand((momentum, flux) => momentum < 0 && flux < 0, "rgba(151, 5, 41, 0.42)");
+      addLowerGaugeBand((momentum, flux) => !(momentum < 0 && flux < 0) && (momentum < 0 || flux < 0), "rgba(151, 5, 41, 0.22)");
+      addLowerGaugeBand((momentum, flux) => momentum >= 0 && flux >= 0, "rgba(120, 123, 134, 0.12)");
+
+      const fluxSeries = chart.addSeries(BaselineSeries, {
+        baseValue: { type: "price", price: 0 },
+        topFillColor1: "rgba(22, 155, 93, 0.30)",
+        topFillColor2: "rgba(22, 155, 93, 0.03)",
+        topLineColor: "rgba(22, 155, 93, 0.55)",
+        bottomFillColor1: "rgba(151, 5, 41, 0.03)",
+        bottomFillColor2: "rgba(151, 5, 41, 0.30)",
+        bottomLineColor: "rgba(151, 5, 41, 0.55)",
+        lineWidth: 1,
+        ...squeezeScaleOptions,
+      });
+      chart.priceScale("squeeze").applyOptions({
+        scaleMargins: { top: squeezeTopMargin, bottom: 0 },
+        borderColor: "rgba(197, 203, 206, 0.12)",
+      });
+      fluxSeries.setData(
+        compactChartData<BaselineData<Time>>(
+          data.map((d) => {
+            const value = finiteChartNumber(d.squeezeDeluxe?.flux);
+            return value !== null ? { time: asChartTime(d.time), value } : null;
+          })
+        )
+      );
+
+      chart.addSeries(BaselineSeries, {
+        baseValue: { type: "price", price: 0 },
+        topFillColor1: "rgba(17, 207, 119, 0.52)",
+        topFillColor2: "rgba(17, 207, 119, 0.08)",
+        topLineColor: "rgba(17, 207, 119, 0.85)",
+        bottomFillColor1: "rgba(209, 22, 69, 0.08)",
+        bottomFillColor2: "rgba(209, 22, 69, 0.52)",
+        bottomLineColor: "rgba(209, 22, 69, 0.85)",
+        lineWidth: 1,
+        ...squeezeScaleOptions,
+      }).setData(
+        compactChartData<BaselineData<Time>>(
+          data.map((d) => {
+            const value = finiteChartNumber(d.squeezeDeluxe?.overflux ?? d.squeezeDeluxe?.overFlux);
+            return value !== null ? { time: asChartTime(d.time), value } : null;
+          })
+        )
+      );
+
+      chart.addSeries(HistogramSeries, { ...squeezeScaleOptions })
+        .setData(
+          compactChartData<HistogramData<Time>>(
+            data.map((d) => {
+              const sqz = d.squeezeDeluxe?.squeeze;
+              if (!sqz?.low) return null;
+              const color = sqz.high ? "#ff1100" : sqz.mid ? "#ff5e00" : "#ffa600";
+              const value = 1;
+              return { time: asChartTime(d.time), value, color };
+            })
+          )
+        );
+
+      chart.addSeries(LineSeries, {
+        color: "rgba(203, 213, 225, 0.45)",
+        lineWidth: 1 as LineWidth,
+        ...squeezeScaleOptions,
+      }).setData(
+        compactChartData<LineData<Time>>(
+          data.map((d) => {
+            const value = finiteChartNumber(d.squeezeDeluxe?.signal);
+            return value !== null ? { time: asChartTime(d.time), value } : null;
+          })
+        )
+      );
+
+      const momentumSeries = chart.addSeries(LineSeries, {
+        color: "#ffcfa6",
+        lineWidth: 2 as LineWidth,
+        ...squeezeScaleOptions,
+      });
+      momentumSeries.setData(
+        compactChartData<LineData<Time>>(
+          data.map((d) => {
+            const value = finiteChartNumber(d.squeezeDeluxe?.momentum);
+            const signal = finiteChartNumber(d.squeezeDeluxe?.signal);
+            if (value === null) return null;
+            return {
+              time: asChartTime(d.time),
+              value,
+              color: signal !== null && value > signal ? "#ffcfa6" : "#419fec"
+            };
+          })
+        )
+      );
+
+      const squeezeMarkers: SeriesMarker<Time>[] = data.flatMap((d): SeriesMarker<Time>[] => {
+        const markers: SeriesMarker<Time>[] = [];
+        if (d.squeezeDeluxe?.isBearDiv) {
+          markers.push({
+            time: asChartTime(d.time),
+            position: "aboveBar" as const,
+            color: "#d11645",
+            shape: "arrowDown" as const,
+            text: "D-",
+          });
+        }
+        if (d.squeezeDeluxe?.isBullDiv) {
+          markers.push({
+            time: asChartTime(d.time),
+            position: "belowBar" as const,
+            color: "#ffa600",
+            shape: "arrowUp" as const,
+            text: "D+",
+          });
+        }
+        return markers;
+      });
+      if (squeezeMarkers.length > 0) {
+        createSeriesMarkers(momentumSeries, squeezeMarkers);
+      }
     }
 
     // --- 7. PIVOTS ---
@@ -441,7 +696,7 @@ export default function AdvancedChart({
           chartRef.current = null;
       }
     };
-  }, [data, ticker, chartType, showEMA10, showEMA20, showEMA50, showEMA200, showUndercutBounce, showSqueezeDeluxe, showSuperTrend, showBB, showMFI, showVWAP, showOBV, showCMF, onLogicalRangeChange, pivots]);
+  }, [data, ticker, chartType, showEMA9, showEMA10, showEMA20, showEMA50, showEMA60, showEMA200, showUndercutBounce, showSqueezeDeluxe, showSuperTrend, showBB, showMFI, showVWAP, showOBV, showCMF, onLogicalRangeChange, pivots]);
 
   useEffect(() => {
     if (isMounted.current && chartRef.current && syncLogicalRange) {
@@ -458,12 +713,16 @@ export default function AdvancedChart({
       <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span>TECHNICAL ANALYSIS: {ticker}</span>
         <div className="mobile-hide" style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
+          {showEMA9 && <span style={{ color: '#ffcfa6' }}>EMA 9</span>}
           {showEMA20 && <span style={{ color: '#2962FF' }}>● EMA 20</span>}
           {showEMA50 && <span style={{ color: '#FF6D00' }}>● EMA 50</span>}
           {showEMA200 && <span style={{ color: '#FFEB3B' }}>● EMA 200</span>}
+          {showEMA60 && <span style={{ color: '#ffa040' }}>EMA 60</span>}
+          <span style={{ color: '#26a69a' }}>MACD</span>
+          {showSqueezeDeluxe && <span style={{ color: '#ffa600' }}>SQZ DELUXE</span>}
         </div>
       </div>
-      <div ref={chartContainerRef} style={{ width: '100%', height: '600px' }} />
+      <div ref={chartContainerRef} style={{ width: '100%', height: showSqueezeDeluxe ? '760px' : '660px' }} />
     </div>
   );
 }

@@ -71,6 +71,9 @@ Core AI research tables should cover:
   - W4 & Wave A aggressively target absolute Fib retracements iteratively below `lastPrice`. 
   - W5 geometric calculation fixed: `W5Target = w4Price + diff * 0.618` instead of an absolute 1.618 overhead extension. 
   - Textual Conviction Report is synced with charting logic to display strictly matching dynamic Fibo levels and Target prices.
+- [x] **Squeeze Deluxe parity**: EliCobra formula aligned for momentum, squeeze thresholds, DFO/overflux, bullish/bearish divergence markers, and shared scanner helper usage.
+- [x] **Conviction Report execution plan**: `/search` now combines Squeeze Deluxe with 20 EMA pullback/reclaim rules to output BUY, SELL/REDUCE, or WAIT AND SEE with entry zone, stop, target, invalidation, and wait reasons.
+- [x] **EMA crossover confirmation**: `/search` now calculates/displays EMA9 and EMA60; Conviction Report uses EMA9/20 for fast timing and EMA20/60 for swing trend confirmation.
 - [ ] Persist `1-10` candle pre-breakout features in a structured form.
 - [ ] Store versioned `Secret Sauce` formulas and their performance.
 - [ ] Run the screener from the latest formula instead of hardcoded rules.
