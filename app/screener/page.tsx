@@ -20,7 +20,7 @@ interface SignalData {
 
 export default function ScreenerPage() {
   const [data, setData] = useState<SignalData[]>([]);
-  const [view, setView] = useState<'signals' | 'sauce' | 'divergence' | 'sqz_div' | 'arahunter'>('signals');
+  const [view, setView] = useState<'signals' | 'sauce' | 'divergence' | 'sqz_div' | 'arahunter' | 'flyer'>('signals');
   const [priceRange, setPriceRange] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [sqzTimeframe, setSqzTimeframe] = useState<'1d' | '4h'>('1d');
@@ -79,13 +79,14 @@ export default function ScreenerPage() {
   const displayedSignals = data.filter(s => {
       const strat = s.strategy?.toLowerCase() || '';
       if (view === 'sauce') return strat.includes('secret');
+      if (view === 'flyer') return strat.includes('flyer');
       if (view === 'divergence') return strat.includes('cvd');
       if (view === 'sqz_div') {
           const isSqz = strat.includes('squeeze');
           const isRightTF = strat.includes(sqzTimeframe.toLowerCase());
           return isSqz && isRightTF;
       }
-      return !strat.includes('secret') && !strat.includes('cvd') && !strat.includes('squeeze');
+      return !strat.includes('secret') && !strat.includes('cvd') && !strat.includes('squeeze') && !strat.includes('flyer');
   });
 
   const saveSettings = () => {
@@ -154,6 +155,7 @@ export default function ScreenerPage() {
             <div className="tabs-container custom-scrollbar">
               {[
                 { id: 'signals', label: 'EMA_BOUNCE', color: 'var(--accent-emerald)' },
+                { id: 'flyer', label: 'SILENT_FLYER', color: 'oklch(0.75 0.2 320)' },
                 { id: 'divergence', label: 'CVD_DIVERGENCE', color: 'oklch(0.7 0.2 300)' },
                 { id: 'sqz_div', label: 'SQZ_DIVERGENCE', color: 'oklch(0.82 0.18 145)' },
                 { id: 'sauce', label: 'SECRET_SAUCE', color: 'oklch(0.85 0.25 200)' }
@@ -245,17 +247,18 @@ export default function ScreenerPage() {
         <div className="signals-viewport panel">
           <div className="viewport-header">
             <div className="header-status">
-              <div className="pulse-dot" style={{ backgroundColor: view === 'sauce' ? 'oklch(0.85 0.25 200)' : (view === 'sqz_div' ? 'oklch(0.82 0.18 145)' : 'var(--accent-emerald)') }}></div>
+              <div className="pulse-dot" style={{ backgroundColor: view === 'sauce' ? 'oklch(0.85 0.25 200)' : (view === 'sqz_div' ? 'oklch(0.82 0.18 145)' : (view === 'flyer' ? 'oklch(0.75 0.2 320)' : 'var(--accent-emerald)')) }}></div>
               <span className="view-label">
-                {(view === 'sauce' ? 'PREDICTIVE_MODELS' : (view === 'sqz_div' ? 'SQZ_MOMENTUM' : (view === 'divergence' ? 'CVD_DIVERGENCE' : 'TECHNICAL_BOUNCE')))}
+                {(view === 'sauce' ? 'PREDICTIVE_MODELS' : (view === 'sqz_div' ? 'SQZ_MOMENTUM' : (view === 'flyer' ? 'INSTITUTIONAL_FLYER' : (view === 'divergence' ? 'CVD_DIVERGENCE' : 'TECHNICAL_BOUNCE'))))}
               </span>
+              {(loading || scanning) && <span className="refreshing-tag animate-pulse">REFRESHING_VECTORS...</span>}
             </div>
             <span className="risk-badge">
-               {view === 'sauce' ? 'AI_ACCUMULATION' : (view === 'sqz_div' ? 'VOLATILITY_ENGINE' : 'RISK_LIMIT: < 5.5%')}
+               {view === 'sauce' ? 'AI_ACCUMULATION' : (view === 'sqz_div' ? 'VOLATILITY_ENGINE' : (view === 'flyer' ? 'FLYER_RADAR: HIGH_INERTIA' : 'RISK_LIMIT: < 5.5%'))}
             </span>
           </div>
 
-          {(loading || scanning) ? (
+          {(loading || scanning) && data.length === 0 ? (
             <div className="loading-container">
               <div className="scanner-glow"></div>
               <div className="loading-text">{scanning ? "MAPPING_MARKET_DNA..." : "ESTABLISHING_DATA_LINK..."}</div>
@@ -264,7 +267,7 @@ export default function ScreenerPage() {
           ) : displayedSignals.length === 0 ? (
             <div className="empty-viewport">NO_SIGNALS_DETECTED_IN_THIS_VECTOR</div>
           ) : (
-            <div className="table-responsive custom-scrollbar">
+            <div className={`table-responsive custom-scrollbar ${(loading || scanning) ? 'opacity-50' : ''}`}>
               <table className="signals-table">
                 <thead>
                   <tr>
@@ -626,6 +629,19 @@ export default function ScreenerPage() {
             color: white;
             letter-spacing: 0.05em;
         }
+
+        .refreshing-tag {
+            font-size: 0.6rem;
+            font-weight: 900;
+            color: var(--accent-cyan);
+            background: oklch(from var(--accent-cyan) l c h / 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+        }
+
+        .opacity-50 { opacity: 0.5; }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
         .risk-badge {
             font-size: 0.65rem;
