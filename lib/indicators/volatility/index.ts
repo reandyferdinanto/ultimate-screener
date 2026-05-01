@@ -21,6 +21,42 @@ export function calculateATR(quotes: OHLCV[], period = 14): number[] {
   return i_rma(tr, { period });
 }
 
+export function calculateATRP(quotes: OHLCV[], period = 14): number[] {
+  const atr = calculateATR(quotes, period);
+  return quotes.map((quote, i) => {
+    const value = atr[i];
+    return isFiniteNumber(value) && quote.close ? (value / quote.close) * 100 : Number.NaN;
+  });
+}
+
+export function calculateChandelierExit(quotes: OHLCV[], period = 22, multiplier = 3) {
+  const atr = calculateATR(quotes, period);
+  const highs = quotes.map(quote => quote.high);
+  const lows = quotes.map(quote => quote.low);
+  const highestHigh = calculateHighest(highs, period);
+  const lowestLow = calculateLowest(lows, period);
+
+  return {
+    long: quotes.map((_, i) => {
+      const value = atr[i];
+      return isFiniteNumber(value) ? highestHigh[i] - value * multiplier : Number.NaN;
+    }),
+    short: quotes.map((_, i) => {
+      const value = atr[i];
+      return isFiniteNumber(value) ? lowestLow[i] + value * multiplier : Number.NaN;
+    })
+  };
+}
+
+export function calculateKeltnerChannels(quotes: OHLCV[], ema: number[], atrPeriod = 10, multiplier = 2) {
+  const atr = calculateATR(quotes, atrPeriod);
+  return {
+    middle: ema,
+    upper: ema.map((value, i) => isFiniteNumber(value) && isFiniteNumber(atr[i]) ? value + atr[i] * multiplier : Number.NaN),
+    lower: ema.map((value, i) => isFiniteNumber(value) && isFiniteNumber(atr[i]) ? value - atr[i] * multiplier : Number.NaN)
+  };
+}
+
 /**
  * Helper: True Range
  */

@@ -3,7 +3,7 @@
 Terminal-inspired financial intelligence dashboard (Bloomberg-lite) for Indonesian Stock Exchange (IDX).
 
 ## Features
-- **Real-time Technical Analysis:** Advanced indicators including Squeeze Momentum Deluxe, Elliott Wave, and Pivot Points.
+- **Real-time Technical Analysis:** Advanced indicators including Squeeze Momentum Deluxe and Pivot Points.
 - **AI Stock Analysis:** Integration with Google Gemini to analyze >20% price spikes and identify common patterns.
 - **Custom Screeners:** Automatic scanners for "Secret Sauce", "ARA Hunter", and "EMA Bounce" strategies.
 - **Telegram Bot:** Interactive bot for on-demand stock analysis and automated alerts.

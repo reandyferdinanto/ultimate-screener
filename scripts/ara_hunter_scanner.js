@@ -103,15 +103,19 @@ async function scan() {
                 signalSource: 'ARAHunter',
                 entryDate: new Date(),
                 entryPrice: history[lastIdx].close,
+                currentPrice: history[lastIdx].close,
                 targetPrice: history[lastIdx].close * 1.2, // Arbitrary 20% target
+                stopLossPrice: history[lastIdx].close * 0.95,
                 status: 'pending',
                 relevanceScore: volRatio * (change / 10),
+                priceHistory: [{ date: new Date(), price: history[lastIdx].close }],
                 metadata: {
                   volRatio,
                   change,
                   momentum: recentResults[4].momentum,
                   squeezeStatus: recentResults[4].squeeze,
-                  avgRangeBefore
+                  avgRangeBefore,
+                  lastQuoteDate: history[lastIdx].date ? new Date(history[lastIdx].date).toISOString() : new Date().toISOString()
                 }
               },
               { upsert: true, new: true }

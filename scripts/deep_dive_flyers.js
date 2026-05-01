@@ -18,7 +18,6 @@ async function analyzeTickers() {
       const last = json.data[json.data.length - 1];
       const prev = json.data[json.data.length - 2];
       const analysis = json.unifiedAnalysis;
-      const elliott = json.elliott;
 
       console.log(`[${ticker}]`);
       console.log(`- Verdict      : ${analysis.verdict}`);
@@ -27,8 +26,6 @@ async function analyzeTickers() {
       console.log(`- Momentum     : ${last.squeezeDeluxe.momentum > last.squeezeDeluxe.signal ? "ACCELERATING" : "DECELERATING"}`);
       console.log(`- Conviction   : ${analysis.score.setup}%`);
       console.log(`- Vol Strength : ${analysis.score.volume}%`);
-      console.log(`- Elliott Trend: ${elliott.trend}`);
-      console.log(`- Interpretation: ${elliott.interpretation.substring(0, 150)}...`);
       
       // Check for specific "Spark" markers
       const isSqzFired = !last.squeezeDeluxe.squeeze.low && !last.squeezeDeluxe.squeeze.mid && !last.squeezeDeluxe.squeeze.high && 

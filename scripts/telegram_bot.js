@@ -1,7 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const mongoose = require('mongoose');
 const { chromium } = require('playwright');
-const sharp = require('sharp');
 const YahooFinance = require('yahoo-finance2').default;
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
@@ -12,7 +11,7 @@ const settingsSchema = new mongoose.Schema({ key: String, value: mongoose.Schema
 const Settings = mongoose.models.Settings || mongoose.model("Settings", settingsSchema);
 
 const indonesiaStockSchema = new mongoose.Schema({
-    ticker: String, name: String, active: Boolean, sector: String, lastPrice: Number
+    ticker: String, symbol: String, name: String, active: Boolean, sector: String, lastPrice: Number
 }, { collection: "indonesiastocks" });
 const IndonesiaStock = mongoose.models.IndonesiaStock || mongoose.model("IndonesiaStock", indonesiaStockSchema);
 
@@ -24,54 +23,222 @@ const SignalPerformance = mongoose.models.SignalPerformance || mongoose.model("S
 let bot;
 let botToken = "";
 
-async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
-    let ticker = tickerInput.toUpperCase().trim();
-    if (!ticker.includes(".")) ticker += ".JK";
-    const rawTicker = ticker.split('.')[0];
+const APP_BASE_URL = (process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://ultimate-screener.ebite.biz.id").replace(/\/$/, "");
 
-    const timeLabel = interval === "15m" ? " (15m SCALP)" : "";
-    const sentMsg = await bot.sendMessage(chatId, "```md\n# ANALYZING: " + rawTicker + timeLabel + "\nPlease wait...\n```", { parse_mode: 'Markdown' });
+function normalizeTickerInput(value) {
+    const input = String(value || "").trim().toUpperCase();
+    if (!input) return "";
+    if (input.includes(".")) return input;
+    if (input.startsWith("^")) return input;
+    return `${input}.JK`;
+}
 
-    try {
-        // 1. Fetch Data in Parallel
-        const [quote, techRes, stockInfo] = await Promise.all([
-            yahooFinance.quote(ticker).catch(() => null),
-            fetch(`https://ultimate-screener.ebite.biz.id/api/technical?symbol=${ticker}&interval=${interval}`).then(res => res.json()).catch(() => ({ success: false })),
-            IndonesiaStock.findOne({ ticker: rawTicker })
-        ]);
+function rawTicker(value) {
+    return String(value || "").trim().toUpperCase().replace(/\.JK$/, "").split(".")[0];
+}
 
-        if (!quote || !techRes.success) {
-            throw new Error("Data not found for " + ticker);
+function tickerLookupKeys(value) {
+    const yahooTicker = normalizeTickerInput(value);
+    const raw = rawTicker(yahooTicker);
+    return Array.from(new Set([yahooTicker, raw, `${raw}.JK`].filter(Boolean)));
+}
+
+async function findStockByTicker(value) {
+    const keys = tickerLookupKeys(value);
+    if (keys.length === 0) return null;
+    return IndonesiaStock.findOne({
+        $or: [
+            { ticker: { $in: keys } },
+            { symbol: { $in: keys } }
+        ]
+    });
+}
+
+async function fetchJson(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+async function fetchTechnical(ticker, interval = "1d") {
+    const url = `${APP_BASE_URL}/api/technical?symbol=${encodeURIComponent(normalizeTickerInput(ticker))}&interval=${encodeURIComponent(interval)}`;
+    return fetchJson(url).catch(error => ({ success: false, error: error.message }));
+}
+
+function analysisUrl(ticker, interval = "1d") {
+    return `${APP_BASE_URL}/search?symbol=${encodeURIComponent(normalizeTickerInput(ticker))}&interval=${encodeURIComponent(interval)}`;
+}
+
+function formatNumber(value, digits = 0) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "-";
+    return number.toLocaleString("id-ID", { maximumFractionDigits: digits, minimumFractionDigits: digits });
+}
+
+function formatPrice(value) {
+    return formatNumber(value, 0);
+}
+
+function formatPct(value, digits = 2) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return "-";
+    return `${number.toFixed(digits)}%`;
+}
+
+function formatDateTime(value) {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+}
+
+function formatSignalLabel(value) {
+    return String(value || "TECHNICAL").replace(/_/g, " ");
+}
+
+function cleanMarkdownText(value, maxLength = 700) {
+    const text = String(value || "-").replace(/```/g, "'''").trim();
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, maxLength - 3)}...`;
+}
+
+function getExecutionPlan(analysis) {
+    return analysis?.screenerTradePlan || analysis?.tradePlan || null;
+}
+
+function buildInlineKeyboard(ticker, interval = "1d") {
+    const raw = rawTicker(ticker);
+    return {
+        inline_keyboard: [
+            [
+                { text: '📊 View Interactive Chart', url: analysisUrl(ticker, interval) },
+                { text: '🔄 Refresh', callback_data: `refresh_${raw}_${interval}` }
+            ],
+            [
+                { text: '💸 Execution Plan', callback_data: `buyplan_${raw}_${interval}` }
+            ]
+        ]
+    };
+}
+
+function buildConvictionReport(raw, interval, price, changePct, techRes) {
+    const analysis = techRes.unifiedAnalysis || {};
+    const screener = techRes.screenerContext || analysis.screenerContext;
+    const activeSignals = techRes.activeScreenerSignals || analysis.activeScreenerSignals || [];
+    const plan = getExecutionPlan(analysis);
+    const timeLabel = interval === "15m" ? " (15m SCALP)" : interval !== "1d" ? ` (${interval})` : "";
+
+    let md = "```md\n";
+    md += `# CONVICTION_REPORT: ${raw}${timeLabel}\n`;
+    md += `Price   : ${formatPrice(price)} (${formatPct(changePct)})\n`;
+    md += `Verdict : ${analysis.verdict || "-"}\n`;
+    md += `Risk    : ${analysis.riskLevel || "-"}\n\n`;
+
+    if (screener) {
+        md += "## SCREENER_SYNC\n";
+        md += `- Category : ${formatSignalLabel(screener.category)}\n`;
+        md += `- Vector   : ${screener.vector || screener.signalSource || "-"}\n`;
+        md += `- Appeared : ${formatDateTime(screener.appearedAt || screener.entryDate)}\n`;
+        md += `- Last Scan: ${formatDateTime(screener.lastScannedAt || screener.updatedAt)}\n`;
+        md += `- Entry    : ${formatPrice(screener.entryPrice)}\n`;
+        md += `- Stop     : ${formatPrice(screener.stopLossPrice)}\n`;
+        md += `- Target   : ${formatPrice(screener.targetPrice)}\n`;
+        md += `- RR/Delta : ${screener.rewardRisk ?? "-"}R / ${formatPct(screener.deltaPct)}\n`;
+        if (screener.thesis) md += `- Thesis   : ${cleanMarkdownText(screener.thesis, 260)}\n`;
+        if (activeSignals.length > 1) {
+            md += `- Stack    : ${activeSignals.slice(1, 4).map(s => formatSignalLabel(s.category)).join(", ")}\n`;
         }
+        md += "\n";
+    }
 
-        const last = techRes.data[techRes.data.length - 1];
-        const analysis = techRes.unifiedAnalysis;
-        const elliott = techRes.elliott;
+    if (plan) {
+        md += "## EXECUTION_STATE\n";
+        md += `- State    : ${plan.stateLabel || plan.action || "-"}\n`;
+        md += `- RR       : ${plan.rewardRisk ?? "-"}R\n`;
+        md += `- Max Loss : ${plan.maxLossPct ?? "-"}%\n`;
+        md += `- Entry    : ${plan.entryZone || "-"}\n`;
+        md += `- Ideal Buy: ${formatPrice(plan.idealBuy)}\n`;
+        md += `- EarlyExit: ${formatPrice(plan.earlyExit)}\n`;
+        md += `- Hard Stop: ${formatPrice(plan.hardStop ?? plan.stopLoss)}\n`;
+        md += `- Target 1 : ${formatPrice(plan.target1 ?? plan.takeProfit)}\n`;
+        md += `- Target 2 : ${formatPrice(plan.target2)}\n`;
+        if (plan.timeStopRule) md += `- TimeStop : ${cleanMarkdownText(plan.timeStopRule, 220)}\n`;
+        md += "\n";
+    }
 
-        const price = quote?.regularMarketPrice || last.close;
-        const change = quote?.regularMarketChangePercent ? quote.regularMarketChangePercent.toFixed(2) : "0.00";
+    md += "## DECISION_SUMMARY\n";
+    md += `${cleanMarkdownText(analysis.suggestion, 500)}\n\n`;
 
-        // 2. Generate Screenshot (Technical Chart + Elliott Predictions)
-        const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    if (plan?.reason) {
+        md += "## WHY_THIS_DECISION\n";
+        md += `${cleanMarkdownText(plan.reason, 360)}\n\n`;
+    }
+
+    if (plan?.timing) {
+        md += "## NEXT_ACTION\n";
+        md += `${cleanMarkdownText(plan.timing, 360)}\n\n`;
+    }
+
+    if (analysis.squeezeInsight) {
+        md += "## COMPRESSION_INSIGHT\n";
+        md += `${cleanMarkdownText(analysis.squeezeInsight, 320)}\n\n`;
+    }
+
+    md += "## QUALITY_METRICS\n";
+    md += `- Setup Quality : ${analysis.score?.setup ?? "-"}%\n`;
+    md += `- Vol Conviction: ${analysis.score?.volume ?? "-"}%\n\n`;
+
+    md += "## FLOW_METRICS\n";
+    const details = analysis.details || {};
+    ["mfi", "obv", "vwap", "rsi", "emaFast", "emaSwing", "emaBounce", "cooldown", "squeeze", "flux", "execution", "rewardRisk", "maxLoss", "atrp"].forEach(key => {
+        if (details[key] !== undefined) md += `- ${key.padEnd(10)}: ${details[key]}\n`;
+    });
+    md += "```";
+    return md;
+}
+
+function buildExecutionPlanReport(ticker, interval, techRes) {
+    const analysis = techRes.unifiedAnalysis || {};
+    const plan = getExecutionPlan(analysis);
+    const screener = techRes.screenerContext || analysis.screenerContext;
+    const raw = rawTicker(ticker);
+    if (!plan) throw new Error("No execution plan available from /api/technical.");
+
+    let md = "```md\n";
+    md += `# EXECUTION_PLAN: ${raw}${interval === "15m" ? " (15m)" : ""}\n`;
+    md += `Source : ${plan.screenerSynced ? "SCREENER_SYNC + /api/technical" : "/api/technical tradePlan"}\n`;
+    md += `Verdict: ${analysis.verdict || "-"}\n`;
+    md += `State  : ${plan.stateLabel || plan.action || "-"}\n`;
+    if (screener) md += `Signal : ${formatSignalLabel(screener.category)} / ${screener.vector || "-"}\n`;
+    md += "\n";
+    md += `ENTRY_ZONE : ${plan.entryZone || "-"}\n`;
+    md += `IDEAL_BUY  : ${formatPrice(plan.idealBuy)}\n`;
+    md += `EARLY_EXIT : ${formatPrice(plan.earlyExit)}\n`;
+    md += `HARD_STOP  : ${formatPrice(plan.hardStop ?? plan.stopLoss)}\n`;
+    md += `TARGET_1   : ${formatPrice(plan.target1 ?? plan.takeProfit)}\n`;
+    md += `TARGET_2   : ${formatPrice(plan.target2)}\n`;
+    md += `RR / RISK  : ${plan.rewardRisk ?? "-"}R / ${plan.maxLossPct ?? "-"}%\n\n`;
+    if (plan.timeStopRule) md += `TIME_STOP  : ${cleanMarkdownText(plan.timeStopRule, 240)}\n`;
+    if (plan.positionSizing) md += `SIZE_RULE  : ${cleanMarkdownText(plan.positionSizing, 240)}\n`;
+    if (plan.reason) md += `REASON     : ${cleanMarkdownText(plan.reason, 300)}\n`;
+    if (plan.timing) md += `NEXT       : ${cleanMarkdownText(plan.timing, 300)}\n`;
+    md += "```";
+    return md;
+}
+
+async function captureChart(ticker, interval) {
+    const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    try {
         const page = await browser.newPage();
         await page.setViewportSize({ width: 1200, height: 1600 });
-        const url = `https://ultimate-screener.ebite.biz.id/search?symbol=${ticker}&interval=${interval}`;
+        const url = analysisUrl(ticker, interval);
         await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
 
-        // Enable indicators via evaluating client-side buttons
-        await page.evaluate(() => {
-            const buttons = Array.from(document.querySelectorAll('button'));
-            const toClick = ["SQZ_DELUXE", "SUPERTREND", "BB", "MFI", "VWAP", "OBV", "CMF", "EMA10", "BOUNCE_MARKER"];
-            buttons.forEach(btn => {
-                if (toClick.some(txt => btn.innerText.includes(txt))) {
-                    btn.click();
-                }
-            });
-        });
-        
-        await page.waitForTimeout(6000); // Wait for all charts to render
-
-        // HIDE UNNECESSARY UI ELEMENTS FOR CLEAN CHART
         await page.evaluate(() => {
             const elementsToHide = [
                 '.command-center',
@@ -79,7 +246,8 @@ async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
                 '.search-grid > div:last-child',
                 'nav',
                 'footer'
-            ];            elementsToHide.forEach(selector => {
+            ];
+            elementsToHide.forEach(selector => {
                 const el = document.querySelector(selector);
                 if (el) el.style.display = 'none';
             });
@@ -90,110 +258,80 @@ async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
                 container.style.background = '#0a0a0a';
             }
 
-            // Focus on the main chart area
             const mainChart = document.querySelector('.chart-wrapper');
-            if (mainChart) {
-                mainChart.scrollIntoView();
-            }
-            });
+            if (mainChart) mainChart.scrollIntoView();
+        });
 
-            const buffer = await page.locator('.charts-column').screenshot({
-            type: 'png'
-            });
+        await page.waitForTimeout(3500);
+        return page.locator('.charts-column').screenshot({ type: 'png' });
+    } finally {
         await browser.close();
+    }
+}
 
-        // 3. Compose MD Analysis (Refined Conviction Report)
-        let md = "```md\n";
-        md += `# CONVICTION_REPORT: ${rawTicker}${timeLabel}\n`;
-        md += `Price   : ${price} (${change}%)\n`;
-        md += `Verdict : ${analysis.verdict}\n`;
-        md += `Risk    : ${analysis.riskLevel}\n\n`;
+function parseCallback(data, prefix) {
+    const payload = String(data || "").replace(prefix, "");
+    const parts = payload.split("_");
+    return {
+        ticker: parts[0],
+        interval: parts[1] || "1d"
+    };
+}
 
-        md += `## SCORE_METRICS\n`;
-        md += `- Setup Quality : ${analysis.score.setup}%\n`;
-        md += `- Vol Conviction: ${analysis.score.volume}%\n\n`;
+async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
+    const ticker = normalizeTickerInput(tickerInput);
+    const raw = rawTicker(ticker);
 
-        md += `## EXTENSION_WATCH\n`;
-        md += `- Peak Status   : ${analysis.details.peakStatus.replace('_', ' ')}\n`;
-        md += `- Vol Climax    : ${analysis.details.volClimax ? 'YES (High Risk)' : 'NO'}\n`;
-        md += `- MFI Extreme   : ${analysis.details.mfiExtreme ? 'YES (>85)' : 'NO'}\n\n`;
+    const timeLabel = interval === "15m" ? " (15m SCALP)" : "";
+    const sentMsg = await bot.sendMessage(chatId, "```md\n# ANALYZING: " + raw + timeLabel + "\nSyncing with web CONVICTION_REPORT...\n```", { parse_mode: 'Markdown' });
 
-        if (analysis.squeezeInsight) {
-            md += `## VOLATILITY_ENGINE\n`;
-            md += `- Squeeze Life : ${analysis.squeezeDuration} Bars\n`;
-            md += `- Insight      : ${analysis.squeezeInsight}\n\n`;
+    try {
+        const [quote, techRes] = await Promise.all([
+            yahooFinance.quote(ticker).catch(() => null),
+            fetchTechnical(ticker, interval)
+        ]);
+
+        if (!techRes.success) {
+            throw new Error(techRes.error || "Data not found for " + ticker);
         }
 
-        if (elliott) {
-            md += `## ELLIOTT_WAVE_PROJECT\n`;
-            md += `- Trend       : ${elliott.trend}\n`;
-            if (elliott.trend === 'BULLISH' && elliott.w5Target) {
-                md += `- Reachability: ${elliott.w5Target.reachability}\n`;
-                md += `- Target W5   : ${elliott.w5Target.current.toFixed(0)} (Current)\n`;
-                if (elliott.w5Target.aggressive > elliott.w5Target.current) {
-                    md += `- Stretch Tgt : ${elliott.w5Target.aggressive.toFixed(0)} (0.618 Ext)\n`;
-                }
-            }
-            md += `- Support 61.8: ${elliott.retracement.h618?.toFixed(0)}\n`;
-            md += `- Interpretation: ${elliott.interpretation}\n\n`;
-        }
-
-        md += `## FLOW_METRICS\n`;
-        md += `- Flux Status   : ${analysis.details.flux}\n`;
-        md += `- MFI Momentum  : ${analysis.details.mfi}\n`;
-        md += `- OBV Trend     : ${analysis.details.obv}\n`;
-        md += `- VWAP Position : ${analysis.details.vwap}\n`;
-        md += `- KDJ J-Line    : ${analysis.details.kdj}\n`;
-        md += `- Squeeze Status: ${analysis.details.squeeze}\n\n`;
-
-        md += `## STRATEGIC_CONCLUSION\n`;
-        md += `${analysis.suggestion}\n`;
-        md += "```";
-
-        const caption = `🟢 *${rawTicker}${timeLabel}:* \`${analysis.verdict}\``;
+        const last = techRes.data[techRes.data.length - 1];
+        const analysis = techRes.unifiedAnalysis;
+        const price = quote?.regularMarketPrice || last.close;
+        const change = quote?.regularMarketChangePercent ?? 0;
+        const url = analysisUrl(ticker, interval);
+        const md = buildConvictionReport(raw, interval, price, change, techRes);
+        const caption = `🟢 *${raw}${timeLabel}:* \`${analysis.verdict}\``;
         const fullReport = `${caption}\n\n${md}`;
+        const replyMarkup = buildInlineKeyboard(ticker, interval);
+        const buffer = await captureChart(ticker, interval).catch(error => {
+            console.warn(`[Telegram] Chart screenshot failed for ${ticker}:`, error.message);
+            return null;
+        });
 
-        if (fullReport.length > 1024) {
-            // Send photo with short caption
+        if (buffer && fullReport.length > 1024) {
             await bot.sendPhoto(chatId, buffer, {
                 caption: caption,
                 parse_mode: 'Markdown'
             });
 
-            // Send full report as follow-up message
             const opts = {
                 parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            { text: '📊 View Interactive Chart', url: url },
-                            { text: '🔄 Refresh', callback_data: `refresh_${rawTicker}` }
-                        ],
-                        [
-                            { text: '💸 Get Buy Plan', callback_data: `buyplan_${rawTicker}` }
-                        ]
-                    ]
-                }
+                reply_markup: replyMarkup
             };
             await bot.sendMessage(chatId, fullReport, opts);
-        } else {
-            // Send together if within limits
+        } else if (buffer) {
             const opts = {
                 caption: fullReport,
                 parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            { text: '📊 View Interactive Chart', url: url },
-                            { text: '🔄 Refresh', callback_data: `refresh_${rawTicker}` }
-                        ],
-                        [
-                            { text: '💸 Get Buy Plan', callback_data: `buyplan_${rawTicker}` }
-                        ]
-                    ]
-                }
+                reply_markup: replyMarkup
             };
             await bot.sendPhoto(chatId, buffer, opts);
+        } else {
+            await bot.sendMessage(chatId, `${fullReport}\n\nChart: ${url}`, {
+                parse_mode: 'Markdown',
+                reply_markup: replyMarkup
+            });
         }
 
         bot.deleteMessage(chatId, sentMsg.message_id).catch(() => {});
@@ -225,92 +363,54 @@ async function initBot() {
         const chatId = query.message.chat.id;
 
         if (data.startsWith('refresh_')) {
-            const ticker = data.split('_')[1];
+            const { ticker, interval } = parseCallback(data, 'refresh_');
             bot.answerCallbackQuery(query.id, { text: `Refreshing ${ticker}...` });
-            generateFullAnalysis(chatId, ticker);
+            generateFullAnalysis(chatId, ticker, interval);
         }
 
         if (data.startsWith('full_list_')) {
-            const category = data.split('_')[2]; 
+            const category = data.replace('full_list_', '').toUpperCase(); 
             bot.answerCallbackQuery(query.id, { text: `Fetching full list for ${category}...` });
 
             try {
-                const res = await fetch(`https://ultimate-screener.ebite.biz.id/api/screener`);
+                const res = await fetch(`${APP_BASE_URL}/api/screener`);
                 const json = await res.json();
                 if (!json.success) return;
 
-                const signals = json.data.filter(s => s.strategy && s.strategy.toUpperCase().includes(category));
+                const signals = json.data.filter(s => {
+                    const haystack = [s.category, s.vector, s.strategy, s.signalSource, s.metadata?.category, s.metadata?.vector]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toUpperCase();
+                    return haystack.includes(category);
+                });
 
                 let text = "```md\n";
                 text += `# FULL LIST: ${category}\n\n`;
-                text += "| TICKER | SCORE | PRICE | SL    |\n";
-                text += "|--------|-------|-------|-------|\n";
+                text += "| TICKER | CAT      | ENTRY | CUR   | DELTA |\n";
+                text += "|--------|----------|-------|-------|-------|\n";
                 signals.slice(0, 20).forEach(s => {
                     const rawTicker = s.ticker.replace(".JK", "").padEnd(6);
-                    const score = (s.relevanceScore || 0).toString().padEnd(5);
-                    const price = (s.buyArea || 0).toString().padEnd(5);
-                    const sl = (s.sl || 0).toString().padEnd(5);
-                    text += `| ${rawTicker} | ${score} | ${price} | ${sl} |\n`;
+                    const cat = formatSignalLabel(s.category || s.metadata?.category).slice(0, 8).padEnd(8);
+                    const entry = formatPrice(s.buyArea).padEnd(5);
+                    const cur = formatPrice(s.currentPrice).padEnd(5);
+                    const delta = formatPct(s.deltaPct, 1).padEnd(5);
+                    text += `| ${rawTicker} | ${cat} | ${entry} | ${cur} | ${delta} |\n`;
                 });
+                if (signals.length === 0) text += "No active signals found.\n";
                 text += "```";
                 bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
             } catch (e) {}
         }
 
         if (data.startsWith('buyplan_')) {
-            const ticker = data.split('_')[1];
+            const { ticker, interval } = parseCallback(data, 'buyplan_');
             bot.answerCallbackQuery(query.id, { text: `Building Realistic Plan for ${ticker}...` });
 
             try {
-                const res = await fetch(`https://ultimate-screener.ebite.biz.id/api/technical?symbol=${ticker}.JK`).then(r => r.json());
+                const res = await fetchTechnical(ticker, interval);
                 if (!res.success) throw new Error("Failed to fetch data for plan.");
-
-                const last = res.data[res.data.length - 1];
-                const price = last.close;
-                const ema20 = last.ema20;
-
-                const sl = Math.floor(ema20 * 0.97); 
-                const riskPerShare = price - sl;
-                if (riskPerShare <= 0) throw new Error("Price is below Stop Loss. Invalid plan.");
-
-                const recentHigh = Math.max(...res.data.slice(-10).map(q => q.high));
-                let tp1 = Math.min(res.pivots.r1, recentHigh);
-
-                const riskPct = ((riskPerShare / price) * 100);
-                const rewardPct = (((tp1 - price) / price) * 100);
-                let rrRatio = rewardPct / riskPct;
-
-                if (riskPct > 10) {
-                    let rejectionMsg = "```md\n# NO BUY PLAN AVAILABLE\n\n";
-                    rejectionMsg += `Reason: Risiko terlalu tinggi (${riskPct.toFixed(1)}%)\n`;
-                    rejectionMsg += `Sangat jauh dari EMA20. Tunggu pullback.\n`;
-                    rejectionMsg += "```";
-                    bot.sendMessage(chatId, rejectionMsg, { parse_mode: 'Markdown' });
-                    return;
-                }
-
-                if (rrRatio < 1.2) {
-                    tp1 = res.pivots.r1 > price ? res.pivots.r1 : res.pivots.r2;
-                    const newRewardPct = (((tp1 - price) / price) * 100);
-                    rrRatio = newRewardPct / riskPct;
-                }
-
-                const swingTarget = Math.max(Math.floor(price + (riskPerShare * 3.5)), res.pivots.r2);
-                const swingRewardPct = (((swingTarget - price) / price) * 100);
-
-                let planMd = "```md\n";
-                planMd += `# REALISTIC BUY PLAN: ${ticker}\n`;
-                planMd += `Strategy: High-Conviction EMA20 Bounce\n\n`;
-                planMd += `ENTRY : ${price} (Area: ${ema20.toFixed(0)} - ${price})\n`;
-                planMd += `SL    : ${sl} (Risk: ${riskPct.toFixed(1)}%)\n`;
-                planMd += `TP 1  : ${tp1.toFixed(0)} (Realistic Target: ${rewardPct.toFixed(1)}%)\n`;
-                planMd += `TP 2  : ${swingTarget.toFixed(0)} (Swing Target: ${swingRewardPct.toFixed(1)}%)\n\n`;
-                planMd += `Ratio : 1:${rrRatio.toFixed(1)} (Risk/Reward to TP1)\n`;
-                planMd += `------------------------------\n`;
-                planMd += `Position Sizing (Equity 10jt, Risk 2%):\n`;
-                planMd += `Max Buy: ${Math.floor((10000000 * 0.02) / riskPerShare)} lembar.\n`;
-                planMd += "```";
-
+                const planMd = buildExecutionPlanReport(ticker, interval, res);
                 bot.sendMessage(chatId, planMd, { parse_mode: 'Markdown' });
 
             } catch (e) {
@@ -323,22 +423,29 @@ async function initBot() {
     bot.onText(/\/start/, (msg) => {
         let text = "```md\n";
         text += "# WELCOME TO ULTIMATE SCREENER BOT\n\n";
-        text += "Your professional assistant for IDX stock analysis.\n\n";
-        text += "Type /help to see available commands.\n";
-        text += "Or just type a ticker name (e.g. BUMI) to start.\n";
+        text += "Telegram output is synced with the web CONVICTION_REPORT.\n\n";
+        text += "Type /help to see current commands.\n";
+        text += "Or type a ticker name, for example: BUMI, FIRE, PICO.\n";
         text += "```";
         bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
     });
 
     bot.onText(/\/help/, (msg) => {
         let text = "```md\n";
-        text += "# AVAILABLE COMMANDS\n\n";
-        text += "TICKER       - Get Chart (1d)\n";
-        text += "TICKER scalp - Get Scalp Chart (15m)\n";
-        text += "/scalp       - Show 15m Scalping Signals\n";
-        text += "/top         - Show IDX top movers\n";
-        text += "/daytrade    - Show high potential stocks (1d)\n";
-        text += "/help        - Show this help menu\n";
+        text += "# HELP: WEB_SYNC COMMANDS\n\n";
+        text += "Ticker analysis uses the same /api/technical data as /search.\n\n";
+        text += "BUMI          - CONVICTION_REPORT 1D\n";
+        text += "FIRE          - CONVICTION_REPORT 1D\n";
+        text += "PICO scalp    - CONVICTION_REPORT 15m\n";
+        text += "/chart BUMI   - Same as typing BUMI\n";
+        text += "/analysis BUMI scalp - 15m analysis\n";
+        text += "\n";
+        text += "/daytrade     - Web screener summary: EMA Bounce, Cooldown, Squeeze, Silent Flyer\n";
+        text += "/scalp        - Stored 15m scalp setups, if available\n";
+        text += "/arahunter    - ARA Hunter candidates from screener\n";
+        text += "/top          - IDX movers enriched with web verdict/risk\n";
+        text += "/help         - Show this menu\n\n";
+        text += "Buttons: View Chart, Refresh, Execution Plan.\n";
         text += "```";
         bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
     });
@@ -347,23 +454,30 @@ async function initBot() {
         try {
             bot.sendMessage(msg.chat.id, "```md\n# SCANNING 15M SCALP SETUPS...\nPlease wait...\n```", { parse_mode: 'Markdown' });
 
-            const res = await fetch(`https://ultimate-screener.ebite.biz.id/api/screener`);
+            const res = await fetch(`${APP_BASE_URL}/api/screener`);
             const json = await res.json();
 
             if (json.success) {
-                const signals = json.data.filter(s => s.strategy && s.strategy.includes('SCALP'))
+                const signals = json.data.filter(s => {
+                    const haystack = [s.category, s.vector, s.strategy, s.signalSource, s.metadata?.category, s.metadata?.vector]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toUpperCase();
+                    return haystack.includes('SCALP') || haystack.includes('15M');
+                })
                     .sort((a,b) => b.relevanceScore - a.relevanceScore);
 
-                let text = "```md\n# 15M SCALP SIGNALS (EMA20 + SQZ)\n\n";
-                text += "| TICKER | VOL | FLOW    | SQZ STATUS |\n";
-                text += "|--------|-----|---------|------------|\n";
+                let text = "```md\n# 15M SCALP SIGNALS (WEB_SYNC)\n\n";
+                text += "| TICKER | CAT      | ENTRY | CUR   | DELTA |\n";
+                text += "|--------|----------|-------|-------|-------|\n";
 
                 signals.slice(0, 15).forEach(s => {
                     const rawTicker = s.ticker.replace(".JK", "").padEnd(6);
-                    const vol = (s.metadata?.volConviction || s.metadata?.volScore || 0).toString().padEnd(3);
-                    const flow = (s.metadata?.fluxStatus || "N/A").split(' ')[0].padEnd(7);
-                    const sqz = (s.metadata?.squeezeStatus || "N/A").replace(" COMPRESSION", "").padEnd(10);
-                    text += `| ${rawTicker} | ${vol}% | ${flow} | ${sqz} |\n`;
+                    const cat = formatSignalLabel(s.category || s.metadata?.category).slice(0, 8).padEnd(8);
+                    const entry = formatPrice(s.buyArea).padEnd(5);
+                    const cur = formatPrice(s.currentPrice).padEnd(5);
+                    const delta = formatPct(s.deltaPct, 1).padEnd(5);
+                    text += `| ${rawTicker} | ${cat} | ${entry} | ${cur} | ${delta} |\n`;
                 });
                 if (signals.length === 0) {
                     text += "No active scalp signals found.\n";
@@ -397,40 +511,48 @@ async function initBot() {
 
     bot.onText(/\/daytrade/, async (msg) => {
         try {
-            bot.sendMessage(msg.chat.id, "```md\n# SCANNING EMA BOUNCE CATEGORIES...\nSynchronizing with Web Analysis Engine...\n```", { parse_mode: 'Markdown' });
+            bot.sendMessage(msg.chat.id, "```md\n# SCANNING WEB_SYNC SETUPS...\nReading the same screener context used by CONVICTION_REPORT...\n```", { parse_mode: 'Markdown' });
 
-            const res = await fetch(`https://ultimate-screener.ebite.biz.id/api/screener`);
+            const res = await fetch(`${APP_BASE_URL}/api/screener`);
             const json = await res.json();
 
             if (json.success) {
-                const signals = json.data.filter(s => s.strategy && (s.strategy.startsWith('CONVICTION:') || s.strategy.includes('ACCUMULATION')));
+                const signals = json.data.filter(s => {
+                    const category = String(s.category || s.metadata?.category || "").toUpperCase();
+                    const vector = String(s.vector || s.metadata?.vector || "").toUpperCase();
+                    const source = String(s.strategy || s.signalSource || "").toUpperCase();
+                    return /EMA_BOUNCE|ELITE_BOUNCE|BUY_ON_DIP|TURNAROUND|COOLDOWN|SQUEEZE|SILENT_FLYER|ACCUMULATION|DIP|EMA20/.test(`${category} ${vector} ${source}`);
+                });
 
-                const elite = signals.filter(s => s.strategy.includes('ELITE')).sort((a,b) => b.relevanceScore - a.relevanceScore);
-                const explosion = signals.filter(s => s.strategy.includes('EXPLOSION')).sort((a,b) => b.relevanceScore - a.relevanceScore);
-                const dip = signals.filter(s => s.strategy.includes('DIP')).sort((a,b) => b.relevanceScore - a.relevanceScore);
-                const silent = signals.filter(s => s.strategy.includes('SILENT') || s.strategy.includes('ACCUMULATION')).sort((a,b) => b.relevanceScore - a.relevanceScore);
-                const turnaround = signals.filter(s => s.strategy.includes('TURNAROUND')).sort((a,b) => b.relevanceScore - a.relevanceScore);
+                const byCategory = (matcher) => signals
+                    .filter(s => matcher(`${s.category || s.metadata?.category || ""} ${s.vector || s.metadata?.vector || ""} ${s.strategy || s.signalSource || ""}`.toUpperCase()))
+                    .sort((a,b) => b.relevanceScore - a.relevanceScore);
 
-                let text = "```md\n# EMA BOUNCE SUMMARY (WEB_SYNC)\n\n";
+                const cooldown = byCategory(text => text.includes('COOLDOWN'));
+                const emaBounce = byCategory(text => /EMA_BOUNCE|ELITE_BOUNCE|BUY_ON_DIP|TURNAROUND|DIP|EMA20/.test(text));
+                const squeeze = byCategory(text => text.includes('SQUEEZE'));
+                const silent = byCategory(text => /SILENT|FLYER|ACCUMULATION/.test(text));
+
+                let text = "```md\n# DAYTRADE SUMMARY (WEB_SYNC)\n\n";
 
                 const renderCategory = (title, items) => {
                     if (items.length === 0) return "";
                     let section = `## ${title}\n`;
                     items.slice(0, 4).forEach(s => {
                         const rawTicker = s.ticker.replace(".JK", "").padEnd(5);
-                        const score = (s.relevanceScore || 0).toString().padEnd(3);
-                        const flux = (s.metadata?.fluxStatus || "N/A").split(' ')[0];
-                        const vol = (s.metadata?.volConviction || s.metadata?.volScore || 0);
-                        section += `${rawTicker} | Vol:${vol}% | ${flux} | Sqz:${s.metadata?.squeezeStatus || 'N/A'}\n`;
+                        const cat = formatSignalLabel(s.category || s.metadata?.category).slice(0, 12);
+                        const entry = formatPrice(s.buyArea).padStart(5);
+                        const cur = formatPrice(s.currentPrice).padStart(5);
+                        const delta = formatPct(s.deltaPct, 1).padStart(6);
+                        section += `${rawTicker} | ${cat} | E:${entry} | C:${cur} | ${delta}\n`;
                     });
                     return section + "\n";
                 };
 
-                text += renderCategory("ELITE BOUNCE", elite);
-                text += renderCategory("VOLATILITY EXPLOSION", explosion);
-                text += renderCategory("BUY ON DIP", dip);
+                text += renderCategory("COOLDOWN RESET", cooldown);
+                text += renderCategory("EMA BOUNCE / DIP", emaBounce);
+                text += renderCategory("SQUEEZE ENGINE", squeeze);
                 text += renderCategory("SILENT ACCUMULATION", silent);
-                text += renderCategory("TURNAROUND CANDIDATES", turnaround);
 
                 if (signals.length === 0) {
                     text += "No high-conviction setups found.\n";
@@ -439,15 +561,12 @@ async function initBot() {
 
                 const inline_keyboard = [];
                 inline_keyboard.push([
-                    { text: '💎 Elite', callback_data: 'full_list_ELITE' },
-                    { text: '💥 Explosion', callback_data: 'full_list_EXPLOSION' }
+                    { text: 'Cooldown', callback_data: 'full_list_COOLDOWN' },
+                    { text: 'EMA Bounce', callback_data: 'full_list_EMA_BOUNCE' }
                 ]);
                 inline_keyboard.push([
-                    { text: '📥 Dip', callback_data: 'full_list_DIP' },
-                    { text: '🤫 Silent Acc', callback_data: 'full_list_SILENT' }
-                ]);
-                inline_keyboard.push([
-                    { text: '🔄 Turnaround', callback_data: 'full_list_TURNAROUND' }
+                    { text: 'Squeeze', callback_data: 'full_list_SQUEEZE' },
+                    { text: 'Silent Flyer', callback_data: 'full_list_SILENT' }
                 ]);
 
                 bot.sendMessage(msg.chat.id, text, { 
@@ -464,23 +583,30 @@ async function initBot() {
         try {
             bot.sendMessage(msg.chat.id, "```md\n# SCANNING ARA HUNTER CANDIDATES...\nPlease wait...\n```", { parse_mode: 'Markdown' });
 
-            const res = await fetch(`https://ultimate-screener.ebite.biz.id/api/screener`);
+            const res = await fetch(`${APP_BASE_URL}/api/screener`);
             const json = await res.json();
 
             if (json.success) {
-                const signals = json.data.filter(s => s.strategy && s.strategy.includes('ARAHunter'))
+                const signals = json.data.filter(s => {
+                    const haystack = [s.category, s.vector, s.strategy, s.signalSource, s.metadata?.category, s.metadata?.vector]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toUpperCase();
+                    return haystack.includes('ARAHUNTER');
+                })
                     .sort((a,b) => b.relevanceScore - a.relevanceScore);
 
-                let text = "```md\n# ARA HUNTER: SQUEEZE RELEASE SIGNALS\n\n";
-                text += "| TICKER | CHG%  | VOL  | MOM status |\n";
-                text += "|--------|-------|------|------------|\n";
+                let text = "```md\n# ARA HUNTER (WEB_SYNC)\n\n";
+                text += "| TICKER | ENTRY | CUR   | DELTA | VECTOR |\n";
+                text += "|--------|-------|-------|-------|--------|\n";
 
                 signals.slice(0, 15).forEach(s => {
                     const rawTicker = s.ticker.replace(".JK", "").padEnd(6);
-                    const chg = (s.metadata?.change || 0).toFixed(1).toString().padEnd(5);
-                    const vol = (s.metadata?.volRatio || 0).toFixed(1).toString().padEnd(4);
-                    const mom = (s.metadata?.momentum || 0).toFixed(0).toString().padEnd(10);
-                    text += `| ${rawTicker} | ${chg}% | ${vol}x | ${mom} |\n`;
+                    const entry = formatPrice(s.buyArea).padEnd(5);
+                    const cur = formatPrice(s.currentPrice).padEnd(5);
+                    const delta = formatPct(s.deltaPct, 1).padEnd(5);
+                    const vector = String(s.vector || s.metadata?.vector || "-").slice(0, 6).padEnd(6);
+                    text += `| ${rawTicker} | ${entry} | ${cur} | ${delta} | ${vector} |\n`;
                 });
                 if (signals.length === 0) {
                     text += "No ARA Hunter candidates found yet.\n";
@@ -498,7 +624,7 @@ async function initBot() {
         try {
             bot.sendMessage(msg.chat.id, "```md\n# ANALYZING TOP MOVERS...\nPlease wait...\n```", { parse_mode: 'Markdown' });
 
-            const res = await fetch(`https://ultimate-screener.ebite.biz.id/api/market/movers`);
+            const res = await fetch(`${APP_BASE_URL}/api/market/movers`);
             const json = await res.json();
             if (!json.success) throw new Error("Movers failed");
 
@@ -506,33 +632,36 @@ async function initBot() {
             const losers = json.losers.slice(0, 10);
 
             const gainerTechs = await Promise.all(gainers.map(async (s) => {
-                const techRes = await fetch(`https://ultimate-screener.ebite.biz.id/api/technical?symbol=${s.ticker}.JK`).then(r => r.json()).catch(() => null);
-                if (!techRes || !techRes.success || !techRes.pivots) return { ...s, resis: 0, mfi: 0, push: "Low" };
+                const techRes = await fetchTechnical(s.ticker, "1d").catch(() => null);
+                if (!techRes || !techRes.success || !techRes.pivots) return { ...s, resis: 0, mfi: 0, push: "Low", verdict: "-", risk: "-" };
                 const last = techRes.data[techRes.data.length - 1];
                 let resis = techRes.pivots.r1 || 0;
                 if (s.price >= resis && techRes.pivots.r2) resis = techRes.pivots.r2;
-                const push = (last && last.mfi > 65 && last.macd.histogram > 0) ? "STRONG" : "NORMAL";
-                return { ...s, resis, push, mfi: last ? last.mfi : 0 };
+                const verdict = techRes.unifiedAnalysis?.verdict || "-";
+                const risk = techRes.unifiedAnalysis?.riskLevel || "-";
+                const push = techRes.unifiedAnalysis?.screenerContext?.category || ((last && last.mfi > 65 && last.macd.histogram > 0) ? "STRONG" : "NORMAL");
+                return { ...s, resis, push, mfi: last ? last.mfi : 0, verdict, risk };
             }));
 
             const loserTechs = await Promise.all(losers.map(async (s) => {
-                const techRes = await fetch(`https://ultimate-screener.ebite.biz.id/api/technical?symbol=${s.ticker}.JK&interval=15m`).then(r => r.json()).catch(() => null);
-                if (!techRes || !techRes.success || !techRes.data) return { ...s, note: "Distribution", mfi: 0 };
+                const techRes = await fetchTechnical(s.ticker, "15m").catch(() => null);
+                if (!techRes || !techRes.success || !techRes.data) return { ...s, note: "Distribution", mfi: 0, verdict: "-", risk: "-" };
                 const data = techRes.data;
                 const last = data[data.length - 1];
                 const prevMfi = data[data.length - 4]?.mfi || 0;
                 let note = "Distribution";
                 if (last && (last.mfi > 55 || last.mfi > prevMfi + 5)) note = "Hidden Acc";
-                return { ...s, note, mfi: last ? last.mfi : 0 };
+                return { ...s, note, mfi: last ? last.mfi : 0, verdict: techRes.unifiedAnalysis?.verdict || "-", risk: techRes.unifiedAnalysis?.riskLevel || "-" };
             }));
 
-            let text = "```md\n# IDX TOP GAINERS\n| TICKER | PRICE | CHG% | RESIS | PUSH |\n|--------|-------|------|-------|------|\n";
+            let text = "```md\n# IDX TOP GAINERS (WEB_VERDICT)\n| TICKER | CHG% | RISK | SIGNAL/BIAS |\n|--------|------|------|-------------|\n";
             gainerTechs.forEach(s => {
-                text += `| ${s.ticker.padEnd(6)} | ${s.price.toString().padEnd(5)} | ${(s.changePercent || 0).toFixed(1).padEnd(4)}% | ${(!s.resis ? "-" : s.resis.toFixed(0)).padEnd(5)} | ${s.push.padEnd(4)} |\n`;
+                const bias = String(s.push || s.verdict || "-").replace(/_/g, " ").slice(0, 11).padEnd(11);
+                text += `| ${s.ticker.padEnd(6)} | ${(s.changePercent || 0).toFixed(1).padEnd(4)}% | ${String(s.risk || "-").slice(0, 4).padEnd(4)} | ${bias} |\n`;
             });
-            text += "\n# IDX TOP LOSERS\n| TICKER | PRICE | CHG% | MFI  | REMARK       |\n|--------|-------|------|------|--------------|\n";
+            text += "\n# IDX TOP LOSERS (15M CHECK)\n| TICKER | CHG% | RISK | 15M REMARK   |\n|--------|------|------|--------------|\n";
             loserTechs.forEach(s => {
-                text += `| ${s.ticker.padEnd(6)} | ${s.price.toString().padEnd(5)} | ${(s.changePercent || 0).toFixed(1).padEnd(4)}% | ${(s.mfi || 0).toFixed(0).padEnd(4)} | ${s.note.padEnd(12)} |\n`;
+                text += `| ${s.ticker.padEnd(6)} | ${(s.changePercent || 0).toFixed(1).padEnd(4)}% | ${String(s.risk || "-").slice(0, 4).padEnd(4)} | ${s.note.padEnd(12)} |\n`;
             });
             text += "```";
             bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
@@ -554,14 +683,13 @@ async function initBot() {
             interval = "15m";
         }
 
-        let dbSearchTicker = input;
-        if (!dbSearchTicker.includes('.')) dbSearchTicker += ".JK";
+        const dbSearchTicker = normalizeTickerInput(input);
 
-        const rawTicker = dbSearchTicker.split('.')[0];
-        if (rawTicker.length < 3 || rawTicker.length > 7) return;
-        if (!/^[A-Z0-9-]{3,7}$/.test(rawTicker)) return;
+        const raw = rawTicker(dbSearchTicker);
+        if (raw.length < 3 || raw.length > 7) return;
+        if (!/^[A-Z0-9-]{3,7}$/.test(raw)) return;
 
-        const stock = await IndonesiaStock.findOne({ ticker: dbSearchTicker });
+        const stock = await findStockByTicker(dbSearchTicker);
         if (stock) {
             generateFullAnalysis(msg.chat.id, dbSearchTicker, interval);
         }

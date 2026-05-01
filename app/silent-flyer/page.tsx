@@ -1,24 +1,71 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Navigation from "@/components/Navigation";
 import AdvancedChart from "@/components/AdvancedChart";
-import { Search, TrendingUp, AlertCircle, Clock, CheckCircle2, XCircle, ChevronRight, Activity, Menu, X, Filter } from "lucide-react";
+import { Search, TrendingUp, AlertCircle, Clock, CheckCircle2, XCircle, ChevronRight, Activity, Menu, X, Filter, Plus, Trash2, Archive, RefreshCw, Zap } from "lucide-react";
+
+interface FlyerItem {
+    ticker: string;
+    sector?: string;
+    signalSource: string;
+    entryDate: Date;
+    entryPrice: number;
+    targetPrice: number;
+    stopLossPrice?: number;
+    status: 'silent' | 'taking_off' | 'flying' | 'failed' | 'archived';
+    currentPrice?: number;
+    relevanceScore?: number;
+    priceHistory: { date: Date; price: number }[];
+    metadata: any;
+    createdAt: Date;
+    updatedAt: Date;
+}
 
 export default function SilentFlyerTracker() {
-    const [signals, setSignals] = useState<any[]>([]);
-    const [selectedSignal, setSelectedSignal] = useState<any>(null);
+    const [radarItems, setRadarItems] = useState<FlyerItem[]>([]);
+    const [availableSignals, setAvailableSignals] = useState<any[]>([]);
+    const [selectedItem, setSelectedItem] = useState<FlyerItem | null>(null);
     const [chartData, setChartData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [chartLoading, setChartLoading] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
     useEffect(() => {
-        fetchSignals();
+        fetchRadarItems();
     }, []);
 
-    const fetchSignals = async () => {
+    const fetchRadarItems = async () => {
         setLoading(true);
         try {
+            const res = await fetch('/api/flyer-radar');
+            const json = await res.json();
+            if (json.success) {
+                setRadarItems(json.data);
+                if (json.data.length > 0 && !selectedItem) {
+                    handleSelectItem(json.data[0]);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to fetch radar items", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchAvailableSignals = async () => {
+        try {
+            // Try to get from flyer-radar scan API first (real-time analysis)
+            const scanRes = await fetch('/api/flyer-radar/scan');
+            const scanJson = await scanRes.json();
+            
+            if (scanJson.success && scanJson.data && scanJson.data.length > 0) {
+                setAvailableSignals(scanJson.data);
+                return;
+            }
+            
+            // Fallback to screener API
             const res = await fetch('/api/screener?all=false');
             const json = await res.json();
             if (json.success) {
@@ -28,26 +75,21 @@ export default function SilentFlyerTracker() {
                     const isEmaBounce = s.strategy.includes("EMA Bounce") && (s.metadata?.atrCompression < 0.8 || s.relevanceScore > 100);
                     return isSilentFlyer || isEliteBounce || isEmaBounce;
                 });
-                setSignals(silentFlyers);
-                if (silentFlyers.length > 0) {
-                    handleSelectSignal(silentFlyers[0]);
-                }
+                setAvailableSignals(silentFlyers);
             }
         } catch (error) {
             console.error("Failed to fetch signals", error);
-        } finally {
-            setLoading(false);
         }
     };
 
-    const handleSelectSignal = async (signal: any) => {
-        setSelectedSignal(signal);
+    const handleSelectItem = async (item: FlyerItem) => {
+        setSelectedItem(item);
         setChartLoading(true);
         if (window.innerWidth < 1024) {
             setIsSidebarOpen(false);
         }
         try {
-            const res = await fetch(`/api/technical?symbol=${signal.ticker}&interval=1d`);
+            const res = await fetch(`/api/technical?symbol=${item.ticker}&interval=1d`);
             const json = await res.json();
             if (json.success) {
                 setChartData(json);
@@ -59,11 +101,93 @@ export default function SilentFlyerTracker() {
         }
     };
 
-    const getStatusInfo = (s: any) => {
-        const current = s.currentPrice || s.buyArea;
-        const entry = s.buyArea;
-        const target = s.tp;
-        const stop = s.sl;
+    const addToRadar = async (signal: any) => {
+        try {
+            // Handle both screener format and flyer-radar/scan format
+            const ticker = signal.ticker;
+            const entryPrice = signal.buyArea || signal.entryPrice || signal.currentPrice;
+            const targetPrice = signal.tp || signal.targetPrice || entryPrice * 1.3;
+            const stopLossPrice = signal.sl || signal.stopLossPrice || entryPrice * 0.95;
+            
+            const res = await fetch('/api/flyer-radar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ticker,
+                    sector: signal.sector,
+                    signalSource: signal.strategy || signal.signalSource || 'SILENT FLYER',
+                    entryPrice,
+                    targetPrice,
+                    stopLossPrice,
+                    relevanceScore: signal.relevanceScore,
+                    metadata: signal.metadata
+                })
+            });
+            const json = await res.json();
+            if (json.success) {
+                setShowAddModal(false);
+                fetchRadarItems();
+            } else {
+                alert(json.error || 'Failed to add');
+            }
+        } catch (error) {
+            console.error("Failed to add to radar", error);
+        }
+    };
+
+    const deleteFromRadar = async (ticker: string) => {
+        if (!confirm(`Remove ${ticker} from radar?`)) return;
+        
+        try {
+            const res = await fetch(`/api/flyer-radar?ticker=${encodeURIComponent(ticker)}`, {
+                method: 'DELETE'
+            });
+            const json = await res.json();
+            if (json.success) {
+                if (selectedItem?.ticker === ticker) {
+                    setSelectedItem(null);
+                    setChartData(null);
+                }
+                fetchRadarItems();
+            }
+        } catch (error) {
+            console.error("Failed to delete", error);
+        }
+    };
+
+    const updatePrices = async () => {
+        setLoading(true);
+        try {
+            const updated: FlyerItem[] = [];
+            for (const item of radarItems) {
+                try {
+                    const res = await fetch('/api/flyer-radar', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ticker: item.ticker, action: 'updatePrice' })
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                        updated.push(json.data);
+                    }
+                } catch (e) {
+                    updated.push(item);
+                }
+            }
+            setRadarItems(updated);
+            setLastUpdate(new Date());
+        } catch (error) {
+            console.error("Failed to update prices", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getStatusInfo = (item: FlyerItem) => {
+        const current = item.currentPrice || item.entryPrice;
+        const entry = item.entryPrice;
+        const target = item.targetPrice;
+        const stop = item.stopLossPrice || entry * 0.95;
 
         if (current >= target) return { label: 'FLYING', color: 'oklch(0.7 0.25 150)', bg: 'oklch(0.7 0.25 150 / 0.1)', icon: <TrendingUp size={12} /> };
         if (current <= stop) return { label: 'FAILED', color: 'oklch(0.6 0.2 25)', bg: 'oklch(0.6 0.2 25 / 0.1)', icon: <XCircle size={12} /> };
@@ -74,37 +198,62 @@ export default function SilentFlyerTracker() {
         return { label: 'SILENT', color: 'oklch(0.8 0.15 80)', bg: 'oklch(0.8 0.15 80 / 0.1)', icon: <Clock size={12} /> };
     };
 
+    const getChangeFromEntry = (item: FlyerItem) => {
+        const current = item.currentPrice || item.entryPrice;
+        return ((current - item.entryPrice) / item.entryPrice) * 100;
+    };
+
+    const getMaxGain = (item: FlyerItem) => {
+        if (!item.priceHistory || item.priceHistory.length === 0) return 0;
+        const entry = item.entryPrice;
+        const maxPrice = Math.max(...item.priceHistory.map((h: any) => h.price));
+        return ((maxPrice - entry) / entry) * 100;
+    };
+
+    const formatDate = (date: Date | string) => {
+        const d = new Date(date);
+        return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' });
+    };
+
     return (
         <div className="flyer-tracker-root min-h-screen bg-[#050505] text-silver-300 font-mono">
-            
             <div className="mobile-header">
                 <button onClick={() => setIsSidebarOpen(true)} className="menu-trigger">
                     <Menu size={20} />
-                    <span>TACTICAL_REGISTRY</span>
+                    <span>FLYER_RADAR</span>
                 </button>
                 <div className="active-ticker-display">
-                    {selectedSignal ? selectedSignal.ticker.replace('.JK', '') : 'AWAITING_RADAR'}
+                    {selectedItem ? selectedItem.ticker.replace('.JK', '') : 'AWAITING'}
                 </div>
             </div>
 
             <div className="main-layout">
-                {/* SIDEBAR: TACTICAL REGISTRY */}
                 <div className={`registry-sidebar ${isSidebarOpen ? 'open' : ''}`}>
                     <div className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)}></div>
                     <div className="sidebar-content">
                         <div className="registry-header">
                             <div className="header-top">
                                 <div className="title-group">
-                                    <span className="title">TACTICAL_REGISTRY</span>
-                                    <div className="count-badge">{signals.length}</div>
+                                    <span className="title">FLYER_RADAR</span>
+                                    <div className="count-badge">{radarItems.length}</div>
                                 </div>
                                 <button onClick={() => setIsSidebarOpen(false)} className="close-sidebar mobile-only">
                                     <X size={18} />
                                 </button>
                             </div>
-                            <button onClick={fetchSignals} className="refresh-btn">
-                                SYNC_SYSTEM_RADAR
-                            </button>
+                            <div className="header-actions">
+                                <button onClick={() => { setShowAddModal(true); fetchAvailableSignals(); }} className="action-btn add">
+                                    <Plus size={14} /> ADD
+                                </button>
+                                <button onClick={updatePrices} className="action-btn refresh">
+                                    <RefreshCw size={14} className={loading ? 'spin' : ''} /> SYNC
+                                </button>
+                            </div>
+                            {lastUpdate && (
+                                <div className="last-update">
+                                    <Zap size={10} /> {formatDate(lastUpdate)}
+                                </div>
+                            )}
                         </div>
 
                         <div className="registry-list custom-scrollbar">
@@ -113,46 +262,58 @@ export default function SilentFlyerTracker() {
                                     <div className="scanner-line"></div>
                                     <span>INITIALIZING_RADAR...</span>
                                 </div>
-                            ) : signals.length === 0 ? (
-                                <div className="empty-state">NO_ACTIVE_FLYERS_DETECTED</div>
+                            ) : radarItems.length === 0 ? (
+                                <div className="empty-state">
+                                    <span>NO_FLYERS_IN_RADAR</span>
+                                    <button onClick={() => { setShowAddModal(true); fetchAvailableSignals(); }} className="add-first-btn">
+                                        <Plus size={14} /> ADD_FIRST_FLYER
+                                    </button>
+                                </div>
                             ) : (
-                                signals.map((s, idx) => {
-                                    const status = getStatusInfo(s);
-                                    const isActive = selectedSignal?.ticker === s.ticker;
-                                    const change = ((s.currentPrice - s.buyArea) / s.buyArea) * 100;
+                                radarItems.map((item, idx) => {
+                                    const status = getStatusInfo(item);
+                                    const isActive = selectedItem?.ticker === item.ticker;
+                                    const change = getChangeFromEntry(item);
+                                    const maxGain = getMaxGain(item);
                                     
                                     return (
-                                        <button 
-                                            key={idx} 
-                                            onClick={() => handleSelectSignal(s)}
-                                            className={`registry-card ${isActive ? 'active' : ''}`}
-                                        >
-                                            <div className="card-glitch-bg"></div>
-                                            <div className="card-content">
-                                                <div className="card-top">
-                                                    <div className="ticker-group">
-                                                        <span className="ticker">{s.ticker.replace('.JK', '')}</span>
-                                                        {(s.metadata?.verdict?.includes("BOUNCE") || s.strategy?.includes("BOUNCE")) && (
-                                                            <span className="bounce-tag">BOUNCE</span>
-                                                        )}
+                                        <div key={idx} className={`registry-card ${isActive ? 'active' : ''}`}>
+                                            <button onClick={() => handleSelectItem(item)} className="card-main">
+                                                <div className="card-glitch-bg"></div>
+                                                <div className="card-content">
+                                                    <div className="card-top">
+                                                        <div className="ticker-group">
+                                                            <span className="ticker">{item.ticker.replace('.JK', '')}</span>
+                                                            {item.signalSource.includes("BOUNCE") && (
+                                                                <span className="bounce-tag">BOUNCE</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="status-pill" style={{ color: status.color, backgroundColor: status.bg }}>
+                                                            {status.icon}
+                                                            <span>{status.label}</span>
+                                                        </div>
                                                     </div>
-                                                    <div className="status-pill" style={{ color: status.color, backgroundColor: status.bg }}>
-                                                        {status.icon}
-                                                        <span>{status.label}</span>
+                                                    <div className="card-bottom">
+                                                        <div className="price-info">
+                                                            <span className="label">NOW</span>
+                                                            <span className="value">{item.currentPrice || item.entryPrice}</span>
+                                                        </div>
+                                                        <div className={`change-info ${change >= 0 ? 'pos' : 'neg'}`}>
+                                                            {change >= 0 ? '+' : ''}{change.toFixed(1)}%
+                                                        </div>
                                                     </div>
+                                                    {maxGain > 5 && (
+                                                        <div className="peak-gain">
+                                                            <Zap size={10} /> PEAK: +{maxGain.toFixed(1)}%
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="card-bottom">
-                                                    <div className="price-info">
-                                                        <span className="label">NOW</span>
-                                                        <span className="value">{s.currentPrice}</span>
-                                                    </div>
-                                                    <div className={`change-info ${change >= 0 ? 'pos' : 'neg'}`}>
-                                                        {change >= 0 ? '+' : ''}{change.toFixed(1)}%
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <ChevronRight className="arrow-icon" size={14} />
-                                        </button>
+                                                <ChevronRight className="arrow-icon" size={14} />
+                                            </button>
+                                            <button onClick={() => deleteFromRadar(item.ticker)} className="delete-btn">
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
                                     );
                                 })
                             )}
@@ -160,47 +321,45 @@ export default function SilentFlyerTracker() {
                     </div>
                 </div>
 
-                {/* MAIN CONTENT: MISSION CONTROL */}
                 <div className="mission-control">
-                    {selectedSignal ? (
+                    {selectedItem ? (
                         <div className="mission-wrapper">
-                            {/* TARGET HUD */}
                             <div className="tactical-hud">
                                 <div className="hud-unit main">
                                     <div className="unit-label">ACTIVE_MISSION</div>
-                                    <div className="unit-value">{selectedSignal.ticker.replace('.JK', '')}</div>
-                                    <div className="unit-sub">SECTOR: {selectedSignal.sector || 'N/A'}</div>
+                                    <div className="unit-value">{selectedItem.ticker.replace('.JK', '')}</div>
+                                    <div className="unit-sub">SECTOR: {selectedItem.sector || 'N/A'}</div>
+                                    <div className="unit-date">ENTRY: {formatDate(selectedItem.entryDate)}</div>
                                 </div>
 
                                 <div className="hud-grid-metrics">
                                     <div className="hud-unit">
                                         <div className="unit-label">ENTRY</div>
-                                        <div className="unit-value small">{selectedSignal.buyArea}</div>
+                                        <div className="unit-value small">{selectedItem.entryPrice}</div>
                                     </div>
                                     <div className="hud-unit highlight">
                                         <div className="unit-label">TARGET</div>
-                                        <div className="unit-value small">{selectedSignal.tp}</div>
+                                        <div className="unit-value small">{selectedItem.targetPrice}</div>
                                     </div>
                                     <div className="hud-unit danger">
                                         <div className="unit-label">ABORT</div>
-                                        <div className="unit-value small">{selectedSignal.sl}</div>
+                                        <div className="unit-value small">{selectedItem.stopLossPrice || (selectedItem.entryPrice * 0.95).toFixed(0)}</div>
                                     </div>
                                     <div className="hud-unit score-mobile">
                                         <div className="unit-label">SCORE</div>
-                                        <div className="unit-value small text-emerald">{selectedSignal.relevanceScore}</div>
+                                        <div className="unit-value small text-emerald">{selectedItem.relevanceScore}</div>
                                     </div>
                                 </div>
 
                                 <div className="hud-unit score desktop-only">
                                     <div className="unit-label">FLYER_SCORE</div>
-                                    <div className="unit-value">{selectedSignal.relevanceScore}</div>
+                                    <div className="unit-value">{selectedItem.relevanceScore}</div>
                                     <div className="score-bar">
-                                        <div className="fill" style={{ width: `${Math.min(100, (selectedSignal.relevanceScore/400)*100)}%` }}></div>
+                                        <div className="fill" style={{ width: `${Math.min(100, (selectedItem.relevanceScore || 0) / 400 * 100)}%` }}></div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* CHART VIZ */}
                             <div className="chart-container">
                                 {chartLoading && (
                                     <div className="chart-overlay">
@@ -212,9 +371,7 @@ export default function SilentFlyerTracker() {
                                     <AdvancedChart 
                                         data={chartData.data}
                                         pivots={chartData.pivots}
-                                        elliott={chartData.elliott}
-                                        wavePivots={chartData.wavePivots}
-                                        ticker={selectedSignal.ticker}
+                                        ticker={selectedItem.ticker}
                                         showSqueezeDeluxe={true}
                                     />
                                 ) : (
@@ -222,26 +379,27 @@ export default function SilentFlyerTracker() {
                                 )}
                             </div>
 
-                            {/* INTEL FEED */}
                             <div className="intel-grid">
                                 <div className="intel-panel dna">
                                     <div className="panel-tag"><TrendingUp size={12}/> FLYER_DNA</div>
                                     <div className="intel-rows">
                                         <div className="row">
-                                            <span className="label">COMPRESSION_LIFE</span>
-                                            <span className="value">{selectedSignal.metadata.squeezeDuration} BARS</span>
+                                            <span className="label">SIGNAL_SOURCE</span>
+                                            <span className="value">{selectedItem.signalSource}</span>
                                         </div>
                                         <div className="row">
-                                            <span className="label">ELLIOTT_CYCLE</span>
-                                            <span className="value">{selectedSignal.metadata.elliottTrend}</span>
+                                            <span className="label">DAYS_TRACKED</span>
+                                            <span className="value">
+                                                {Math.floor((Date.now() - new Date(selectedItem.entryDate).getTime()) / (1000 * 60 * 60 * 24))}
+                                            </span>
                                         </div>
                                         <div className="row">
-                                            <span className="label">INSTITUTIONAL_FLUX</span>
-                                            <span className="value positive">{selectedSignal.metadata.flux}</span>
+                                            <span className="label">PRICE_POINTS</span>
+                                            <span className="value">{selectedItem.priceHistory?.length || 0}</span>
                                         </div>
                                     </div>
                                     <div className="intel-quote">
-                                        {selectedSignal.metadata.squeezeInsight}
+                                        Added to radar on {formatDate(selectedItem.entryDate)}. Tracking price movement from entry to now.
                                     </div>
                                 </div>
 
@@ -250,21 +408,26 @@ export default function SilentFlyerTracker() {
                                     <div className="metrics-box">
                                         <div className="metric">
                                             <div className="m-label">MOVE_FROM_ENTRY</div>
-                                            <div className={`m-value ${selectedSignal.currentPrice >= selectedSignal.buyArea ? 'pos' : 'neg'}`}>
-                                                {selectedSignal.currentPrice >= selectedSignal.buyArea ? '+' : ''}{(((selectedSignal.currentPrice - selectedSignal.buyArea)/selectedSignal.buyArea)*100).toFixed(2)}%
+                                            <div className={`m-value ${getChangeFromEntry(selectedItem) >= 0 ? 'pos' : 'neg'}`}>
+                                                {getChangeFromEntry(selectedItem) >= 0 ? '+' : ''}{getChangeFromEntry(selectedItem).toFixed(2)}%
                                             </div>
                                         </div>
                                         <div className="metric">
-                                            <div className="m-label">RR_PROBABILITY</div>
-                                            <div className="m-value">1 : {((selectedSignal.tp - selectedSignal.buyArea) / (selectedSignal.buyArea - selectedSignal.sl)).toFixed(1)}</div>
+                                            <div className="m-label">PEAK_GAIN</div>
+                                            <div className="m-value pos">+{getMaxGain(selectedItem).toFixed(1)}%</div>
                                         </div>
                                     </div>
                                     <div className="status-banner">
-                                        {selectedSignal.currentPrice >= selectedSignal.tp ? (
+                                        {selectedItem.status === 'flying' && (
                                             <div className="banner success">MISSION_COMPLETE // TGT_REACHED</div>
-                                        ) : selectedSignal.currentPrice <= selectedSignal.sl ? (
+                                        )}
+                                        {selectedItem.status === 'failed' && (
                                             <div className="banner failure">MISSION_ABORTED // SL_TRIGGERED</div>
-                                        ) : (
+                                        )}
+                                        {selectedItem.status === 'taking_off' && (
+                                            <div className="banner takingoff">MOMENTUM_BUILDING // +5%_GAIN</div>
+                                        )}
+                                        {selectedItem.status === 'silent' && (
                                             <div className="banner pending">RADAR_LOCKED // TRACKING_TARGET</div>
                                         )}
                                     </div>
@@ -274,11 +437,53 @@ export default function SilentFlyerTracker() {
                     ) : (
                         <div className="mission-empty">
                             <div className="radar-circle"></div>
-                            <span>AWAITING_COMMAND... SELECT_REGISTRY_UNIT</span>
+                            <span>AWAITING_COMMAND... ADD_FLYERS_TO_RADAR</span>
                         </div>
                     )}
                 </div>
             </div>
+
+            {showAddModal && (
+                <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <span>ADD_TO_RADAR</span>
+                            <button onClick={() => setShowAddModal(false)}><X size={18} /></button>
+                        </div>
+                        <div className="modal-search">
+                            <Search size={14} className="search-icon" />
+                            <input type="text" placeholder="SEARCH_SIGNALS..." className="search-input" />
+                        </div>
+                        <div className="modal-list custom-scrollbar">
+                            {availableSignals.length === 0 ? (
+                                <div className="modal-empty">
+                                    No signals found. Run the screener script first.
+                                </div>
+                            ) : (
+                                availableSignals.map((signal, idx) => {
+                                    const price = signal.buyArea || signal.entryPrice || signal.currentPrice || 0;
+                                    const change = signal.currentPrice && price ? ((signal.currentPrice - price) / price) * 100 : 0;
+                                    const strategy = signal.strategy || signal.signalSource || 'UNKNOWN';
+                                    return (
+                                        <button key={idx} onClick={() => addToRadar(signal)} className="modal-item">
+                                            <div className="item-left">
+                                                <span className="item-ticker">{signal.ticker.replace('.JK', '')}</span>
+                                                <span className="item-strategy">{strategy}</span>
+                                            </div>
+                                            <div className="item-right">
+                                                <span className="item-price">{price.toFixed(0)}</span>
+                                                <span className={`item-change ${change >= 0 ? 'pos' : 'neg'}`}>
+                                                    {change >= 0 ? '+' : ''}{change.toFixed(1)}%
+                                                </span>
+                                            </div>
+                                        </button>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <style jsx global>{`
                 :root {
@@ -307,7 +512,6 @@ export default function SilentFlyerTracker() {
                     width: 100%;
                 }
 
-                /* MOBILE HEADER */
                 .mobile-header {
                     display: none;
                     height: 50px;
@@ -340,7 +544,6 @@ export default function SilentFlyerTracker() {
                     letter-spacing: 0.05em;
                 }
 
-                /* REGISTRY SIDEBAR */
                 .registry-sidebar {
                     width: 380px;
                     min-width: 380px;
@@ -391,23 +594,54 @@ export default function SilentFlyerTracker() {
                     border-radius: 3px;
                 }
 
-                .refresh-btn {
-                    width: 100%;
-                    padding: 10px;
+                .header-actions {
+                    display: flex;
+                    gap: 8px;
+                }
+
+                .action-btn {
+                    flex: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                    padding: 8px;
                     background: transparent;
                     border: 1px solid var(--border-tactical);
                     color: var(--text-muted);
-                    font-size: 0.65rem;
+                    font-size: 0.6rem;
                     font-weight: 900;
                     cursor: pointer;
                     transition: all 0.2s;
                     letter-spacing: 0.05em;
                 }
 
-                .refresh-btn:hover {
+                .action-btn.add:hover {
+                    border-color: var(--accent-emerald);
+                    color: var(--accent-emerald);
+                }
+
+                .action-btn.refresh:hover {
                     border-color: var(--accent-cyan);
                     color: var(--accent-cyan);
-                    background: oklch(0.75 0.2 200 / 0.05);
+                }
+
+                .spin {
+                    animation: spin 1s linear infinite;
+                }
+
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                .last-update {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 0.55rem;
+                    color: var(--text-muted);
+                    margin-top: 8px;
                 }
 
                 .registry-list {
@@ -420,48 +654,72 @@ export default function SilentFlyerTracker() {
                 }
 
                 .registry-card {
-                    position: relative;
-                    width: 100%;
-                    padding: 14px;
+                    display: flex;
+                    align-items: stretch;
                     background: oklch(0.12 0.01 240);
                     border: 1px solid var(--border-tactical);
                     border-radius: 10px;
-                    text-align: left;
-                    cursor: pointer;
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
                     overflow: hidden;
-                    flex-shrink: 0;
+                    transition: all 0.3s;
                 }
 
                 .registry-card:hover {
-                    background: oklch(0.18 0.02 240);
                     border-color: var(--accent-cyan);
-                    transform: translateY(-2px);
-                    box-shadow: 0 8px 24px -8px oklch(0.75 0.2 200 / 0.3);
                 }
 
                 .registry-card.active {
-                    background: oklch(0.2 0.04 240);
                     border-color: var(--accent-cyan);
                     border-left: 4px solid var(--accent-cyan);
+                }
+
+                .card-main {
+                    flex: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 14px;
+                    background: transparent;
+                    border: none;
+                    text-align: left;
+                    cursor: pointer;
+                    overflow: hidden;
+                    position: relative;
+                }
+
+                .card-glitch-bg {
+                    position: absolute;
+                    inset: 0;
+                    background: linear-gradient(90deg, transparent, oklch(0.75 0.2 200 / 0.05), transparent);
+                    transform: translateX(-100%);
+                    transition: transform 0.5s;
+                }
+
+                .registry-card:hover .card-glitch-bg {
+                    transform: translateX(100%);
+                }
+
+                .card-content {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .card-top {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
                 }
 
                 .ticker-group {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    min-width: 0;
-                    flex: 1;
                 }
 
                 .ticker {
                     font-size: 1rem;
                     font-weight: 1000;
                     color: white;
-                    letter-spacing: -0.01em;
                 }
 
                 .bounce-tag {
@@ -471,7 +729,6 @@ export default function SilentFlyerTracker() {
                     background: var(--accent-cyan);
                     padding: 1px 4px;
                     border-radius: 2px;
-                    flex-shrink: 0;
                 }
 
                 .status-pill {
@@ -506,7 +763,90 @@ export default function SilentFlyerTracker() {
                 .change-info.pos { color: var(--accent-emerald); }
                 .change-info.neg { color: var(--accent-rose); }
 
-                /* MISSION CONTROL */
+                .peak-gain {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    font-size: 0.6rem;
+                    font-weight: 1000;
+                    color: var(--accent-emerald);
+                    margin-top: 6px;
+                }
+
+                .arrow-icon {
+                    color: var(--text-muted);
+                    flex-shrink: 0;
+                    margin-left: 8px;
+                }
+
+                .delete-btn {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 36px;
+                    background: oklch(0.15 0.02 240);
+                    border: none;
+                    border-left: 1px solid var(--border-tactical);
+                    color: var(--accent-rose);
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .delete-btn:hover {
+                    background: oklch(0.6 0.2 25 / 0.2);
+                }
+
+                .loading-state {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 40px;
+                    color: var(--text-muted);
+                    font-size: 0.7rem;
+                    position: relative;
+                    height: 100px;
+                }
+
+                .scanner-line {
+                    position: absolute;
+                    width: 100%;
+                    height: 100px;
+                    background: linear-gradient(to bottom, transparent, var(--accent-cyan), transparent);
+                    opacity: 0.1;
+                    animation: scanner-glow 2s linear infinite;
+                }
+
+                @keyframes scanner-glow {
+                    0% { top: -100%; }
+                    100% { top: 200%; }
+                }
+
+                .empty-state {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 40px;
+                    color: var(--text-muted);
+                    font-size: 0.7rem;
+                    gap: 16px;
+                }
+
+                .add-first-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 10px 16px;
+                    background: transparent;
+                    border: 1px solid var(--accent-cyan);
+                    color: var(--accent-cyan);
+                    font-size: 0.6rem;
+                    font-weight: 900;
+                    cursor: pointer;
+                    letter-spacing: 0.05em;
+                }
+
                 .mission-control {
                     flex: 1;
                     min-width: 0;
@@ -538,8 +878,14 @@ export default function SilentFlyerTracker() {
                     font-size: 2.25rem;
                     font-weight: 1000;
                     color: white;
-                    letter-spacing: -0.04em;
                     line-height: 1;
+                }
+
+                .hud-unit.main .unit-sub,
+                .hud-unit.main .unit-date {
+                    font-size: 0.65rem;
+                    color: var(--text-muted);
+                    margin-top: 4px;
                 }
 
                 .hud-grid-metrics {
@@ -565,10 +911,22 @@ export default function SilentFlyerTracker() {
                     margin-bottom: 4px;
                 }
 
+                .score-bar {
+                    height: 4px;
+                    background: var(--border-tactical);
+                    border-radius: 2px;
+                    overflow: hidden;
+                }
+
+                .score-bar .fill {
+                    height: 100%;
+                    background: var(--accent-emerald);
+                    transition: width 0.3s;
+                }
+
                 .score-mobile { display: none; }
                 .text-emerald { color: var(--accent-emerald); }
 
-                /* CHART */
                 .chart-container {
                     background: var(--panel-bg);
                     border: 1px solid var(--border-tactical);
@@ -578,7 +936,39 @@ export default function SilentFlyerTracker() {
                     height: 600px;
                 }
 
-                /* INTEL GRID */
+                .chart-overlay {
+                    position: absolute;
+                    inset: 0;
+                    background: var(--panel-bg);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 16px;
+                    z-index: 10;
+                    color: var(--text-muted);
+                    font-size: 0.7rem;
+                }
+
+                .spinner {
+                    width: 32px;
+                    height: 32px;
+                    border: 2px solid var(--border-tactical);
+                    border-top-color: var(--accent-cyan);
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+
+                .chart-empty {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--text-muted);
+                    font-size: 0.8rem;
+                }
+
                 .intel-grid {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
@@ -625,8 +1015,213 @@ export default function SilentFlyerTracker() {
                 }
 
                 .metric .m-value { font-size: 1.5rem; font-weight: 1000; margin-top: 4px; }
+                .metric .m-value.pos { color: var(--accent-emerald); }
+                .metric .m-value.neg { color: var(--accent-rose); }
 
-                /* RESPONSIVE BREAKPOINTS */
+                .status-banner {
+                    margin-top: auto;
+                }
+
+                .banner {
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    font-size: 0.7rem;
+                    font-weight: 1000;
+                    letter-spacing: 0.05em;
+                }
+
+                .banner.success {
+                    background: oklch(0.7 0.25 150 / 0.1);
+                    color: var(--accent-emerald);
+                }
+
+                .banner.failure {
+                    background: oklch(0.6 0.2 25 / 0.1);
+                    color: var(--accent-rose);
+                }
+
+                .banner.takingoff {
+                    background: oklch(0.75 0.2 200 / 0.1);
+                    color: var(--accent-cyan);
+                }
+
+                .banner.pending {
+                    background: oklch(0.8 0.15 80 / 0.1);
+                    color: oklch(0.8 0.15 80);
+                }
+
+                .mission-empty {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    height: 400px;
+                    background: var(--panel-bg);
+                    border: 1px solid var(--border-tactical);
+                    border-radius: 16px;
+                    color: var(--text-muted);
+                    font-size: 0.8rem;
+                    gap: 24px;
+                }
+
+                .radar-circle {
+                    width: 80px;
+                    height: 80px;
+                    border: 2px solid var(--border-tactical);
+                    border-radius: 50%;
+                    position: relative;
+                    animation: pulse 2s ease-in-out infinite;
+                }
+
+                @keyframes pulse {
+                    0%, 100% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.1); opacity: 0.7; }
+                }
+
+                .modal-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: oklch(0.05 0 0 / 0.9);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 3000;
+                }
+
+                .modal-content {
+                    width: 90%;
+                    max-width: 500px;
+                    max-height: 80vh;
+                    background: var(--panel-bg);
+                    border: 1px solid var(--border-tactical);
+                    border-radius: 16px;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+
+                .modal-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 16px 20px;
+                    border-bottom: 1px solid var(--border-tactical);
+                    font-size: 0.8rem;
+                    font-weight: 900;
+                    letter-spacing: 0.1em;
+                }
+
+                .modal-header button {
+                    background: transparent;
+                    border: none;
+                    color: var(--text-muted);
+                    cursor: pointer;
+                }
+
+                .modal-search {
+                    padding: 16px 20px;
+                    border-bottom: 1px solid var(--border-tactical);
+                    position: relative;
+                }
+
+                .search-icon {
+                    position: absolute;
+                    left: 32px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    color: var(--text-muted);
+                }
+
+                .search-input {
+                    width: 100%;
+                    padding: 10px 10px 10px 36px;
+                    background: oklch(0.12 0.01 240);
+                    border: 1px solid var(--border-tactical);
+                    border-radius: 8px;
+                    color: white;
+                    font-size: 0.75rem;
+                    font-family: inherit;
+                }
+
+                .search-input:focus {
+                    outline: none;
+                    border-color: var(--accent-cyan);
+                }
+
+                .modal-list {
+                    flex: 1;
+                    overflow-y: auto;
+                    padding: 12px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                }
+
+                .modal-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 12px;
+                    background: oklch(0.12 0.01 240);
+                    border: 1px solid var(--border-tactical);
+                    border-radius: 8px;
+                    text-align: left;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .modal-item:hover {
+                    border-color: var(--accent-emerald);
+                    background: oklch(0.7 0.2 150 / 0.05);
+                }
+
+                .modal-empty {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 40px;
+                    color: var(--text-muted);
+                    font-size: 0.75rem;
+                    text-align: center;
+                }
+
+                .item-left {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+
+                .item-ticker {
+                    font-weight: 1000;
+                    color: white;
+                    font-size: 0.9rem;
+                }
+
+                .item-strategy {
+                    font-size: 0.6rem;
+                    color: var(--text-muted);
+                }
+
+                .item-right {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 2px;
+                }
+
+                .item-price {
+                    font-weight: 1000;
+                    color: white;
+                }
+
+                .item-change {
+                    font-size: 0.7rem;
+                    font-weight: 1000;
+                }
+
+                .item-change.pos { color: var(--accent-emerald); }
+                .item-change.neg { color: var(--accent-rose); }
+
                 @media (max-width: 1200px) {
                     .registry-sidebar { width: 320px; min-width: 320px; }
                     .hud-grid-metrics { gap: 20px; padding: 0 20px; }
@@ -703,21 +1298,6 @@ export default function SilentFlyerTracker() {
                     .hud-grid-metrics { gap: 12px; }
                     .unit-value.small { font-size: 0.9rem; }
                     .metric .m-value { font-size: 1.25rem; }
-                }
-
-                /* ANIMATIONS */
-                @keyframes scanner-glow {
-                    0% { top: -100%; }
-                    100% { top: 200%; }
-                }
-
-                .scanner-line {
-                    position: absolute;
-                    width: 100%;
-                    height: 100px;
-                    background: linear-gradient(to bottom, transparent, var(--accent-cyan), transparent);
-                    opacity: 0.1;
-                    animation: scanner-glow 2s linear infinite;
                 }
             `}</style>
         </div>

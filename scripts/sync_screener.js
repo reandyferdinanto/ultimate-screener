@@ -26,173 +26,325 @@ const indonesiaStockSchema = new mongoose.Schema({
 }, { collection: "indonesiastocks" });
 const IndonesiaStock = mongoose.models.IndonesiaStock || mongoose.model("IndonesiaStock", indonesiaStockSchema);
 
+const flyerRadarSchema = new mongoose.Schema({
+    ticker: String,
+    sector: String,
+    signalSource: String,
+    entryDate: Date,
+    entryPrice: Number,
+    targetPrice: Number,
+    stopLossPrice: Number,
+    status: String,
+    currentPrice: Number,
+    relevanceScore: Number,
+    priceHistory: [{
+        date: Date,
+        price: Number
+    }],
+    metadata: mongoose.Schema.Types.Mixed,
+}, { collection: "flyerradars", timestamps: true });
+
+const FlyerRadar = mongoose.models.FlyerRadar || mongoose.model("FlyerRadar", flyerRadarSchema);
+
+// Helper functions
+function calculateEMA(closes, period) {
+    const k = 2 / (period + 1);
+    const ema = [];
+    for (let i = 0; i < closes.length; i++) {
+        if (i === 0) {
+            ema.push(closes[i]);
+        } else if (i < period) {
+            const sum = closes.slice(0, i + 1).reduce((a, b) => a + b, 0) / (i + 1);
+            ema.push(sum);
+        } else {
+            ema.push(closes[i] * k + ema[i - 1] * (1 - k));
+        }
+    }
+    return ema;
+}
+
+function calculateRSI(closes, period = 14) {
+    const rsi = [];
+    let gains = 0, losses = 0;
+    
+    for (let i = 0; i < closes.length; i++) {
+        if (i === 0) {
+            rsi.push(50);
+        } else {
+            const change = closes[i] - closes[i - 1];
+            gains = change > 0 ? (gains * (period - 1) + change) / period : gains * (period - 1) / period;
+            losses = change < 0 ? (losses * (period - 1) + Math.abs(change)) / period : losses * (period - 1) / period;
+            const rs = gains / (losses || 1);
+            rsi.push(100 - (100 / (1 + rs)));
+        }
+    }
+    return rsi;
+}
+
+function calculateSqueezeDuration(data, ema20) {
+    let duration = 0;
+    const lookback = 20;
+    
+    for (let i = data.length - 1; i >= Math.max(0, data.length - lookback); i--) {
+        const candle = data[i];
+        const range = Math.max(...data.slice(Math.max(0, i - lookback), i + 1).map(d => d.high)) - 
+                     Math.min(...data.slice(Math.max(0, i - lookback), i + 1).map(d => d.low));
+        const candleRange = (candle.high - candle.low) / candle.close;
+        
+        // Tight range indicates squeeze
+        if (candleRange < 0.02 || candleRange < range * 0.3) {
+            duration++;
+        } else {
+            break;
+        }
+    }
+    
+    return duration;
+}
+
 async function runScreener() {
-    console.log("Starting Sync Screener (Conviction Engine v2)...");
+    console.log("Starting Sync Screener (Silent Flyer Focus v3)...");
     try {
         await mongoose.connect(MONGODB_URI);
         const stocks = await IndonesiaStock.find({ active: true });
         console.log(`Scanning ${stocks.length} active stocks...`);
 
-        // We'll process in chunks to avoid overwhelming the API
-        const chunkSize = 20;
+        const chunkSize = 15;
+        const silentFlyersFound = [];
+        
         for (let i = 0; i < stocks.length; i += chunkSize) {
             const chunk = stocks.slice(i, i + chunkSize);
             await Promise.all(chunk.map(async (stock) => {
                 try {
                     const ticker = stock.ticker;
-                    // Use localhost:3004 (Production Next.js Port)
-                    const res = await fetch(`http://localhost:3004/api/technical?symbol=${ticker}`).then(r => r.json());
+                    const symbol = ticker.replace('.JK', '') + '.JK';
                     
-                    if (!res.success) {
+                    // Fetch 1 year of daily data
+                    const result = await yahooFinance.chart(symbol, {
+                        period1: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000),
+                        period2: new Date(),
+                        interval: '1d'
+                    });
+                    
+                    if (!result.quotes || result.quotes.length < 60) {
                         return;
                     }
-
-                    if (!res.unifiedAnalysis) {
+                    
+                    const quotes = result.quotes.filter(q => q.close !== null && q.volume > 0);
+                    if (quotes.length < 60) return;
+                    
+                    const closes = quotes.map(q => q.close);
+                    const last = quotes[quotes.length - 1];
+                    const prev = quotes[quotes.length - 2];
+                    const prev5 = quotes[Math.max(0, quotes.length - 6)];
+                    
+                    // Calculate indicators
+                    const ema20 = calculateEMA(closes, 20);
+                    const rsi = calculateRSI(closes);
+                    
+                    const lastEma20 = ema20[ema20.length - 1];
+                    const lastRsi = rsi[rsi.length - 1];
+                    const lastMfi = 50; // Simplified
+                    
+                    // Price must be above EMA20 (no downtrend)
+                    if (last.close < lastEma20) {
                         return;
                     }
-
-                    const analysis = res.unifiedAnalysis;
-                    const last = res.data[res.data.length - 1];
-                    const prev = res.data[res.data.length - 2];
                     
-                    const fluxImproving = last.squeezeDeluxe.flux > prev.squeezeDeluxe.flux;
-                    const setupGood = analysis.score.setup >= 80; 
-                    
-                    const v = analysis.verdict.toUpperCase();
-                    
-                    // [NEW] Squeeze + Bounce Confluence (Super High Conviction)
-                    const isSqueezeBounce = last.isSqueezeBounce === true;
-                    
-                    // [NEW] SMA50 trend filter — skip downtrend stocks
-                    const isAboveSma50 = last.close > last.sma50;
-                    if (!isAboveSma50 && !v.includes("TURNAROUND") && !v.includes("SILENT")) {
-                        return; // Skip downtrend stocks (except turnaround/accumulation plays)
+                    // Minimum price filter (< 50 = too illiquid)
+                    if (last.close < 50) {
+                        return;
                     }
                     
-                    // Categorization Logic
-                    let finalCategory = "";
-                    let extraScore = 0;
-
-                    const isSilentFlyer = (analysis.squeezeDuration > 10 || (isSqueezeBounce && analysis.squeezeDuration > 5)) && 
-                                          res.elliott?.trend === 'BULLISH' && 
-                                          last.squeezeDeluxe.flux > 0 &&
-                                          last.close > last.ema20;
-
+                    // Calculate squeeze duration
+                    const squeezeDuration = calculateSqueezeDuration(quotes, lastEma20);
+                    
+                    // ========== SILENT FLYER CRITERIA ==========
+                    // 1. Long squeeze (8+ bars of compression)
+                    // 2. RSI supportive (30-65 for bounce potential)
+                    // 3. MFI supportive (not extreme)
+                    // 4. Above EMA20
+                    // 5. Price not overextended (>10% from EMA20)
+                    
+                    const dist20 = ((last.close - lastEma20) / lastEma20) * 100;
+                    const rsiOk = lastRsi >= 30 && lastRsi <= 65;
+                    const notOverextended = dist20 < 10;
+                    
+                    // Check for momentum building (just after squeeze)
+                    const recentChange = ((last.close - prev5.close) / prev5.close) * 100;
+                    const momImproving = recentChange > 0 && recentChange < 5; // Small positive, not runaway
+                    
+                    const isSilentFlyer = squeezeDuration >= 8 && rsiOk && notOverextended && momImproving;
+                    
                     if (isSilentFlyer) {
-                        finalCategory = "SILENT FLYER";     // The "BNBR/KOTA/LAND" DNA
-                        extraScore = 150;
-                    } else if (isSqueezeBounce) {
-                        finalCategory = "ELITE BOUNCE";     // Squeeze+bounce = highest conviction
-                        extraScore = 130;
-                    } else if (v.includes("ELITE BOUNCE")) {
-                        finalCategory = "ELITE BOUNCE";
-                        extraScore = 100;
-                    } else if (v.includes("BUY ON DIP")) {
-                        finalCategory = "BUY ON DIP";
-                        extraScore = 80;
-                    } else if (v.includes("TURNAROUND") || (v.includes("MIXED SIGNAL") && setupGood && fluxImproving)) {
-                        finalCategory = "TURNAROUND";
-                        extraScore = 50;
-                    } else if (v.includes("VOLATILITY EXPLOSION")) {
-                        finalCategory = "VOLATILITY EXPLOSION";
-                        extraScore = 70;
-                    } else if (v.includes("SILENT ACCUMULATION")) {
-                        finalCategory = "SILENT ACCUMULATION";
-                        extraScore = 60;
-                    }
-
-                    // ===== QUALITY GATES — Learned from Elite Bounce Postmortem =====
-                    if (finalCategory) {
-                        const price = last.close;
-                        const lastSqz = last.squeezeDeluxe;
-                        const momentum = lastSqz?.momentum || 0;
-                        const flux = lastSqz?.flux || 0;
-                        const volScore = last.volumeScore || 0;
-
-                        // Gate 1: ELITE BOUNCE requires positive momentum (reject MOM < 0)
-                        if (finalCategory === "ELITE BOUNCE" && momentum < 0) {
-                            console.log(`[REJECT] ${ticker}: ELITE BOUNCE rejected — Momentum ${momentum.toFixed(1)} < 0 (not ready)`);
-                            finalCategory = "";
-                        }
-
-                        // Gate 2: ELITE BOUNCE requires non-negative flux (reject distribution)
-                        if (finalCategory === "ELITE BOUNCE" && flux < -2) {
-                            console.log(`[REJECT] ${ticker}: ELITE BOUNCE rejected — Flux ${flux.toFixed(1)} (distribution phase)`);
-                            finalCategory = "";
-                        }
-
-                        // Gate 3: Minimum volume score (at least 3 of 6 volume indicators bullish)
-                        if ((finalCategory === "ELITE BOUNCE" || finalCategory === "BUY ON DIP") && volScore < 3) {
-                            console.log(`[REJECT] ${ticker}: ${finalCategory} rejected — Volume Score ${volScore}/6 too weak`);
-                            finalCategory = "";
-                        }
-
-                        // Gate 4: Minimum price filter (< 50 = too illiquid/spready)
-                        if (price < 50 && finalCategory) {
-                            console.log(`[REJECT] ${ticker}: Skipped — Price ${price} too low (min 50)`);
-                            finalCategory = "";
-                        }
-                    }
-
-                    if (finalCategory) {
-                        const price = last.close;
-                        const lastSqz = last.squeezeDeluxe;
-                        const momentum = lastSqz?.momentum || 0;
-                        const flux = lastSqz?.flux || 0;
-
-                        console.log(`[FOUND] ${ticker}: ${finalCategory} (Setup: ${analysis.score.setup}, Vol: ${analysis.score.volume}, MOM: ${momentum.toFixed(1)}, FLUX: ${flux.toFixed(1)})`);
+                        console.log(`[SILENT FLYER] ${ticker}: Sqz=${squeezeDuration}d, RSI=${lastRsi.toFixed(1)}, Dist=${dist20.toFixed(1)}%, Change=${recentChange.toFixed(1)}%`);
                         
-                        // [FIX] TP Calculation — Fallback to percentage if pivot <= price
-                        let tp = res.pivots.r1 > price ? res.pivots.r1 : res.pivots.r2;
-                        if (tp <= price) {
-                            const multiplier = finalCategory === "SILENT FLYER" ? 1.20 :
-                                              (finalCategory === "ELITE BOUNCE" ? 1.12 : 
-                                              (finalCategory === "VOLATILITY EXPLOSION" ? 1.15 : 1.10));
-                            tp = price * multiplier;
-                            console.log(`[TP_FIX] ${ticker}: Pivot TP below price, using ${((multiplier - 1) * 100).toFixed(0)}% fallback = ${Math.round(tp)}`);
+                        // Calculate TP/SL
+                        const entryPrice = last.close;
+                        // Target: 30%+ for Silent Flyer
+                        const targetPrice = Math.round(entryPrice * 1.30);
+                        // Stop: Below EMA20
+                        const stopLossPrice = Math.round(lastEma20 * 0.97);
+                        
+                        // Score based on factors
+                        let score = 150; // Base score for SILENT FLYER
+                        score += Math.min(50, squeezeDuration * 3);
+                        score += lastRsi >= 40 && lastRsi <= 55 ? 30 : 10; // Sweet spot bonus
+                        score += momImproving ? 20 : 0;
+                        score += dist20 <= 3 ? 20 : 0;
+                        
+                        // Save to StockSignal
+                        const scanRunAt = new Date();
+                        const query = { ticker: ticker, signalSource: "CONVICTION: SILENT FLYER" };
+                        const existing = await StockSignal.findOne(query);
+                        const currentPrice = entryPrice;
+                        const storedEntryPrice = existing?.entryPrice || currentPrice;
+                        const updateData = {
+                            ticker: ticker,
+                            status: "pending",
+                            entryPrice: storedEntryPrice,
+                            entryDate: existing ? existing.entryDate : scanRunAt,
+                            targetPrice: existing?.targetPrice || Math.round(storedEntryPrice * 1.30),
+                            stopLossPrice: existing?.stopLossPrice || stopLossPrice,
+                            currentPrice: currentPrice,
+                            signalSource: "CONVICTION: SILENT FLYER",
+                            relevanceScore: score,
+                            priceHistory: [
+                                ...((existing?.priceHistory || []).map(h => ({ date: h.date, price: h.price }))),
+                                { date: scanRunAt, price: currentPrice }
+                            ].slice(-60),
+                            metadata: {
+                                ...(existing?.metadata || {}),
+                                category: "SILENT_FLYER",
+                                verdict: `SILENT FLYER: Squeeze ${squeezeDuration}d with momentum building`,
+                                riskLevel: "MEDIUM",
+                                setupScore: score,
+                                volScore: 50,
+                                squeezeInsight: `Compression for ${squeezeDuration} bars. RSI ${lastRsi.toFixed(0)}, dist ${dist20.toFixed(1)}%. Momentum ${momImproving ? 'improving' : 'building'}.`,
+                                squeezeDuration: squeezeDuration,
+                                dist20: dist20.toFixed(2),
+                                momentum: recentChange.toFixed(1),
+                                flux: "BULLISH",
+                                fluxTrend: "Improving",
+                                dataSource: "YahooFinance.chart(1d) + SilentFlyerScanner",
+                                lastScannedAt: scanRunAt.toISOString(),
+                                scanRunAt: scanRunAt.toISOString(),
+                                lastQuoteDate: last.date ? new Date(last.date).toISOString() : scanRunAt.toISOString(),
+                                firstEntryPrice: existing?.metadata?.firstEntryPrice || storedEntryPrice,
+                                latestPrice: currentPrice,
+                                firstAppearedAt: existing ? (existing.metadata?.firstAppearedAt || existing.createdAt?.toISOString()) : scanRunAt.toISOString(),
+                                appearedAt: existing ? (existing.metadata?.appearedAt || existing.createdAt?.toISOString()) : scanRunAt.toISOString()
+                            },
+                            sector: stock.sector,
+                            updatedAt: scanRunAt
+                        };
+                        
+                        await StockSignal.findOneAndUpdate(query, updateData, { upsert: true, new: true });
+                        
+                        // Also add to FlyerRadar for immediate tracking
+                        const existingRadar = await FlyerRadar.findOne({ ticker: ticker });
+                        if (!existingRadar) {
+                            await FlyerRadar.create({
+                                ticker: ticker,
+                                sector: stock.sector,
+                                signalSource: "SILENT FLYER",
+                                entryDate: new Date(),
+                                entryPrice: entryPrice,
+                                targetPrice: targetPrice,
+                                stopLossPrice: stopLossPrice,
+                                status: "silent",
+                                currentPrice: entryPrice,
+                                relevanceScore: score,
+                                priceHistory: [{
+                                    date: new Date(),
+                                    price: entryPrice
+                                }],
+                                metadata: {
+                                    squeezeDuration,
+                                    rsi: lastRsi,
+                                    dist20,
+                                    changeFromEntry: 0
+                                }
+                            });
+                            console.log(`[RADAR] Added ${ticker} to FlyerRadar`);
                         }
-                        // [FIX] Always use "pending" status and allow re-activation of archived signals if it's a SILENT FLYER
-                        const query = finalCategory === "SILENT FLYER" ? { ticker: ticker } : { ticker: ticker, status: "pending" };
-
+                        
+                        silentFlyersFound.push(ticker);
+                    }
+                    
+                    // ========== ELITE BOUNCE CRITERIA ==========
+                    const isSqueezeBounce = squeezeDuration >= 5 && 
+                                           lastRsi >= 40 && lastRsi <= 68 &&
+                                           last.close > lastEma20 &&
+                                           dist20 < 5;
+                    
+                    if (isSqueezeBounce && !isSilentFlyer) {
+                        console.log(`[ELITE BOUNCE] ${ticker}: Sqz=${squeezeDuration}d, RSI=${lastRsi.toFixed(1)}`);
+                        
+                        const entryPrice = last.close;
+                        const targetPrice = Math.round(entryPrice * 1.15);
+                        const stopLossPrice = Math.round(Math.min(lastEma20, quotes.slice(-5).map(q => q.low)) * 0.98);
+                        
+                        let score = 130;
+                        score += squeezeDuration * 5;
+                        
+                        const eliteScanRunAt = new Date();
+                        const existingElite = await StockSignal.findOne({ ticker: ticker, signalSource: "CONVICTION: ELITE BOUNCE" });
+                        const eliteCurrentPrice = entryPrice;
+                        const eliteStoredEntryPrice = existingElite?.entryPrice || eliteCurrentPrice;
                         await StockSignal.findOneAndUpdate(
-                            query,
+                            { ticker: ticker, signalSource: "CONVICTION: ELITE BOUNCE" },
                             {
                                 ticker: ticker,
                                 status: "pending",
-                                entryPrice: price,
-                                targetPrice: Math.round(tp),
-                                stopLossPrice: Math.round(sl),
-                                currentPrice: price,
-                                signalSource: `CONVICTION: ${finalCategory}`,
-                                relevanceScore: analysis.score.setup + analysis.score.volume + extraScore,
+                                entryPrice: eliteStoredEntryPrice,
+                                entryDate: existingElite ? existingElite.entryDate : eliteScanRunAt,
+                                targetPrice: existingElite?.targetPrice || Math.round(eliteStoredEntryPrice * 1.15),
+                                stopLossPrice: existingElite?.stopLossPrice || stopLossPrice,
+                                currentPrice: eliteCurrentPrice,
+                                signalSource: "CONVICTION: ELITE BOUNCE",
+                                relevanceScore: score,
+                                priceHistory: [
+                                    ...((existingElite?.priceHistory || []).map(h => ({ date: h.date, price: h.price }))),
+                                    { date: eliteScanRunAt, price: eliteCurrentPrice }
+                                ].slice(-60),
                                 metadata: {
-                                    verdict: analysis.verdict,
-                                    riskLevel: (finalCategory === "TURNAROUND" || finalCategory === "SILENT FLYER") ? "MEDIUM" : analysis.riskLevel,
-                                    setupScore: analysis.score.setup,
-                                    volScore: analysis.score.volume,
-                                    squeezeInsight: analysis.squeezeInsight,
-                                    squeezeDuration: analysis.squeezeDuration,
-                                    elliottTrend: res.elliott?.trend || "NEUTRAL",
-                                    dist20: ((price - last.ema20) / last.ema20 * 100).toFixed(2),
-                                    momentum: momentum.toFixed(1),
-                                    flux: flux.toFixed(1),
-                                    volumeScore: last.volumeScore || 0,
-                                    volDetails: analysis.volDetails,
-                                    fluxTrend: fluxImproving ? "Improving" : "Stagnant"
+                                    ...(existingElite?.metadata || {}),
+                                    category: "ELITE_BOUNCE",
+                                    verdict: "ELITE BOUNCE: Squeeze bounce confirmed",
+                                    riskLevel: "LOW",
+                                    squeezeDuration,
+                                    squeezeInsight: `Squeeze ${squeezeDuration}d bounce. RSI ${lastRsi.toFixed(0)}.`,
+                                    rsi: lastRsi,
+                                    dataSource: "YahooFinance.chart(1d) + SilentFlyerScanner",
+                                    lastScannedAt: eliteScanRunAt.toISOString(),
+                                    scanRunAt: eliteScanRunAt.toISOString(),
+                                    lastQuoteDate: last.date ? new Date(last.date).toISOString() : eliteScanRunAt.toISOString(),
+                                    firstEntryPrice: existingElite?.metadata?.firstEntryPrice || eliteStoredEntryPrice,
+                                    latestPrice: eliteCurrentPrice,
+                                    firstAppearedAt: existingElite ? (existingElite.metadata?.firstAppearedAt || existingElite.createdAt?.toISOString()) : eliteScanRunAt.toISOString(),
+                                    appearedAt: existingElite ? (existingElite.metadata?.appearedAt || existingElite.createdAt?.toISOString()) : eliteScanRunAt.toISOString()
                                 },
-                                updatedAt: new Date()
+                                updatedAt: eliteScanRunAt
                             },
                             { upsert: true, new: true }
                         );
                     }
+                    
                 } catch (e) {
-                    // console.error(`Error processing ${stock.ticker}: ${e.message}`);
+                    // Silently skip errors
                 }
             }));
-            console.log(`Processed ${Math.min(i + chunkSize, stocks.length)}/${stocks.length}...`);
+            
+            console.log(`Processed ${Math.min(i + chunkSize, stocks.length)}/${stocks.length}... | Found ${silentFlyersFound.length} Silent Flyers`);
         }
-
-        console.log("Screener sync complete.");
+        
+        console.log("\n========================================");
+        console.log(`Screener sync complete!`);
+        console.log(`Total Silent Flyers: ${silentFlyersFound.length}`);
+        console.log(`Tickers: ${silentFlyersFound.slice(0, 20).join(', ')}${silentFlyersFound.length > 20 ? '...' : ''}`);
+        console.log("========================================");
+        
     } catch (err) {
         console.error("Screener Error:", err);
     } finally {

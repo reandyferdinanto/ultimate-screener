@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pip install yfinance pandas numpy)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s \"http://localhost:3000/api/technical?symbol=ISEA\")",
+      "Bash(curl -s \"http://localhost:3000/api/technical?symbol=ISEA.JK\")"
+    ]
+  }
+}

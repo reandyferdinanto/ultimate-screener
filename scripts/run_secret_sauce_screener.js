@@ -232,19 +232,28 @@ async function runScreener() {
                 priceHistory: [{ date: Date, price: Number }], metadata: Object,
             }, { timestamps: true }));
 
+            const existingSignal = await StockSignal.findOne({ ticker: tickerClean, status: 'pending', signalSource: 'Secret Sauce' });
+            const currentPrice = cand.tech.price;
+            const storedEntryPrice = existingSignal?.entryPrice || currentPrice;
+
             await StockSignal.findOneAndUpdate(
                 { ticker: tickerClean, status: 'pending', signalSource: 'Secret Sauce' },
                 {
                     ticker: tickerClean,
                     signalSource: 'Secret Sauce',
-                    entryDate: new Date(),
-                    entryPrice: cand.tech.price,
-                    currentPrice: cand.tech.price,
-                    targetPrice: Math.round(cand.tech.price * 1.15),
-                    stopLossPrice: Math.round(Math.min(cand.tech.price * 0.94, cand.tech.ema20 * 0.97)),
+                    entryDate: existingSignal?.entryDate || new Date(),
+                    entryPrice: storedEntryPrice,
+                    currentPrice,
+                    targetPrice: existingSignal?.targetPrice || Math.round(storedEntryPrice * 1.15),
+                    stopLossPrice: existingSignal?.stopLossPrice || Math.round(Math.min(storedEntryPrice * 0.94, cand.tech.ema20 * 0.97)),
                     status: 'pending',
                     relevanceScore: 500 + cand.score,
+                    priceHistory: [
+                        ...((existingSignal?.priceHistory || []).map(h => ({ date: h.date, price: h.price }))),
+                        { date: new Date(), price: currentPrice }
+                    ].slice(-60),
                     metadata: {
+                        ...(existingSignal?.metadata || {}),
                         secretSauceVersion: activeVersion.versionLabel,
                         candidateScore: cand.score,
                         candidateRank: index + 1,
@@ -258,6 +267,8 @@ async function runScreener() {
                         compressionPct: cand.tech.compressionPct?.toFixed(2),
                         closeNearHighPct: cand.tech.closeNearHighPct?.toFixed(1),
                         strategyRank: 500 + cand.score,
+                        firstEntryPrice: existingSignal?.metadata?.firstEntryPrice || storedEntryPrice,
+                        latestPrice: currentPrice,
                     },
                     updatedAt: new Date(),
                 },

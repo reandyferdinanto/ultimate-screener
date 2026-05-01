@@ -7,6 +7,7 @@ import {
   IChartApi, 
   UTCTimestamp,
   LineWidth,
+  LineStyle,
   LogicalRange,
   CandlestickSeries,
   LineSeries,
@@ -23,11 +24,11 @@ const compactChartData = <T,>(values: (T | null)[]): T[] =>
 const finiteChartNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
+
 interface AdvancedChartProps {
   data: any[];
   pivots: any;
-  elliott?: any;
-  wavePivots?: any[];
+  riskPlan?: any;
   ticker: string;
   onLogicalRangeChange?: (range: LogicalRange | null) => void;
   syncLogicalRange?: LogicalRange | null;
@@ -51,8 +52,7 @@ interface AdvancedChartProps {
 export default function AdvancedChart({ 
   data, 
   pivots, 
-  elliott,
-  wavePivots,
+  riskPlan,
   ticker, 
   onLogicalRangeChange,
   syncLogicalRange,
@@ -75,14 +75,14 @@ export default function AdvancedChart({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const isMounted = useRef(true);
-
+  
   useEffect(() => {
     isMounted.current = true;
     if (!chartContainerRef.current || data.length === 0) return;
 
-    const bgColor = "#0a0a0a";
-    const textColor = "#d1d4dc";
-    const gridColor = "rgba(42, 46, 57, 0.1)";
+    const bgColor = "#050505";
+    const textColor = "#e0e0e0";
+    const gridColor = "rgba(60, 60, 80, 0.15)";
     const isMobile = window.innerWidth < 768;
     const hasSqueezePane = showSqueezeDeluxe;
     const macdPaneRatio = hasSqueezePane ? 0.2 : 0.26;
@@ -102,15 +102,41 @@ export default function AdvancedChart({
     chartContainerRef.current.innerHTML = '';
 
     const chart = createChart(chartContainerRef.current, {
-      layout: { background: { type: ColorType.Solid, color: bgColor }, textColor: textColor },
-      grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
-      crosshair: { mode: CrosshairMode.Normal },
-      timeScale: { 
-        borderColor: "rgba(197, 203, 206, 0.2)", 
-        timeVisible: true, 
-        secondsVisible: false, 
+      layout: {
+        background: { type: ColorType.Solid, color: bgColor },
+        textColor: textColor
+      },
+      grid: {
+        vertLines: { color: gridColor, style: 0 },
+        horzLines: { color: gridColor, style: 0 }
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          width: 1,
+          color: "rgba(255, 255, 255, 0.3)",
+          style: 3
+        },
+        horzLine: {
+          width: 1,
+          color: "rgba(255, 255, 255, 0.3)",
+          style: 3
+        }
+      },
+      timeScale: {
+        borderColor: "rgba(255, 255, 255, 0.1)",
+        timeVisible: true,
+        secondsVisible: false,
         rightOffset: 15,
-        barSpacing: 12
+        barSpacing: isMobile ? 8 : 12
+      },
+      rightPriceScale: {
+        borderColor: "rgba(255, 255, 255, 0.1)",
+        textColor: textColor
+      },
+      leftPriceScale: {
+        borderColor: "rgba(255, 255, 255, 0.1)",
+        textColor: textColor
       },
       width: chartContainerRef.current.clientWidth,
       height: chartHeight,
@@ -119,6 +145,12 @@ export default function AdvancedChart({
     chartRef.current = chart;
     chart.priceScale("right").applyOptions({
       scaleMargins: { top: 0.02, bottom: priceBottomMargin },
+      borderColor: "rgba(255, 255, 255, 0.1)",
+    });
+
+    chart.priceScale("left").applyOptions({
+      scaleMargins: { top: 0.02, bottom: priceBottomMargin },
+      borderColor: "rgba(255, 255, 255, 0.1)",
     });
 
     if (onLogicalRangeChange) {
@@ -137,14 +169,21 @@ export default function AdvancedChart({
     })));
 
     // --- 2. MAIN SERIES (CANDLE / LINE) ---
-    const mainSeries = chartType === 'candle' 
+    const mainSeries = chartType === 'candle'
         ? chart.addSeries(CandlestickSeries, {
-            upColor: "#26a69a", downColor: "#ef5350", borderVisible: false,
-            wickUpColor: "#26a69a", wickDownColor: "#ef5350",
-        })
+            upColor: "#22c55e",
+            downColor: "#ef4444",
+            borderUpColor: "#22c55e",
+            borderDownColor: "#ef4444",
+            wickUpColor: "#22c55e",
+            wickDownColor: "#ef4444",
+          })
         : chart.addSeries(LineSeries, {
-            color: "rgba(255, 255, 255, 0.8)", lineWidth: 2 as LineWidth,
-            lastValueVisible: true, priceLineVisible: true, title: "Price"
+            color: "rgba(255, 255, 255, 0.9)",
+            lineWidth: 2 as LineWidth,
+            lastValueVisible: true,
+            priceLineVisible: true,
+            title: "Price"
         });
 
     if (chartType === 'candle') {
@@ -155,33 +194,19 @@ export default function AdvancedChart({
         (mainSeries as any).setData(data.map(d => ({ time: d.time as UTCTimestamp, value: d.close })));
     }
 
-    // --- 2.1 MARKERS (BOUNCE & DIVERGENCE) ---
-    if (showUndercutBounce || showSqueezeDeluxe) {
+    // --- 2.1 MARKERS (BOUNCE) ---
+    if (showUndercutBounce) {
         const markers: any[] = [];
         
-        if (showUndercutBounce) {
-            data.filter(d => d.isUndercutBounce || d.isEliteBounce).forEach(d => {
-                markers.push({
-                    time: d.time as UTCTimestamp,
-                    position: 'belowBar',
-                    color: d.isEliteBounce ? 'rgba(255, 215, 0, 1)' : 'rgba(130, 255, 160, 1)',
-                    shape: 'arrowUp',
-                    text: d.isEliteBounce ? `ELITE ${d.convictionScore}%` : `BOUNCE ${d.convictionScore}%`,
-                });
+        data.filter(d => d.isUndercutBounce || d.isEliteBounce).forEach(d => {
+            markers.push({
+                time: d.time as UTCTimestamp,
+                position: 'belowBar',
+                color: d.isEliteBounce ? 'rgba(255, 215, 0, 1)' : 'rgba(130, 255, 160, 1)',
+                shape: 'arrowUp',
+                text: d.isEliteBounce ? `ELITE ${d.convictionScore}%` : `BOUNCE ${d.convictionScore}%`,
             });
-        }
-        
-        if (showSqueezeDeluxe) {
-            data.filter(d => d.squeezeDeluxe?.isBullDiv).forEach(d => {
-                markers.push({
-                    time: d.time as UTCTimestamp,
-                    position: 'belowBar',
-                    color: '#ffa600',
-                    shape: 'arrowUp',
-                    text: 'D▴',
-                });
-            });
-        }
+        });
         
         // Sort markers by time to avoid render issues
         markers.sort((a, b) => (a.time as number) - (b.time as number));
@@ -189,33 +214,116 @@ export default function AdvancedChart({
     }
 
     // --- 3. EMAs ---
-    const sanitizeData = (arr: any[], key: string) => 
+    const sanitizeData = (arr: any[], key: string) =>
         arr.map(d => ({ time: d.time as UTCTimestamp, value: d[key] }))
            .filter(v => v.value !== undefined && v.value !== null && !isNaN(v.value));
+    const sanitizeMappedData = (mapper: (item: any) => number | null | undefined) =>
+        compactChartData<LineData<Time>>(
+          data.map((d) => {
+            const value = mapper(d);
+            return typeof value === "number" && Number.isFinite(value)
+              ? { time: asChartTime(d.time), value }
+              : null;
+          })
+        );
 
     if (showEMA9) {
-        chart.addSeries(LineSeries, { color: "#ffcfa6", lineWidth: 1.5 as LineWidth, title: "EMA 9", lastValueVisible: false, priceLineVisible: false })
-             .setData(sanitizeData(data, 'ema9'));
+        chart.addSeries(LineSeries, {
+            color: "#3b82f6",
+            lineWidth: 2 as LineWidth,
+            title: "EMA 9",
+            lastValueVisible: false,
+            priceLineVisible: false,
+            lineStyle: LineStyle.Solid
+        }).setData(sanitizeData(data, 'ema9'));
     }
     if (showEMA10) {
-        chart.addSeries(LineSeries, { color: "rgba(130, 255, 160, 0.5)", lineWidth: 1.5 as LineWidth, title: "EMA 10", lastValueVisible: false, priceLineVisible: false })
-             .setData(sanitizeData(data, 'ema10'));
+        chart.addSeries(LineSeries, {
+            color: "#10b981",
+            lineWidth: 1.5 as LineWidth,
+            title: "EMA 10",
+            lastValueVisible: false,
+            priceLineVisible: false
+        }).setData(sanitizeData(data, 'ema10'));
     }
     if (showEMA20) {
-        chart.addSeries(LineSeries, { color: "#2962FF", lineWidth: 1.5 as LineWidth, title: "EMA 20", lastValueVisible: false, priceLineVisible: false })
-             .setData(sanitizeData(data, 'ema20'));
+        chart.addSeries(LineSeries, {
+            color: "#f59e0b",
+            lineWidth: 2 as LineWidth,
+            title: "EMA 20",
+            lastValueVisible: false,
+            priceLineVisible: false
+        }).setData(sanitizeData(data, 'ema20'));
     }
     if (showEMA50) {
-        chart.addSeries(LineSeries, { color: "#FF6D00", lineWidth: 1.5 as LineWidth, title: "EMA 50", lastValueVisible: false, priceLineVisible: false })
-             .setData(sanitizeData(data, 'ema50'));
+        chart.addSeries(LineSeries, {
+            color: "#ef4444",
+            lineWidth: 2 as LineWidth,
+            title: "EMA 50",
+            lastValueVisible: false,
+            priceLineVisible: false
+        }).setData(sanitizeData(data, 'ema50'));
     }
     if (showEMA60) {
-        chart.addSeries(LineSeries, { color: "rgba(255, 160, 64, 0.75)", lineWidth: 1.5 as LineWidth, title: "EMA 60", lastValueVisible: false, priceLineVisible: false })
-             .setData(sanitizeData(data, 'ema60'));
+        chart.addSeries(LineSeries, {
+            color: "#8b5cf6",
+            lineWidth: 2 as LineWidth,
+            title: "EMA 60",
+            lastValueVisible: false,
+            priceLineVisible: false
+        }).setData(sanitizeData(data, 'ema60'));
     }
     if (showEMA200) {
-        chart.addSeries(LineSeries, { color: "rgba(255, 235, 59, 0.5)", lineWidth: 1.5 as LineWidth, title: "EMA 200", lastValueVisible: false, priceLineVisible: false, lineStyle: 2 })
-             .setData(sanitizeData(data, 'ema200'));
+        chart.addSeries(LineSeries, {
+            color: "#ec4899",
+            lineWidth: 1.5 as LineWidth,
+            title: "EMA 200",
+            lastValueVisible: false,
+            priceLineVisible: false,
+            lineStyle: LineStyle.Dashed
+        }).setData(sanitizeData(data, 'ema200'));
+    }
+
+    // --- 3.1 RISK CHANNELS ---
+    const keltnerUpper = sanitizeMappedData((d) => d.keltner?.upper);
+    const keltnerMiddle = sanitizeMappedData((d) => d.keltner?.middle);
+    const keltnerLower = sanitizeMappedData((d) => d.keltner?.lower);
+    if (keltnerUpper.length > 10 && keltnerLower.length > 10) {
+      chart.addSeries(LineSeries, {
+        color: "rgba(56, 189, 248, 0.20)",
+        lineWidth: 1 as LineWidth,
+        lineStyle: LineStyle.Dotted,
+        title: "Keltner Upper",
+        lastValueVisible: false,
+        priceLineVisible: false,
+      }).setData(keltnerUpper);
+      chart.addSeries(LineSeries, {
+        color: "rgba(148, 163, 184, 0.18)",
+        lineWidth: 1 as LineWidth,
+        title: "Keltner Mid",
+        lastValueVisible: false,
+        priceLineVisible: false,
+      }).setData(keltnerMiddle);
+      chart.addSeries(LineSeries, {
+        color: "rgba(56, 189, 248, 0.20)",
+        lineWidth: 1 as LineWidth,
+        lineStyle: LineStyle.Dotted,
+        title: "Keltner Lower",
+        lastValueVisible: false,
+        priceLineVisible: false,
+      }).setData(keltnerLower);
+    }
+
+    const chandelierLong = sanitizeMappedData((d) => d.chandelier?.long);
+    if (chandelierLong.length > 10) {
+      chart.addSeries(LineSeries, {
+        color: "rgba(248, 113, 113, 0.35)",
+        lineWidth: 1 as LineWidth,
+        lineStyle: LineStyle.Dashed,
+        title: "Chandelier Stop",
+        lastValueVisible: true,
+        priceLineVisible: false,
+      }).setData(chandelierLong);
     }
 
     // --- 4. SUPERTREND ---
@@ -513,168 +621,60 @@ export default function AdvancedChart({
       drawPivot(pivots.s1, "rgba(239, 68, 68, 0.15)", "S1");
     }
 
-    // --- 8. ELLIOTT ZIGZAG & FIBONACCI ---
-    if (wavePivots && wavePivots.length > 0) {
-      const zigzagSeries = chart.addSeries(LineSeries, {
-        color: "rgba(255, 235, 59, 0.6)",
-        lineWidth: 2 as LineWidth,
-        lineStyle: 0,
-        title: "Elliott ZigZag",
+    // --- 8. EXECUTION RISK PLAN ---
+    if (riskPlan && data.length > 2) {
+      const startTime = data[Math.max(0, data.length - 60)].time as UTCTimestamp;
+      const lastTime = data[data.length - 1].time as UTCTimestamp;
+      const timeStep = Number(data[data.length - 1].time) - Number(data[data.length - 2].time);
+      const fallbackEnd = Number.isFinite(timeStep)
+        ? (Number(lastTime) + timeStep * (riskPlan.timeStopBars || 4)) as UTCTimestamp
+        : lastTime;
+      const endTime = (riskPlan.expiresAt || fallbackEnd) as UTCTimestamp;
+      const drawRiskLine = (value: unknown, color: string, title: string, style: LineStyle = LineStyle.Dashed, width: LineWidth = 1 as LineWidth) => {
+        const price = finiteChartNumber(value);
+        if (price === null) return;
+        chart.addSeries(LineSeries, {
+          color,
+          lineWidth: width,
+          lineStyle: style,
+          title,
+          lastValueVisible: true,
+          priceLineVisible: false,
+        }).setData([{ time: startTime, value: price }, { time: endTime, value: price }]);
+      };
+
+      const entryLow = finiteChartNumber(riskPlan.entryLow);
+      const entryHigh = finiteChartNumber(riskPlan.entryHigh);
+      const entryCollapsed = entryLow !== null && entryHigh !== null && Math.abs(entryHigh - entryLow) <= Math.max(1, entryHigh * 0.001);
+      if (entryCollapsed) {
+        drawRiskLine(entryHigh, "rgba(56, 189, 248, 0.78)", riskPlan.screenerSynced ? "Screener Entry" : "Entry", LineStyle.Solid, 2 as LineWidth);
+      } else {
+        drawRiskLine(riskPlan.entryHigh, "rgba(56, 189, 248, 0.65)", "Entry High", LineStyle.Dashed);
+        drawRiskLine(riskPlan.entryLow, "rgba(56, 189, 248, 0.45)", "Entry Low", LineStyle.Dashed);
+      }
+      const idealBuy = finiteChartNumber(riskPlan.idealBuy);
+      if (!entryCollapsed || idealBuy === null || entryHigh === null || Math.abs(idealBuy - entryHigh) > Math.max(1, entryHigh * 0.001)) {
+        drawRiskLine(riskPlan.idealBuy, "rgba(255, 255, 255, 0.50)", "Ideal Buy", LineStyle.Dotted);
+      }
+      drawRiskLine(riskPlan.earlyExit, "rgba(251, 191, 36, 0.70)", "Early Exit", LineStyle.Dashed, 2 as LineWidth);
+      drawRiskLine(riskPlan.hardStop, "rgba(239, 68, 68, 0.75)", "Hard Stop", LineStyle.Solid, 2 as LineWidth);
+      drawRiskLine(riskPlan.target1, "rgba(34, 197, 94, 0.70)", "Target 1", LineStyle.Dashed, 2 as LineWidth);
+      drawRiskLine(riskPlan.target2, "rgba(132, 204, 22, 0.55)", "Target 2", LineStyle.Dotted);
+
+      const markerSeries = chart.addSeries(LineSeries, {
+        color: "transparent",
         lastValueVisible: false,
         priceLineVisible: false,
       });
-
-      const zigzagData = wavePivots.map(p => ({
-        time: data[p.index].time as UTCTimestamp,
-        value: p.price
-      }));
-      zigzagSeries.setData(zigzagData);
-
-      // Markers for Waves dynamically assigned so they tie seamlessly to predictions
-      let waveMarkers: any[] = [];
-      let validPivots = [...wavePivots];
-      
-      // Elliott structure requires the peak to be a HIGH pivot before we predict pullbacks.
-      if (validPivots.length > 0 && validPivots[validPivots.length - 1].type === 'low') {
-          validPivots.pop();
-      }
-
-      if (elliott && elliott.trend === 'BULLISH') {
-          // We need W0 (Low), W1 (High), W2 (Low), W3 (High)
-          const pts = validPivots.slice(-4);
-          waveMarkers = pts.map((p, i) => ({
-            time: data[p.index].time as UTCTimestamp,
-            position: p.type === 'high' ? 'aboveBar' as const : 'belowBar' as const,
-            color: "rgba(130, 255, 160, 1)",
-            shape: 'circle' as const,
-            text: `W${i}`,
-          }));
-      } else if (elliott && elliott.trend === 'BEARISH') {
-          // We need START (Low), 1 (High), 2 (Low), 3 (High), 4 (Low), 5 (High)
-          const pts = validPivots.slice(-6);
-          waveMarkers = pts.map((p, i) => ({
-            time: data[p.index].time as UTCTimestamp,
-            position: p.type === 'high' ? 'aboveBar' as const : 'belowBar' as const,
-            color: "#FFEB3B",
-            shape: 'circle' as const,
-            text: i === 0 ? 'START' : `${i}`,
-          }));
-      } else {
-          waveMarkers = wavePivots.slice(-5).map((p, i) => ({
-            time: data[p.index].time as UTCTimestamp,
-            position: p.type === 'high' ? 'aboveBar' as const : 'belowBar' as const,
-            color: "#FFEB3B",
-            shape: 'circle' as const,
-            text: `${i + 1}`,
-          }));
-      }
-      createSeriesMarkers(zigzagSeries, waveMarkers);
-    }
-
-    if (elliott && elliott.retracement) {
-      const lastTime = data[data.length - 1].time;
-      const startTime = data[data.length - 50].time;
-      
-      const drawFibo = (val: number, color: string, title: string, style = 2) => {
-        const series = chart.addSeries(LineSeries, { 
-          color, lineWidth: 1 as LineWidth, title, lineStyle: style as any, 
-          lastValueVisible: true, priceLineVisible: false 
-        });
-        series.setData([{ time: startTime as UTCTimestamp, value: val }, { time: lastTime as UTCTimestamp, value: val }]);
-      };
-
-      // Support Levels (Retracement)
-      drawFibo(elliott.retracement.h618, "rgba(239, 83, 80, 0.4)", "FIB 0.618");
-      drawFibo(elliott.retracement.h382, "rgba(38, 166, 154, 0.4)", "FIB 0.382");
-
-      // Target Levels (Extension & Retracement Projection)
-      if (elliott.trend === 'BULLISH') {
-        const lastPrice = data[data.length - 1].close;
-        const diff = elliott.retracement.h0 - elliott.retracement.h100;
-        
-        // Find nearest authentic Fibo support below lastPrice
-        let w4TargetFibo = elliott.retracement.h382;
-        if (lastPrice <= elliott.retracement.h382) w4TargetFibo = elliott.retracement.h500;
-        if (lastPrice <= elliott.retracement.h500) w4TargetFibo = elliott.retracement.h618;
-        if (lastPrice <= elliott.retracement.h618) w4TargetFibo = elliott.retracement.h786;
-        
-        // Ensure the line visually drops to target it
-        const w4Price = Math.min(lastPrice * 0.98, w4TargetFibo);
-        
-        // Realistic W5 Target based on Elliott Wave geometry (typically 0.618x the size of the whole W0-W3 impulse, mapped from W4)
-        const w5Target = Math.max(elliott.retracement.h0 * 1.02, w4Price + diff * 0.618);
-
-        drawFibo(w5Target, "rgba(130, 255, 160, 0.6)", "TARGET W5 (0.618 Ext)", 0);
-        
-        // --- 9. PREDICTION WAVE (UP) ---
-        const predictionSeries = chart.addSeries(LineSeries, {
-            color: "rgba(130, 255, 160, 0.4)",
-            lineWidth: 2 as LineWidth,
-            lineStyle: 2,
-            title: "Prediction",
-            lastValueVisible: false,
-            priceLineVisible: false,
-        });
-
-        const lastTimeVal = data[data.length - 1].time as number;
-        const timeStep = (data[1].time as number) - (data[0].time as number);
-
-        const predictionData = [
-            { time: lastTimeVal as UTCTimestamp, value: lastPrice },
-            { time: (lastTimeVal + timeStep * 6) as UTCTimestamp, value: w4Price }, // Pullback W4
-            { time: (lastTimeVal + timeStep * 16) as UTCTimestamp, value: w5Target } // Target W5
-        ];
-        predictionSeries.setData(predictionData);
-
-        createSeriesMarkers(predictionSeries, [
-            { time: predictionData[1].time, position: 'belowBar', color: 'rgba(130, 255, 160, 0.8)', shape: 'circle', text: 'W4' },
-            { time: predictionData[2].time, position: 'aboveBar', color: 'rgba(130, 255, 160, 1)', shape: 'circle', text: 'W5 Target' },
-        ]);
-      } else if (elliott.trend === 'BEARISH') {
-        // --- 9. PREDICTION WAVE (DOWN / A-B-C) ---
-        const predictionSeries = chart.addSeries(LineSeries, {
-            color: "rgba(239, 83, 80, 0.4)",
-            lineWidth: 2 as LineWidth,
-            lineStyle: 2,
-            title: "Correction",
-            lastValueVisible: false,
-            priceLineVisible: false,
-        });
-
-        const lastPrice = data[data.length - 1].close;
-        const lastTimeVal = data[data.length - 1].time as number;
-        const timeStep = (data[1].time as number) - (data[0].time as number);
-
-        // Prediction for A-B-C Correction
-        // Wave A hunts for next Fibo support
-        let wATargetFibo = elliott.retracement.h382;
-        if (lastPrice <= elliott.retracement.h382) wATargetFibo = elliott.retracement.h500;
-        if (lastPrice <= elliott.retracement.h500) wATargetFibo = elliott.retracement.h618;
-        if (lastPrice <= elliott.retracement.h618) wATargetFibo = elliott.retracement.h786;
-        const waveA = Math.min(lastPrice * 0.98, wATargetFibo);
-
-        // Wave B bounces up towards nearest Fibo resistance
-        let wBTargetFibo = elliott.retracement.h618;
-        if (waveA >= elliott.retracement.h618) wBTargetFibo = elliott.retracement.h500;
-        if (waveA >= elliott.retracement.h500) wBTargetFibo = elliott.retracement.h382;
-        const waveB = Math.max(waveA * 1.05, wBTargetFibo);
-
-        const waveC = Math.min(waveA * 0.90, elliott.retracement.h100);
-
-        const predictionData = [
-            { time: lastTimeVal as UTCTimestamp, value: lastPrice },
-            { time: (lastTimeVal + timeStep * 5) as UTCTimestamp, value: waveA }, // Wave A down
-            { time: (lastTimeVal + timeStep * 9) as UTCTimestamp, value: waveB }, // Wave B bounce
-            { time: (lastTimeVal + timeStep * 16) as UTCTimestamp, value: waveC }  // Wave C bottom
-        ];
-        predictionSeries.setData(predictionData);
-
-        createSeriesMarkers(predictionSeries, [
-            { time: predictionData[1].time, position: 'belowBar', color: '#ef5350', shape: 'circle', text: 'A' },
-            { time: predictionData[2].time, position: 'aboveBar', color: '#ef5350', shape: 'circle', text: 'B' },
-            { time: predictionData[3].time, position: 'belowBar', color: '#ef5350', shape: 'circle', text: 'C' },
-        ]);
-      }
+      markerSeries.setData([{ time: lastTime, value: data[data.length - 1].close }]);
+      createSeriesMarkers(markerSeries, [{
+        time: lastTime,
+        position: riskPlan.shouldEnter ? "belowBar" as const : "aboveBar" as const,
+        color: riskPlan.stateColor || "#fbbf24",
+        shape: riskPlan.shouldEnter ? "arrowUp" as const : "circle" as const,
+        text: riskPlan.stateLabel || riskPlan.action,
+        size: 1 as const,
+      }]);
     }
 
     const handleResize = () => {
@@ -696,7 +696,7 @@ export default function AdvancedChart({
           chartRef.current = null;
       }
     };
-  }, [data, ticker, chartType, showEMA9, showEMA10, showEMA20, showEMA50, showEMA60, showEMA200, showUndercutBounce, showSqueezeDeluxe, showSuperTrend, showBB, showMFI, showVWAP, showOBV, showCMF, onLogicalRangeChange, pivots]);
+  }, [data, ticker, chartType, showEMA9, showEMA10, showEMA20, showEMA50, showEMA60, showEMA200, showUndercutBounce, showSqueezeDeluxe, showSuperTrend, showBB, showMFI, showVWAP, showOBV, showCMF, onLogicalRangeChange, pivots, riskPlan]);
 
   useEffect(() => {
     if (isMounted.current && chartRef.current && syncLogicalRange) {
@@ -713,13 +713,15 @@ export default function AdvancedChart({
       <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
         <span>TECHNICAL ANALYSIS: {ticker}</span>
         <div className="mobile-hide" style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
-          {showEMA9 && <span style={{ color: '#ffcfa6' }}>EMA 9</span>}
-          {showEMA20 && <span style={{ color: '#2962FF' }}>● EMA 20</span>}
-          {showEMA50 && <span style={{ color: '#FF6D00' }}>● EMA 50</span>}
-          {showEMA200 && <span style={{ color: '#FFEB3B' }}>● EMA 200</span>}
-          {showEMA60 && <span style={{ color: '#ffa040' }}>EMA 60</span>}
+          {showEMA9 && <span style={{ color: '#3b82f6' }}>EMA 9</span>}
+          {showEMA20 && <span style={{ color: '#f59e0b' }}>● EMA 20</span>}
+          {showEMA50 && <span style={{ color: '#ef4444' }}>● EMA 50</span>}
+          {showEMA200 && <span style={{ color: '#ec4899' }}>● EMA 200</span>}
+          {showEMA60 && <span style={{ color: '#8b5cf6' }}>EMA 60</span>}
           <span style={{ color: '#26a69a' }}>MACD</span>
           {showSqueezeDeluxe && <span style={{ color: '#ffa600' }}>SQZ DELUXE</span>}
+          {riskPlan?.screenerSynced && <span style={{ color: '#38bdf8' }}>SCREENER SYNC</span>}
+          {riskPlan && <span style={{ color: riskPlan.stateColor || '#fbbf24' }}>{riskPlan.stateLabel || 'RISK PLAN'}</span>}
         </div>
       </div>
       <div ref={chartContainerRef} style={{ width: '100%', height: showSqueezeDeluxe ? '760px' : '660px' }} />

@@ -11,7 +11,7 @@ const path = require('path');
   // Wait for the chart to load - looking for a canvas element within the chart container
   await page.waitForSelector('.tv-lightweight-charts-chart', { timeout: 30000 });
   
-  // Wait a bit more for Elliott markers to render
+  // Wait a bit more for the technical overlays to render
   await page.waitForTimeout(5000);
   
   // Take a screenshot
@@ -20,13 +20,9 @@ const path = require('path');
   
   console.log(`Screenshot saved to ${screenshotPath}`);
   
-  // Check for Elliott Wave Projection text in the page
-  const projectionExists = await page.isVisible('text=ELLIOTT_WAVE_PROJECTION');
-  console.log(`Elliott Wave Projection visible: ${projectionExists}`);
-  
-  const interpretation = await page.innerText('.elliott-interpretation || text=Terdeteksi');
-  console.log(`Interpretation found: ${interpretation ? 'Yes' : 'No'}`);
-  console.log(`Text: ${interpretation.substring(0, 100)}...`);
+  // Check for conviction report text in the page
+  const reportExists = await page.isVisible('text=CONVICTION_REPORT');
+  console.log(`Conviction report visible: ${reportExists}`);
 
   await browser.close();
 })();
