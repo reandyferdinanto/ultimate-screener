@@ -57,6 +57,7 @@ repro_crash.js
 test_*.js
 
 # local research artifacts
+data/yfinance-research/*.json
 artifacts/secret-sauce-review/secret-sauce-review-*.json
 artifacts/secret-sauce-review/secret-sauce-walkforward-review-*.json
 artifacts/secret-sauce-walkforward/*.json

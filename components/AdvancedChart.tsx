@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef } from "react";
 import { 
   createChart, 
@@ -677,16 +678,21 @@ export default function AdvancedChart({
       }]);
     }
 
-    const handleResize = () => {
+    const resizeObserver = new ResizeObserver(() => {
         if (chartContainerRef.current && chartRef.current) {
-            chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
+            chartRef.current.applyOptions({
+              width: chartContainerRef.current.clientWidth,
+              height: window.innerWidth < 768
+                ? (showSqueezeDeluxe ? 560 : 460)
+                : (showSqueezeDeluxe ? 760 : 660),
+            });
         }
-    };
-    window.addEventListener("resize", handleResize);
+    });
+    resizeObserver.observe(chartContainerRef.current);
 
     return () => {
       isMounted.current = false;
-      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
       if (chartRef.current) {
           try {
               chartRef.current.remove();
@@ -724,7 +730,17 @@ export default function AdvancedChart({
           {riskPlan && <span style={{ color: riskPlan.stateColor || '#fbbf24' }}>{riskPlan.stateLabel || 'RISK PLAN'}</span>}
         </div>
       </div>
-      <div ref={chartContainerRef} style={{ width: '100%', height: showSqueezeDeluxe ? '760px' : '660px' }} />
+      <div ref={chartContainerRef} className={`advanced-chart-canvas ${showSqueezeDeluxe ? 'with-squeeze' : ''}`} style={{ width: '100%', height: showSqueezeDeluxe ? '760px' : '660px' }} />
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .advanced-chart-canvas {
+            height: 460px !important;
+          }
+          .advanced-chart-canvas.with-squeeze {
+            height: 560px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

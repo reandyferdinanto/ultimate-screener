@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const YahooFinance = require('yahoo-finance2').default;
+const { loadIdxStocks } = require('./idx_stock_file');
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 const { calculateSqueezeDeluxe } = require('./utils/squeeze_logic');
 
@@ -259,8 +260,8 @@ async function analyzeSqueeze(stock, interval = "1d") {
 
 async function run() {
   try {
+    const stocks = loadIdxStocks();
     await mongoose.connect(MONGODB_URI);
-    const stocks = await IndonesiaStock.find({ active: true });
     console.log(`Starting Squeeze Divergence Scan for \${stocks.length} stocks...`);
     
     const timeframes = ["1d", "4h"];

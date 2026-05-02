@@ -6,11 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "secret-sauce:review-log": "node scripts/export_secret_sauce_review_log.js",
-    "secret-sauce:apply-revision": "node scripts/apply_manual_secret_sauce_revision.js",
-    "secret-sauce:walkforward-10d": "node scripts/secret_sauce_walkforward_10d.js",
-    "secret-sauce:walkforward-review-log": "node scripts/export_secret_sauce_walkforward_review_log.js"
+    "lint": "eslint"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

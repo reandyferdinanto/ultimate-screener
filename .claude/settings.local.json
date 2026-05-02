@@ -6,7 +6,17 @@
       "Bash(npm run *)",
       "Bash(curl -s http://localhost:3000)",
       "Bash(curl -s \"http://localhost:3000/api/technical?symbol=ISEA\")",
-      "Bash(curl -s \"http://localhost:3000/api/technical?symbol=ISEA.JK\")"
+      "Bash(curl -s \"http://localhost:3000/api/technical?symbol=ISEA.JK\")",
+      "mcp__ide__getDiagnostics",
+      "Bash(xargs grep *)",
+      "Bash(curl *)",
+      "Bash(npx tsc *)",
+      "Bash(taskkill *)",
+      "Bash(powershell Stop-Process -Id 34704 -Force *)",
+      "Bash(pg_isready *)",
+      "Read(//c/reandy/ultimate-screener/**)",
+      "Bash(mkdir -p \"components/stock-analysis\")",
+      "Bash(echo)"
     ]
   }
 }

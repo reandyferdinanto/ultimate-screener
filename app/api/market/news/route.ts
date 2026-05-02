@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import Parser from "rss-parser";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const parser = new Parser({
   headers: {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

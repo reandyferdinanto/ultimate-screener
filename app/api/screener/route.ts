@@ -7,7 +7,7 @@ export const revalidate = 0;
 
 import { SignalPerformanceModel } from "@/lib/models/SignalPerformance";
 import { StockSignalModel } from "@/lib/models/StockSignal";
-import { IndonesiaStockModel } from "@/lib/models/IndonesiaStock";
+import { findIdxStocksByLookupKeys, loadIdxStocks } from "@/lib/idx-stock-file";
 
 const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
@@ -22,9 +22,7 @@ function deriveSignalCategory(source = "", metadata?: any) {
   if (normalized.includes("BUY ON DIP")) return "BUY_ON_DIP";
   if (normalized.includes("SQUEEZE DIVERGENCE")) return "SQUEEZE_DIVERGENCE";
   if (normalized.includes("SQUEEZE")) return "SQUEEZE";
-  if (normalized.includes("SECRET")) return "SECRET_SAUCE";
   if (normalized.includes("CVD")) return "CVD_DIVERGENCE";
-  if (normalized.includes("SILENT") || normalized.includes("FLYER")) return "SILENT_FLYER";
   return "TECHNICAL";
 }
 
@@ -43,7 +41,6 @@ function deriveSignalVector(source = "", metadata?: any) {
   if (normalized.includes("SQUEEZE DIVERGENCE") && normalized.includes("4H")) return "SQZ_BULL_DIV_4H_ROOM";
   if (normalized.includes("SQUEEZE DIVERGENCE")) return "SQZ_BULL_DIV_1D_ROOM";
   if (normalized.includes("EXPLOSION")) return "SQUEEZE_RELEASE";
-  if (normalized.includes("SECRET")) return "ACCUMULATION_COMPRESSION";
   return normalized.replace(/^CONVICTION:\s*/, "").replace(/^SIGNAL:\s*/, "") || "GENERAL";
 }
 
@@ -229,12 +226,12 @@ export async function GET(req: Request) {
   const quoteConcurrency = parseIntegerParam(searchParams.get("quoteConcurrency"), 8, 1, 16);
 
   try {
-    await connectToDatabase();
-
     if (getAll) {
-      const stocks = await IndonesiaStockModel.find({ active: true }).sort({ ticker: 1 });
+      const stocks = loadIdxStocks();
       return NextResponse.json({ success: true, data: stocks });
     }
+
+    await connectToDatabase();
 
     // Build Price Filter
     let priceFilter = {};
@@ -269,14 +266,7 @@ export async function GET(req: Request) {
     const stockLookupKeys = Array.from(new Set(
       activeSignals.flatMap((signal: any) => tickerLookupKeys(signal.ticker))
     ));
-    const latestStocks = stockLookupKeys.length > 0
-      ? await IndonesiaStockModel.find({
-          $or: [
-            { ticker: { $in: stockLookupKeys } },
-            { symbol: { $in: stockLookupKeys } }
-          ]
-        }).select("ticker symbol lastPrice updatedAt").lean()
-      : [];
+    const latestStocks = findIdxStocksByLookupKeys(stockLookupKeys);
     const latestStockByTicker = new Map<string, any>();
     latestStocks.forEach((stock: any) => {
       tickerLookupKeys(stock.ticker).forEach(key => latestStockByTicker.set(key, stock));
@@ -345,8 +335,7 @@ export async function GET(req: Request) {
       // Priority 3: Fallback calculation for old signal types
       if (!finalRelevanceScore) {
         let strategyScore = 50;
-        if (signal.signalSource.includes("Secret Sauce")) strategyScore = 500;
-        else if (signal.signalSource.includes("CONVICTION:")) strategyScore = 150; 
+        if (signal.signalSource.includes("CONVICTION:")) strategyScore = 150; 
         else if (signal.signalSource === "Swing Volatilitas Tinggi") strategyScore = 100;
 
         finalRelevanceScore = strategyScore + (Number(metadata?.breakoutReadiness) || 0) + (Number(metadata?.accumulationBias) || 0);
@@ -406,21 +395,18 @@ export async function GET(req: Request) {
 
     // DIVERSIFY RESULTS: Ensure we see a mix of categories
     const categories = [
-        "SILENT FLYER", 
         "ARAHunter", 
         "SCALP", 
         "ELITE BOUNCE", 
         "VOLATILITY EXPLOSION", 
         "BUY ON DIP", 
         "COOLDOWN",
-        "SILENT ACCUMULATION", 
         "TURNAROUND", 
         "EMA BOUNCE", 
         "CVD DIVERGENCE",
         "Squeeze Divergence",
         "Squeeze Explosion",
-        "The Perfect Retest",
-        "Secret Sauce"
+        "The Perfect Retest"
     ];
     const diversified: any[] = [];
     const seen = new Set();

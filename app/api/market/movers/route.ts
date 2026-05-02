@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/db";
-import { IndonesiaStockModel } from "@/lib/models/IndonesiaStock";
+import { loadIdxStocks } from "@/lib/idx-stock-file";
 import YahooFinance from 'yahoo-finance2';
 
 const yahooFinance = new YahooFinance();
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   try {
-    await connectToDatabase();
-    
     // Get active stocks. To be efficient, we'll pick a decent sample or focus on liquid ones
     // for this feature, but the request was "all stock database".
     // We'll fetch them all but process in parallel batches.
-    const stocks = await IndonesiaStockModel.find({ active: true }, 'ticker').lean();
+    const stocks = loadIdxStocks();
     const tickers = stocks.map(s => s.ticker);
 
     // Yahoo Finance can handle multiple tickers in one quote call

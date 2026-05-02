@@ -73,9 +73,7 @@ function deriveSignalCategory(source = "", metadata?: Record<string, unknown>) {
   if (normalized.includes("BUY ON DIP")) return "BUY_ON_DIP";
   if (normalized.includes("SQUEEZE DIVERGENCE")) return "SQUEEZE_DIVERGENCE";
   if (normalized.includes("SQUEEZE")) return "SQUEEZE";
-  if (normalized.includes("SECRET")) return "SECRET_SAUCE";
   if (normalized.includes("CVD")) return "CVD_DIVERGENCE";
-  if (normalized.includes("SILENT") || normalized.includes("FLYER")) return "SILENT_FLYER";
   return "TECHNICAL";
 }
 
@@ -94,7 +92,6 @@ function deriveSignalVector(source = "", metadata?: Record<string, unknown>) {
   if (normalized.includes("SQUEEZE DIVERGENCE") && normalized.includes("4H")) return "SQZ_BULL_DIV_4H_ROOM";
   if (normalized.includes("SQUEEZE DIVERGENCE")) return "SQZ_BULL_DIV_1D_ROOM";
   if (normalized.includes("EXPLOSION")) return "SQUEEZE_RELEASE";
-  if (normalized.includes("SECRET")) return "ACCUMULATION_COMPRESSION";
   return normalized.replace(/^CONVICTION:\s*/, "").replace(/^SIGNAL:\s*/, "") || "GENERAL";
 }
 

@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AdvancedChart from "@/components/AdvancedChart";
@@ -58,14 +59,14 @@ function SearchContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [interval, setInterval] = useState(queryInterval);
-  
+
   const [showSuperTrend] = useState(false);
   const [showBB, setShowBB] = useState(true);
   const [showMFI, setShowMFI] = useState(true);
   const [showVWAP, setShowVWAP] = useState(false);
   const [showOBV, setShowOBV] = useState(false);
   const [showCMF, setShowCMF] = useState(false);
-  
+
   const [chartType, setChartType] = useState<'candle' | 'line'>('candle');
   const [showEMA9, setShowEMA9] = useState(true);
   const [showEMA10, setShowEMA10] = useState(false);
@@ -128,7 +129,7 @@ function SearchContent() {
               <Search className="search-icon" size={16} />
               <input 
                 className="input-premium" 
-                placeholder="TICKER_ID..." 
+                placeholder="Search symbols..." 
                 value={input}
                 onChange={e => setInput(e.target.value)}
               />
@@ -249,9 +250,6 @@ function SearchContent() {
                     </div>
                     <div className="v-meta">
                         <span>RISK_LEVEL: <strong>{data.unifiedAnalysis.riskLevel}</strong></span>
-                        {data.unifiedAnalysis.isSilentFlyer && (
-                          <span className="flyer-badge">SILENT_FLYER</span>
-                        )}
                     </div>
                   </div>
 
@@ -465,10 +463,10 @@ function SearchContent() {
         .search-container {
             max-width: 1600px;
             margin: 0 auto;
-            padding: 24px;
+            padding: clamp(10px, 2vw, 24px);
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: clamp(12px, 2vw, 24px);
         }
 
         .command-center {
@@ -518,6 +516,7 @@ function SearchContent() {
             font-weight: 1000;
             font-size: 0.7rem;
             height: 36px;
+            min-height: 42px;
             border-radius: 6px;
             cursor: pointer;
             letter-spacing: 0.05em;
@@ -538,6 +537,7 @@ function SearchContent() {
             font-size: 0.65rem;
             font-weight: 900;
             padding: 6px 14px;
+            min-height: 40px;
             border-radius: 7px;
             cursor: pointer;
             transition: all 0.2s;
@@ -559,6 +559,7 @@ function SearchContent() {
             font-size: 0.65rem;
             font-weight: 900;
             padding: 8px 16px;
+            min-height: 40px;
             cursor: pointer;
         }
 
@@ -1037,14 +1038,39 @@ function SearchContent() {
             .chart-wrapper.main-viz { height: 500px; }
             .command-row.main { flex-direction: column; align-items: stretch; }
             .search-box-premium { max-width: none; }
+            .timeframe-selector,
+            .chart-type-toggle,
+            .indicator-matrix {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
         }
 
         @media (max-width: 640px) {
-            .search-container { padding: 16px; }
-            .command-center { padding: 16px; }
+            .search-container { padding: 10px 0 0; gap: 12px; }
+            .command-center { padding: 12px; gap: 12px; }
+            .command-row { gap: 10px; }
+            .search-box-premium { min-width: 0; width: 100%; }
+            .input-premium { min-width: 0; }
+            .analyze-btn { padding: 0 12px; }
+            .timeframe-selector { width: 100%; justify-content: flex-start; }
+            .tf-pill { flex: 1 0 auto; padding: 9px 14px; }
+            .chart-type-toggle { width: 100%; }
+            .chart-type-toggle button { flex: 1; justify-content: center; }
+            .indicator-matrix { margin-inline: -12px; padding-inline: 12px; }
             .v-value { font-size: 1.1rem; }
+            .v-meta { flex-direction: column; gap: 6px; }
             .sync-grid { grid-template-columns: 1fr; }
-            .chart-wrapper.main-viz { height: 400px; }
+            .chart-wrapper.main-viz { height: 470px; }
+            .chart-wrapper.secondary-viz { height: 220px; }
+            .legend-grid, .insight-grid { grid-template-columns: 1fr; }
+            .analysis-section, .screener-sync-panel, .historical-signals-section { padding: 14px; }
+            .sig-item, .pivot-row, .flow-item { gap: 10px; }
+        }
+
+        @media (max-width: 420px) {
+            .search-icon { margin: 0 8px; }
+            .chart-wrapper.main-viz { height: 430px; }
         }
       `}</style>
     </div>

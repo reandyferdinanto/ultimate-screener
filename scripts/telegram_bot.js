@@ -521,7 +521,7 @@ async function initBot() {
                     const category = String(s.category || s.metadata?.category || "").toUpperCase();
                     const vector = String(s.vector || s.metadata?.vector || "").toUpperCase();
                     const source = String(s.strategy || s.signalSource || "").toUpperCase();
-                    return /EMA_BOUNCE|ELITE_BOUNCE|BUY_ON_DIP|TURNAROUND|COOLDOWN|SQUEEZE|SILENT_FLYER|ACCUMULATION|DIP|EMA20/.test(`${category} ${vector} ${source}`);
+                    return /EMA_BOUNCE|ELITE_BOUNCE|BUY_ON_DIP|TURNAROUND|COOLDOWN|SQUEEZE|DIP|EMA20/.test(`${category} ${vector} ${source}`);
                 });
 
                 const byCategory = (matcher) => signals
@@ -531,8 +531,6 @@ async function initBot() {
                 const cooldown = byCategory(text => text.includes('COOLDOWN'));
                 const emaBounce = byCategory(text => /EMA_BOUNCE|ELITE_BOUNCE|BUY_ON_DIP|TURNAROUND|DIP|EMA20/.test(text));
                 const squeeze = byCategory(text => text.includes('SQUEEZE'));
-                const silent = byCategory(text => /SILENT|FLYER|ACCUMULATION/.test(text));
-
                 let text = "```md\n# DAYTRADE SUMMARY (WEB_SYNC)\n\n";
 
                 const renderCategory = (title, items) => {
@@ -552,7 +550,6 @@ async function initBot() {
                 text += renderCategory("COOLDOWN RESET", cooldown);
                 text += renderCategory("EMA BOUNCE / DIP", emaBounce);
                 text += renderCategory("SQUEEZE ENGINE", squeeze);
-                text += renderCategory("SILENT ACCUMULATION", silent);
 
                 if (signals.length === 0) {
                     text += "No high-conviction setups found.\n";
@@ -565,8 +562,7 @@ async function initBot() {
                     { text: 'EMA Bounce', callback_data: 'full_list_EMA_BOUNCE' }
                 ]);
                 inline_keyboard.push([
-                    { text: 'Squeeze', callback_data: 'full_list_SQUEEZE' },
-                    { text: 'Silent Flyer', callback_data: 'full_list_SILENT' }
+                    { text: 'Squeeze', callback_data: 'full_list_SQUEEZE' }
                 ]);
 
                 bot.sendMessage(msg.chat.id, text, { 

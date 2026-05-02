@@ -811,7 +811,6 @@ function applyScreenerSync(analysis: any, activeScreenerSignals: ScreenerSignalC
     "TURNAROUND",
     "SQUEEZE",
     "SQUEEZE_DIVERGENCE",
-    "SILENT_FLYER",
   ].includes(screenerContext.category);
 
   return {

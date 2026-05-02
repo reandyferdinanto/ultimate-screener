@@ -2,15 +2,56 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Terminal, Activity, Zap, BarChart3, Search, Info, FileText, TrendingUp } from "lucide-react";
+
+type IconProps = {
+  size?: number;
+  style?: React.CSSProperties;
+};
+
+function IconBase({ size = 14, style, children }: IconProps & { children: React.ReactNode }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={style}
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+function TerminalIcon(props: IconProps) {
+  return <IconBase {...props}><path d="m4 17 6-6-6-6" /><path d="M12 19h8" /></IconBase>;
+}
+
+function ZapIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8Z" /></IconBase>;
+}
+
+function SearchIcon(props: IconProps) {
+  return <IconBase {...props}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></IconBase>;
+}
+
+function InfoIcon(props: IconProps) {
+  return <IconBase {...props}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></IconBase>;
+}
+
+function BrainCircuitIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M12 5a3 3 0 0 0-5.8 1" /><path d="M12 5a3 3 0 0 1 5.8 1" /><path d="M6.2 6A3 3 0 0 0 5 11.8" /><path d="M17.8 6A3 3 0 0 1 19 11.8" /><path d="M5 11.8A3 3 0 0 0 7.8 17" /><path d="M19 11.8A3 3 0 0 1 16.2 17" /><path d="M7.8 17A3 3 0 0 0 12 19" /><path d="M16.2 17A3 3 0 0 1 12 19" /><path d="M12 5v14" /><path d="M9 9h1" /><path d="M14 9h1" /><path d="M9 15h1" /><path d="M14 15h1" /></IconBase>;
+}
 
 const NAV_ITEMS = [
-  { label: "DASHBOARD", href: "/", icon: Terminal },
-  { label: "SCREENER", href: "/screener", icon: Zap },
-  { label: "FLYER_RADAR", href: "/silent-flyer", icon: TrendingUp },
-  { label: "REPORTS", href: "/ai-analyze", icon: FileText },
-  { label: "SUMMARY", href: "/summary", icon: Activity },
-  { label: "ANALYSIS", href: "/search", icon: Search },
+  { label: "DASHBOARD", href: "/", icon: TerminalIcon },
+  { label: "SCREENER", href: "/screener", icon: ZapIcon },
+  { label: "RESEARCH", href: "/research", icon: BrainCircuitIcon },
+  { label: "ANALYSIS", href: "/search", icon: SearchIcon },
 ];
 
 export default function Navigation() {
@@ -30,8 +71,8 @@ export default function Navigation() {
       zIndex: 1000,
       overflow: 'hidden'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '32px', height: '100%' }}>
-        <div style={{ 
+      <div className="nav-content" style={{ display: 'flex', alignItems: 'center', gap: '32px', height: '100%' }}>
+        <div className="nav-brand" style={{ 
           display: 'flex', 
           alignItems: 'center', 
           gap: '8px', 
@@ -52,9 +93,9 @@ export default function Navigation() {
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '4px', height: '100%' }}>
+        <div className="nav-items" style={{ display: 'flex', gap: '4px', height: '100%' }}>
           {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
             const Icon = item.icon;
             
             return (
@@ -97,13 +138,13 @@ export default function Navigation() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="nav-status" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
           <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: '600' }}>DATA_STATUS</span>
           <span style={{ fontSize: '0.65rem', color: 'var(--accent-green)', fontWeight: '800' }}>LIVE_CONNECTED</span>
         </div>
         <Link href="/settings" style={{ color: 'var(--text-secondary)', transition: 'color 0.2s' }} className="hover-green">
-           <Info size={16} />
+           <InfoIcon size={16} />
         </Link>
       </div>
 
@@ -114,6 +155,57 @@ export default function Navigation() {
         }
         .hover-green:hover {
           color: var(--accent-green) !important;
+        }
+        @media (max-width: 900px) {
+          .nav {
+            position: fixed !important;
+            top: auto !important;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: calc(64px + env(safe-area-inset-bottom)) !important;
+            padding: 0 10px env(safe-area-inset-bottom) !important;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 0 !important;
+          }
+          .nav-content {
+            width: 100%;
+            gap: 8px !important;
+            min-width: 0;
+          }
+          .nav-brand {
+            display: none !important;
+          }
+          .nav-items {
+            width: 100%;
+            display: grid !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 2px !important;
+          }
+          .nav-link {
+            min-height: 52px;
+            justify-content: center;
+            padding: 0 6px !important;
+            flex-direction: column;
+            gap: 4px !important;
+            font-size: 0.55rem !important;
+            letter-spacing: 0.04em !important;
+          }
+          .nav-link svg {
+            width: 17px;
+            height: 17px;
+          }
+          .nav-status {
+            display: none !important;
+          }
+          .mobile-hide {
+            display: inline !important;
+          }
+        }
+        @media (max-width: 420px) {
+          .nav-link {
+            font-size: 0.5rem !important;
+          }
         }
         @keyframes pulse {
           0% { opacity: 1; transform: scale(1); }

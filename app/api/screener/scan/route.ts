@@ -13,10 +13,9 @@ export async function POST(): Promise<Response> {
   const scanStartedAt = new Date();
   const scriptPath = path.join(process.cwd(), "scripts/scan.js");
   const squeezeScriptPath = path.join(process.cwd(), "scripts/squeeze_divergence_scanner.js");
-  const silentFlyerPath = path.join(process.cwd(), "scripts/sync_screener.js");
 
   return new Promise((resolve) => {
-    exec(`node "${scriptPath}" && node "${squeezeScriptPath}" && node "${silentFlyerPath}"`, { maxBuffer: 1024 * 1024 * 8 }, (error, stdout) => {
+    exec(`node "${scriptPath}" && node "${squeezeScriptPath}"`, { maxBuffer: 1024 * 1024 * 8 }, (error, stdout) => {
       isScanning = false;
       const scanCompletedAt = new Date();
       if (error) {
@@ -30,8 +29,8 @@ export async function POST(): Promise<Response> {
         message: "Scan completed successfully",
         scanStartedAt,
         scanCompletedAt,
-        dataSource: "YahooFinance.chart(1d) + YahooFinance.chart(1h aggregated 4h) + Silent Flyer Scanner",
-        latestDataPolicy: "RUN_SCAN fetches fresh Yahoo Finance data for EMA Bounce, Squeeze Divergence, and Silent Flyer before updating screener signals.",
+        dataSource: "YahooFinance.chart(1d) + YahooFinance.chart(1h aggregated 4h)",
+        latestDataPolicy: "RUN_SCAN fetches fresh Yahoo Finance data for EMA Bounce and Squeeze Divergence before updating screener signals.",
         stdout: stdout.split("\n").slice(-12).join("\n")
       }));
     });

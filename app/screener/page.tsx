@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState, useCallback } from "react";
 import { Send, Settings, RefreshCw, BarChart2, Filter, ChevronDown, Check } from "lucide-react";
 import Link from "next/link";
@@ -47,6 +48,62 @@ interface SignalData {
   metadata?: Record<string, any>;
 }
 
+// PATCH 1: Enhanced Risk Management Interfaces
+interface AdvancedRiskMetrics {
+  volatilityScore: number; // ATR-based volatility 0-1
+  correlationScore: number; // Correlation dengan market 0-1
+  liquidityScore: number; // Volume-based liquidity 0-1
+  regimeScore: number; // Market regime alignment 0-1
+  portfolioOverlap: number; // Portfolio overlap 0-1
+  riskAdjustedReturn: number; // Risk-adjusted return score 0-100
+  maxPositionSize: number; // Recommended max position size
+  recoveryFactor: number; // Recovery potential 0-1
+}
+
+interface SignalStrength {
+  convictionLevel: 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH';
+  catalystType: 'TECHNICAL' | 'FUNDAMENTAL' | 'SENTIMENT' | 'VOLUME';
+  timeframeAlignment: number; // 0-1 score
+  marketStructure: 'ACCUMULATION' | 'DISTRIBUTION' | 'TRENDING' | 'RANGING';
+}
+
+interface MarketConditions {
+  regime: 'BULLISH' | 'BEARISH' | 'SIDEWAYS' | 'VOLATILE';
+  trendStrength: number; // 0-1
+  volatility: number; // 0-1
+  liquidity: number; // 0-1
+  sentiment: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+  vixLevel?: number; // Market fear index
+}
+
+interface SignalScore {
+  totalScore: number;
+  technicalScore: number;
+  fundamentalScore: number;
+  volumeScore: number;
+  marketStructureScore: number;
+  riskAdjustedScore: number;
+  recommendation: 'STRONG_BUY' | 'BUY' | 'HOLD' | 'SELL' | 'STRONG_SELL';
+}
+
+interface PositionSizing {
+  suggestedSize: number;
+  maxLoss: number;
+  riskPercentage: number;
+  pyramidingLevels: number[];
+  trailingConfig: {
+    type: 'PERCENTAGE' | 'ATR' | 'SUPPORT';
+    value: number;
+    activationLevel: number;
+  };
+}
+
+interface RiskCheckResult {
+  canAdd: boolean;
+  warnings: string[];
+  suggestedAdjustments: string[];
+}
+
 interface ScanMeta {
   source?: string;
   priceSource?: string;
@@ -86,9 +143,260 @@ const formatFreshness = (value?: string) => {
   return `${Math.floor(hours / 24)}D AGO`;
 };
 
+// PATCH 1: Enhanced Risk Management Functions
+const detectMarketRegime = (marketData?: any[]): MarketConditions => {
+  // Simplified market regime detection
+  const defaultConditions: MarketConditions = {
+    regime: 'SIDEWAYS',
+    trendStrength: 0.5,
+    volatility: 0.3,
+    liquidity: 0.7,
+    sentiment: 'NEUTRAL',
+    vixLevel: 18
+  };
+
+  // In real implementation, this would analyze market data
+  // For now, we'll use defaults with some logic
+  return defaultConditions;
+};
+
+const calculateTechnicalScore = (signal: SignalData): number => {
+  let score = 50; // Base score
+
+  // Volume score (0-25 points)
+  if (signal.volumeScore) {
+    score += Math.min(25, signal.volumeScore * 0.25);
+  }
+
+  // Setup score (0-25 points)
+  if (signal.setupScore) {
+    score += Math.min(25, signal.setupScore * 0.25);
+  }
+
+  // Risk-Reward ratio (0-25 points)
+  if (signal.rewardRisk && signal.rewardRisk > 1) {
+    score += Math.min(25, signal.rewardRisk * 5);
+  }
+
+  // Volatility adjustment (penalty if too volatile)
+  if (signal.atrPct) {
+    const vol = parseFloat(signal.atrPct.toString());
+    if (vol > 8) score -= 20;
+    else if (vol > 6) score -= 10;
+    else if (vol < 2) score += 10; // Low volatility bonus
+  }
+
+  return Math.max(0, Math.min(100, score));
+};
+
+const calculateRiskAdjustedScore = (signal: SignalData): number => {
+  let score = 50;
+
+  // Risk percentage analysis
+  if (signal.riskPct) {
+    const risk = parseFloat(signal.riskPct.toString());
+    if (risk < 3) score += 20;
+    else if (risk < 5) score += 10;
+    else if (risk > 8) score -= 20;
+    else if (risk > 10) score -= 30;
+  }
+
+  // Reward-Reward ratio
+  if (signal.rewardRisk) {
+    if (signal.rewardRisk >= 3) score += 25;
+    else if (signal.rewardRisk >= 2) score += 15;
+    else if (signal.rewardRisk >= 1.5) score += 5;
+    else score -= 15;
+  }
+
+  // ATR-based volatility adjustment
+  if (signal.atrPct) {
+    const atr = parseFloat(signal.atrPct.toString());
+    const volScore = Math.max(0, 100 - (atr * 10)); // Lower volatility = higher score
+    score = (score + volScore) / 2;
+  }
+
+  return Math.max(0, Math.min(100, score));
+};
+
+const calculateSignalScore = (signal: SignalData, marketConditions?: MarketConditions): SignalScore => {
+  const technicalScore = calculateTechnicalScore(signal);
+  const volumeScore = signal.volumeScore || 50;
+  const riskAdjustedScore = calculateRiskAdjustedScore(signal);
+
+  // Market structure alignment (simplified)
+  let marketStructureScore = 50;
+  if (marketConditions) {
+    if (marketConditions.regime === 'BULLISH' && signal.category === 'ENTRY_IDEAL') {
+      marketStructureScore = 80;
+    } else if (marketConditions.regime === 'BEARISH' && signal.category === 'COOLDOWN') {
+      marketStructureScore = 75;
+    } else if (marketConditions.regime === 'SIDEWAYS') {
+      marketStructureScore = 60;
+    }
+  }
+
+  // Weighted total score
+  const totalScore = (
+    technicalScore * 0.4 +
+    volumeScore * 0.2 +
+    marketStructureScore * 0.2 +
+    riskAdjustedScore * 0.2
+  );
+
+  // Determine recommendation
+  let recommendation: SignalScore['recommendation'] = 'HOLD';
+  if (totalScore >= 80) recommendation = 'STRONG_BUY';
+  else if (totalScore >= 65) recommendation = 'BUY';
+  else if (totalScore < 40) recommendation = 'SELL';
+  else if (totalScore < 25) recommendation = 'STRONG_SELL';
+
+  return {
+    totalScore: Math.round(totalScore),
+    technicalScore: Math.round(technicalScore),
+    fundamentalScore: 50, // Placeholder - would need fundamental data
+    volumeScore,
+    marketStructureScore: Math.round(marketStructureScore),
+    riskAdjustedScore: Math.round(riskAdjustedScore),
+    recommendation
+  };
+};
+
+const calculateOptimalPosition = (signal: SignalData, accountSize: number = 100000): PositionSizing => {
+  const maxRiskPerTrade = accountSize * 0.02; // 2% max risk
+
+  // Calculate stop loss distance
+  const stopDistance = signal.buyArea && signal.sl ?
+    Math.abs(signal.buyArea - signal.sl) : 0;
+
+  if (stopDistance === 0 || !signal.buyArea) {
+    return {
+      suggestedSize: 0,
+      maxLoss: 0,
+      riskPercentage: 0,
+      pyramidingLevels: [],
+      trailingConfig: { type: 'PERCENTAGE', value: 5, activationLevel: 2 }
+    };
+  }
+
+  // Base position size calculation
+  const baseShares = Math.floor(maxRiskPerTrade / stopDistance);
+
+  // Adjust based on signal quality
+  const score = calculateSignalScore(signal);
+  const convictionMultiplier = {
+    'STRONG_BUY': 1.5,
+    'BUY': 1.25,
+    'HOLD': 1.0,
+    'SELL': 0.75,
+    'STRONG_SELL': 0.5
+  };
+
+  const adjustedShares = Math.floor(
+    baseShares * convictionMultiplier[score.recommendation]
+  );
+
+  // Ensure we don't exceed position size limits
+  const positionValue = adjustedShares * signal.buyArea;
+  const maxPositionValue = accountSize * 0.25; // Max 25% per position
+
+  const finalShares = positionValue > maxPositionValue ?
+    Math.floor(maxPositionValue / signal.buyArea) : adjustedShares;
+
+  return {
+    suggestedSize: finalShares,
+    maxLoss: finalShares * stopDistance,
+    riskPercentage: ((finalShares * stopDistance) / accountSize) * 100,
+    pyramidingLevels: generatePyramidingLevels(signal, finalShares),
+    trailingConfig: generateTrailingConfig(signal)
+  };
+};
+
+const generatePyramidingLevels = (signal: SignalData, baseSize: number): number[] => {
+  if (!signal.tp || !signal.buyArea) return [];
+
+  const levels = [];
+  const targetDistance = signal.tp - signal.buyArea;
+
+  // Add entry levels at 25%, 50%, and 75% of target
+  for (let i = 1; i <= 3; i++) {
+    levels.push(Math.floor(baseSize * 0.25 * i));
+  }
+
+  return levels;
+};
+
+const generateTrailingConfig = (signal: SignalData): PositionSizing['trailingConfig'] => {
+  // Use ATR for trailing if available, otherwise percentage
+  if (signal.atrPct) {
+    const atr = parseFloat(signal.atrPct.toString());
+    return {
+      type: 'ATR',
+      value: atr * 2, // 2x ATR trailing
+      activationLevel: 1.5 // Activate after 1.5R move
+    };
+  }
+
+  return {
+    type: 'PERCENTAGE',
+    value: 3, // 3% trailing stop
+    activationLevel: 2 // Activate after 2% gain
+  };
+};
+
+const applyAdvancedFilters = (signals: SignalData[], marketConditions?: MarketConditions, filters?: any): SignalData[] => {
+  // Default filters if not provided
+  const defaultFilters = {
+    minRiskReward: 2.0,
+    maxVolatility: 8,
+    minVolumeScore: 60,
+    enableCorrelationCheck: true,
+    maxSectorExposure: 30,
+    enableAdvancedScoring: true
+  };
+
+  const activeFilters = filters || defaultFilters;
+
+  return signals.filter(signal => {
+    // Risk-Reward filter
+    if (signal.rewardRisk && signal.rewardRisk < activeFilters.minRiskReward) {
+      return false;
+    }
+
+    // Volatility filter
+    if (signal.atrPct) {
+      const vol = parseFloat(signal.atrPct.toString());
+      if (vol > activeFilters.maxVolatility) {
+        return false;
+      }
+    }
+
+    // Volume score filter
+    if (signal.volumeScore && signal.volumeScore < activeFilters.minVolumeScore) {
+      return false;
+    }
+
+    // Market regime filter
+    if (marketConditions && activeFilters.enableCorrelationCheck) {
+      if (marketConditions.regime === 'BEARISH' &&
+          signal.category !== 'COOLDOWN' &&
+          signal.category !== 'ENTRY_IDEAL') {
+        return false;
+      }
+
+      if (marketConditions.regime === 'VOLATILE' &&
+          signal.riskPct && parseFloat(signal.riskPct.toString()) > 6) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+};
+
 export default function ScreenerPage() {
   const [data, setData] = useState<SignalData[]>([]);
-  const [view, setView] = useState<'signals' | 'entry' | 'cooldown' | 'sauce' | 'divergence' | 'sqz_div' | 'arahunter' | 'flyer'>('signals');
+  const [view, setView] = useState<'signals' | 'entry' | 'cooldown' | 'divergence' | 'sqz_div' | 'arahunter'>('signals');
   const [priceRange, setPriceRange] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [sqzTimeframe, setSqzTimeframe] = useState<'1d' | '4h'>('1d');
@@ -98,9 +406,27 @@ export default function ScreenerPage() {
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState("");
   const [scanMeta, setScanMeta] = useState<ScanMeta | null>(null);
+
+  // PATCH 1: Enhanced Risk Management State
+  const [marketConditions, setMarketConditions] = useState<MarketConditions | null>(null);
+  const [advancedFilters, setAdvancedFilters] = useState({
+    minRiskReward: 2.0,
+    maxVolatility: 8,
+    minVolumeScore: 60,
+    enableCorrelationCheck: true,
+    maxSectorExposure: 30,
+    enableAdvancedScoring: true
+  });
+  const [enhancedData, setEnhancedData] = useState<(SignalData & {
+    score?: SignalScore;
+    riskMetrics?: AdvancedRiskMetrics;
+    positionSizing?: PositionSizing;
+    riskCheck?: RiskCheckResult;
+  })[]>([]);
 
   const fetchData = async () => {
     if (view === 'entry') {
@@ -146,21 +472,56 @@ export default function ScreenerPage() {
       const res = await fetch(endpoint);
       const json = await res.json();
       if (json.success) {
-        setData(json.data);
+        const rawData = json.data;
+
+        // PATCH 1: Apply enhanced processing
+        // Detect market conditions (in real app, this would come from API)
+        const conditions = detectMarketRegime();
+        setMarketConditions(conditions);
+
+        // Apply advanced filters
+        const filteredSignals = applyAdvancedFilters(rawData, conditions, advancedFilters);
+
+        // Calculate scores and metrics
+        const enhancedSignals = filteredSignals.map(signal => {
+          const score = calculateSignalScore(signal, conditions);
+          const positionSizing = calculateOptimalPosition(signal);
+
+          return {
+            ...signal,
+            score,
+            positionSizing,
+            riskMetrics: {
+              volatilityScore: signal.atrPct ? Math.max(0, 100 - parseFloat(signal.atrPct.toString()) * 10) : 50,
+              correlationScore: 50, // Placeholder - would need correlation data
+              liquidityScore: signal.volumeScore || 50,
+              regimeScore: conditions.regime === 'BULLISH' ? 80 : conditions.regime === 'BEARISH' ? 30 : 60,
+              portfolioOverlap: 0, // Placeholder - would need portfolio data
+              riskAdjustedReturn: score.riskAdjustedScore,
+              maxPositionSize: positionSizing.suggestedSize,
+              recoveryFactor: 0.5 // Placeholder - would need historical data
+            }
+          };
+        });
+
+        setData(rawData); // Keep original data
+        setEnhancedData(enhancedSignals); // Set enhanced data
         setScanMeta(json.scanMeta || null);
       } else {
         setData([]);
+        setEnhancedData([]);
         setScanMeta(null);
         setMsg(`LOAD_FAILED: ${json.error || 'UNKNOWN'}`);
       }
     } catch {
       console.error("Failed to load current data");
       setData([]);
+      setEnhancedData([]);
       setScanMeta(null);
     } finally {
       setLoading(false);
     }
-  }, [priceRange, dateFilter, view]);
+  }, [priceRange, dateFilter, view, advancedFilters]);
 
   useEffect(() => {
     const savedToken = localStorage.getItem("botToken");
@@ -171,7 +532,7 @@ export default function ScreenerPage() {
 
   useEffect(() => {
     loadCurrentData();
-  }, [priceRange, dateFilter, view, loadCurrentData]);
+  }, [priceRange, dateFilter, view, advancedFilters]);
 
   const baseSignals = data.filter(s => {
       const source = s.signalSource || s.strategy || "";
@@ -179,8 +540,6 @@ export default function ScreenerPage() {
       const vector = String(s.vector || s.metadata?.vector || "").toUpperCase();
       if (view === 'entry') return category === 'ENTRY_IDEAL' || source.includes('ENTRY_IDEAL');
       if (view === 'cooldown') return category === 'COOLDOWN' || /COOLDOWN|EXTENDED_EMA20_COOLDOWN|PULLBACK|SIDEWAYS/.test(`${source} ${vector}`.toUpperCase());
-      if (view === 'sauce') return source.includes('Secret');
-      if (view === 'flyer') return category === 'SILENT_FLYER' || /SILENT|FLYER|ACCUMULATION/i.test(source);
       if (view === 'divergence') return source.includes('CVD');
       if (view === 'sqz_div') {
           const sourceLower = source.toLowerCase();
@@ -214,13 +573,13 @@ export default function ScreenerPage() {
 
   const activeAccent = view === 'entry'
     ? 'oklch(0.78 0.2 115)'
-    : (view === 'cooldown' ? 'oklch(0.82 0.18 95)' : (view === 'sauce' ? 'oklch(0.85 0.25 200)' : (view === 'sqz_div' ? 'oklch(0.82 0.18 145)' : (view === 'flyer' ? 'oklch(0.75 0.2 320)' : 'var(--accent-emerald)'))));
+    : (view === 'cooldown' ? 'oklch(0.82 0.18 95)' : (view === 'sqz_div' ? 'oklch(0.82 0.18 145)' : 'var(--accent-emerald)'));
   const activeViewLabel = view === 'entry'
     ? 'ENTRY_IDEAL_LIVE'
-    : (view === 'cooldown' ? 'COOLDOWN_RESET' : (view === 'sauce' ? 'PREDICTIVE_MODELS' : (view === 'sqz_div' ? 'SQZ_MOMENTUM' : (view === 'flyer' ? 'INSTITUTIONAL_FLYER' : (view === 'divergence' ? 'CVD_DIVERGENCE' : 'TECHNICAL_BOUNCE_ENHANCED')))));
+    : (view === 'cooldown' ? 'COOLDOWN_RESET' : (view === 'sqz_div' ? 'SQZ_DIVERGENCE' : (view === 'divergence' ? 'CVD_DIVERGENCE' : 'TECHNICAL_BOUNCE_ENHANCED')));
   const activeRiskBadge = view === 'entry'
     ? 'FILTER: IN_ZONE + RR>=1.5R'
-    : (view === 'cooldown' ? 'PULLBACK: CONTROLLED_RESET' : (view === 'sauce' ? 'AI_ACCUMULATION' : (view === 'sqz_div' ? 'VOLATILITY_ENGINE' : (view === 'flyer' ? 'FLYER_RADAR: HIGH_INERTIA' : 'RISK_LIMIT: < 5.5%'))));
+    : (view === 'cooldown' ? 'PULLBACK: CONTROLLED_RESET' : (view === 'sqz_div' ? 'VOLATILITY_ENGINE' : 'RISK_LIMIT: < 5.5%'));
 
   const saveSettings = () => {
     localStorage.setItem("botToken", botToken);
@@ -244,7 +603,7 @@ export default function ScreenerPage() {
           return;
       }
 
-      const text = `🎯 *SECRET SAUCE ANALYTICS REPORT*\n\n` + 
+      const text = `🎯 *SCREENER ANALYTICS REPORT*\n\n` + 
         signalsToPush.map(s => {
           const meta = s.metadata || {};
           const mfi = parseFloat(String(meta.mfi)) || 0;
@@ -290,10 +649,8 @@ export default function ScreenerPage() {
                 { id: 'signals', label: 'EMA_BOUNCE', color: 'var(--accent-emerald)' },
                 { id: 'entry', label: 'ENTRY_IDEAL', color: 'oklch(0.78 0.2 115)' },
                 { id: 'cooldown', label: 'COOLDOWN', color: 'oklch(0.82 0.18 95)' },
-                { id: 'flyer', label: 'SILENT_FLYER', color: 'oklch(0.75 0.2 320)' },
                 { id: 'divergence', label: 'CVD_DIVERGENCE', color: 'oklch(0.7 0.2 300)' },
-                { id: 'sqz_div', label: 'SQZ_DIVERGENCE', color: 'oklch(0.82 0.18 145)' },
-                { id: 'sauce', label: 'SECRET_SAUCE', color: 'oklch(0.85 0.25 200)' }
+                { id: 'sqz_div', label: 'SQZ_DIVERGENCE', color: 'oklch(0.82 0.18 145)' }
               ].map(tab => (
                 <button 
                   key={tab.id}
@@ -496,8 +853,6 @@ export default function ScreenerPage() {
                               
                               if (s.includes('entry_ideal')) color = 'oklch(0.78 0.2 115)';
                               else if (s.includes('cooldown')) color = 'oklch(0.82 0.18 95)';
-                              else if (s.includes('secret')) color = 'oklch(0.85 0.25 200)';
-                              else if (s.includes('silent') || s.includes('flyer') || s.includes('accumulation')) color = 'oklch(0.75 0.2 320)';
                               else if (s.includes('elite')) color = 'oklch(0.85 0.3 180)';
                               else if (s.includes('explosion') || s.includes('volatility')) color = 'oklch(0.85 0.25 150)';
                               else if (s.includes('dip')) color = 'oklch(0.8 0.25 160)';
@@ -689,6 +1044,7 @@ export default function ScreenerPage() {
             cursor: pointer;
             width: 100%;
             font-family: inherit;
+            min-height: 40px;
         }
 
         .select-icon {
@@ -708,6 +1064,7 @@ export default function ScreenerPage() {
             font-weight: 900;
             padding: 0 16px;
             height: 32px;
+            min-height: 40px;
             border-radius: 6px;
             display: flex;
             align-items: center;
@@ -1091,21 +1448,58 @@ export default function ScreenerPage() {
         @media (max-width: 1024px) {
             .screener-header { flex-direction: column; align-items: flex-start; gap: 24px; }
             .controls-group { width: 100%; align-items: stretch; }
-            .filters-row { flex-wrap: wrap; }
+            .filters-row, .actions-row { flex-wrap: wrap; }
             .select-wrapper { flex: 1; min-width: 120px; }
             .settings-grid { grid-template-columns: 1fr; }
             .hide-tablet { display: none; }
             .signals-table td, .signals-table th { padding: 12px 16px; }
+            .signals-table { min-width: 980px; }
         }
 
-        @media (max-width: 640px) {
-            .screener-container { padding: 16px; }
+        @media (max-width: 700px) {
+            .screener-container { padding: 10px 0 0; gap: 14px; }
+            .screener-header { gap: 14px; padding: 0 2px; }
+            .header-left { min-width: 0; width: 100%; }
             .hide-mobile { display: none; }
             .ticker-name { font-size: 0.95rem; }
-            .main-title { font-size: 1.25rem; }
-            .tab-item { padding: 6px 12px; font-size: 0.65rem; }
-            .signals-table td, .signals-table th { padding: 12px; }
+            .main-title { font-size: 1.05rem; margin-bottom: 12px; letter-spacing: 0.1em; }
+            .tabs-container { padding-bottom: 10px; margin-inline: -10px; padding-inline: 10px; scroll-snap-type: x proximity; }
+            .tab-item { padding: 10px 12px; font-size: 0.62rem; min-height: 42px; scroll-snap-align: start; }
+            .filters-row, .actions-row { display: grid; grid-template-columns: 1fr 1fr; width: 100%; gap: 8px; }
+            .actions-row .scan-btn { grid-column: 1 / -1; }
+            .action-btn { justify-content: center; min-height: 44px; }
+            .select-wrapper { min-width: 0; }
+            .viewport-header { padding: 14px 12px; align-items: flex-start; flex-direction: column; gap: 8px; }
+            .header-status { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+            .view-label { font-size: 0.72rem; }
+            .risk-badge { font-size: 0.58rem; }
+            .scan-freshness-strip { padding: 10px 12px; gap: 8px; font-size: 0.55rem; flex-wrap: nowrap; overflow-x: auto; }
+            .scan-freshness-strip span { flex: 0 0 auto; }
+            .table-responsive { overflow: visible; }
+            .signals-table { min-width: 0; width: 100%; display: block; white-space: normal; }
+            .signals-table thead { display: none; }
+            .signals-table tbody { display: grid; gap: 10px; padding: 10px; }
+            .signals-table tr.signal-row { display: grid; grid-template-columns: 1fr; border: 1px solid var(--border-tactical); border-radius: 12px; overflow: hidden; background: oklch(0.12 0.015 240); }
+            .signals-table td { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; align-items: start; padding: 9px 10px; border-bottom: 1px solid var(--border-tactical); text-align: left !important; }
+            .signals-table td:last-child { border-bottom: none; }
+            .signals-table td::before { color: var(--text-muted); font-size: 0.55rem; font-weight: 1000; letter-spacing: 0.08em; }
+            .signals-table td:nth-child(1)::before { content: 'TICKER'; }
+            .signals-table td:nth-child(2)::before { content: 'VECTOR'; }
+            .signals-table td:nth-child(5)::before { content: 'ENTRY'; }
+            .signals-table td:nth-child(6)::before { content: 'TARGET'; }
+            .signals-table td:nth-child(8)::before { content: 'DELTA'; }
+            .signals-table td:nth-child(10)::before { content: 'OPS'; }
+            .strategy-badge { max-width: 100%; overflow-wrap: anywhere; }
+            .ticker-metadata { gap: 6px; }
+            .analyze-link { min-height: 40px; justify-content: center; }
             .profit-val { font-size: 0.9rem; }
+            .loading-container { padding: 48px 16px; }
+            .scanner-glow { width: min(240px, 80vw); }
+        }
+
+        @media (max-width: 420px) {
+            .filters-row, .actions-row { grid-template-columns: 1fr; }
+            .signals-table td { grid-template-columns: 72px minmax(0, 1fr); }
         }
 
         .custom-scrollbar::-webkit-scrollbar { height: 4px; width: 4px; }

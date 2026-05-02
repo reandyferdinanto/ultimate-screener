@@ -1,23 +1,46 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { createChart, ColorType, CrosshairMode, IChartApi, AreaSeries } from "lightweight-charts";
+import type { AreaData, Time } from "lightweight-charts";
+
+type MarketChartPoint = {
+  time: Time;
+  value?: number;
+  close?: number;
+};
 
 export default function ChartWidget({ title, symbol, isNegativeMode = false }: { title: string, symbol: string, isNegativeMode?: boolean }) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<MarketChartPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<any>(null);
 
   useEffect(() => {
-    fetch(`/api/market?symbol=${symbol}`)
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && res.data) {
-          setData(res.data);
+    let cancelled = false;
+
+    async function loadMarketData() {
+      try {
+        const res = await fetch(`/api/market?symbol=${encodeURIComponent(symbol)}`, { cache: "no-store" });
+        const contentType = res.headers.get("content-type") || "";
+        if (!res.ok) throw new Error(`/api/market failed with ${res.status}`);
+        if (!contentType.includes("application/json")) throw new Error(`/api/market returned ${contentType || "non-JSON response"}`);
+
+        const json = await res.json();
+        if (!cancelled && json.success && json.data) {
+          setData(json.data);
         }
-        setLoading(false);
-      });
+      } catch (error) {
+        console.error("Failed to load market data", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadMarketData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [symbol]);
 
   useEffect(() => {
@@ -27,7 +50,8 @@ export default function ChartWidget({ title, symbol, isNegativeMode = false }: {
     const gridColor = "#333333";
     const textColor = "#999999";
 
-    const chart = createChart(chartContainerRef.current, {
+    const container = chartContainerRef.current;
+    const chart = createChart(container, {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: textColor,
@@ -47,8 +71,8 @@ export default function ChartWidget({ title, symbol, isNegativeMode = false }: {
         timeVisible: true,
         secondsVisible: false,
       },
-      width: chartContainerRef.current.clientWidth,
-      height: window.innerWidth < 768 ? 250 : 350,
+      width: container.clientWidth,
+      height: window.innerWidth < 768 ? 240 : 350,
     });
     
     chartRef.current = chart;
@@ -60,36 +84,39 @@ export default function ChartWidget({ title, symbol, isNegativeMode = false }: {
       lineWidth: 2,
     });
     
-    seriesRef.current = areaSeries;
-    
-    const formattedData = data.map((d: any) => ({
-      time: d.time,
-      value: d.value || d.close
-    })).sort((a: any, b: any) => a.time - b.time);
+    const formattedData = data.map((d): AreaData<Time> | null => {
+      const value = d.value ?? d.close;
+      return typeof value === "number" ? { time: d.time, value } : null;
+    }).filter((d): d is AreaData<Time> => d !== null).sort((a, b) => Number(a.time) - Number(b.time));
     
     // Remove duplicates
     const uniqueData = Array.from(new Map(formattedData.map(item => [item.time, item])).values());
     
     try {
-      areaSeries.setData(uniqueData as any);
+      areaSeries.setData(uniqueData);
       chart.timeScale().fitContent();
     } catch {
       console.error("Lightweight charts err:");
     }
 
-    const handleResize = () => {
-      chart.applyOptions({ width: chartContainerRef.current?.clientWidth });
-    };
-    window.addEventListener("resize", handleResize);
+    const resizeObserver = new ResizeObserver(() => {
+      chart.applyOptions({
+        width: container.clientWidth,
+        height: window.innerWidth < 768 ? 240 : 350,
+      });
+    });
+    resizeObserver.observe(container);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      resizeObserver.disconnect();
       chart.remove();
     };
   }, [data, isNegativeMode]);
 
-  const latestValue = data.length > 0 ? (data[data.length - 1].close || data[data.length - 1].value) : 0;
-  const prevValue = data.length > 1 ? (data[data.length - 2].close || data[data.length - 2].value) : 0;
+  const latestPoint = data[data.length - 1];
+  const prevPoint = data[data.length - 2];
+  const latestValue = latestPoint ? (latestPoint.close ?? latestPoint.value ?? 0) : 0;
+  const prevValue = prevPoint ? (prevPoint.close ?? prevPoint.value ?? latestValue) : latestValue;
   const diff = latestValue - prevValue;
   const isUp = diff >= 0;
   const valueColorClass = isNegativeMode ? "negative" : (isUp ? "positive" : "negative");
@@ -106,7 +133,14 @@ export default function ChartWidget({ title, symbol, isNegativeMode = false }: {
           </span>
         )}
       </div>
-      <div ref={chartContainerRef} style={{ flex: 1, position: 'relative', minHeight: '300px' }} />
+      <div ref={chartContainerRef} className="chart-widget-canvas" style={{ flex: 1, position: 'relative', minHeight: '300px' }} />
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .chart-widget-canvas {
+            min-height: 240px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

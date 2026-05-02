@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const YahooFinance = require('yahoo-finance2').default;
+const { loadIdxStocks } = require('./idx_stock_file');
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'], validation: { logErrors: false } });
 const { ema, rma, sma, atr, rsi, mfi } = require('indicatorts');
 const { RSI: RSICalc } = require('technicalindicators');
@@ -279,61 +280,6 @@ async function analyzeTicker(stock) {
             ? { ...best, barsSinceBreakout }
             : null;
     };
-
-    // 1. SECRET SAUCE v2 (Accumulation + Compression + Trend)
-    const consolidationScore = Math.abs(closes[lastIdx] - closes[lastIdx - 3]) / closes[lastIdx] * 100;
-    
-    const isSecretSauce = 
-        isAboveSma50 &&                              // [NEW] Must be in uptrend
-        (isCompressed || consolidationScore < 3.5) && // [NEW] ATR compression OR tight price
-        (isVolumeBuildup || volRatio > 1.3) &&        // [UPGRADED] 3-day buildup OR strong spike
-        last.close > prev.close && 
-        lastMfi > 55 && lastMfi < 85 &&
-        lastRsi >= 45 && lastRsi <= 68 &&             // [NEW] RSI sweet spot
-        dist20 > -2 && dist20 < 5 && 
-        isQualityCandle;                              // [NEW] Quality green candle
-
-    if (isSecretSauce) {
-        // Score: weighted composite
-        let ssScore = 0;
-        ssScore += isCompressed ? 30 : 10;            // ATR compression bonus
-        ssScore += hasHL ? 25 : 0;                    // Higher low bonus  
-        ssScore += isVolumeBuildup ? 20 : 10;          // Volume buildup bonus
-        ssScore += macdHistImproving ? 15 : 0;         // MACD momentum bonus
-        ssScore += bodyRatio > 0.6 ? 10 : 5;           // Strong candle bonus
-
-        return {
-            ticker: stock.ticker,
-            sector: stock.sector || "Unknown",
-            signalSource: "Secret Sauce",
-            entryDate: marketDate,
-            entryPrice: price,
-            currentPrice: price,
-            targetPrice: Math.round(price * 1.15),
-            stopLossPrice: Math.round(Math.min(price * 0.94, lastEma20 * 0.97)),
-            relevanceScore: 500 + ssScore,
-            metadata: { 
-                category: "SECRET_SAUCE",
-                vector: "ACCUMULATION_COMPRESSION",
-                appearedAt: marketDateIso,
-                scanRunAt: scanRunAt.toISOString(),
-                dataSource: "YahooFinance.chart(1d)",
-                lastQuoteDate: marketDateIso,
-                volRatio: volRatio.toFixed(2), 
-                mfi: lastMfi.toFixed(1), 
-                rsi: lastRsi.toFixed(1),
-                dist20: dist20.toFixed(2), 
-                consolidationScore: consolidationScore.toFixed(2),
-                atrCompression: atrCompressionRatio.toFixed(2),
-                hasHigherLows: hasHL,
-                volumeBuildup: isVolumeBuildup,
-                macdImproving: macdHistImproving,
-                bodyRatio: bodyRatio.toFixed(2),
-                ssScore,
-                strategyRank: 500 + ssScore 
-            }
-        };
-    }
 
     const recentWindow = quotes.slice(-6);
     const recentTouchedEma20 = recentWindow.some((q, localIdx) => {
@@ -863,8 +809,8 @@ async function analyzeTicker(stock) {
 
 async function run() {
   try {
+    const stocks = loadIdxStocks();
     await mongoose.connect(MONGODB_URI);
-    const stocks = await IndonesiaStock.find({ active: true });
     console.log(`Starting Improved Scan for ${stocks.length} stocks...`);
     
     const results = [];

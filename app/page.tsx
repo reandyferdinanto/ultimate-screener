@@ -3,17 +3,53 @@ import React, { useEffect, useState } from "react";
 import ChartWidget from "@/components/ChartWidget";
 import { TrendingUp, TrendingDown, ExternalLink, RefreshCw } from "lucide-react";
 
+type MarketMover = {
+  ticker: string;
+  changePercent: number;
+};
+
+type MarketNewsItem = {
+  title: string;
+  link: string;
+  date: string;
+};
+
+type MoversResponse = {
+  success: boolean;
+  gainers: MarketMover[];
+  losers: MarketMover[];
+};
+
+type NewsResponse = {
+  success: boolean;
+  data: MarketNewsItem[];
+};
+
 export default function Dashboard() {
-  const [movers, setMovers] = useState<{ gainers: any[], losers: any[] }>({ gainers: [], losers: [] });
-  const [news, setNews] = useState<any[]>([]);
+  const [movers, setMovers] = useState<{ gainers: MarketMover[], losers: MarketMover[] }>({ gainers: [], losers: [] });
+  const [news, setNews] = useState<MarketNewsItem[]>([]);
   const [loadingMovers, setLoadingMovers] = useState(true);
   const [loadingNews, setLoadingNews] = useState(true);
+
+  const fetchJson = async <T,>(url: string): Promise<T> => {
+    const res = await fetch(url, { cache: "no-store" });
+    const contentType = res.headers.get("content-type") || "";
+
+    if (!res.ok) {
+      throw new Error(`${url} failed with ${res.status}`);
+    }
+
+    if (!contentType.includes("application/json")) {
+      throw new Error(`${url} returned ${contentType || "non-JSON response"}`);
+    }
+
+    return res.json() as Promise<T>;
+  };
 
   const fetchMovers = async () => {
     setLoadingMovers(true);
     try {
-      const res = await fetch("/api/market/movers");
-      const json = await res.json();
+      const json = await fetchJson<MoversResponse>("/api/market/movers");
       if (json.success) setMovers({ gainers: json.gainers, losers: json.losers });
     } catch (e) {
       console.error(e);
@@ -25,8 +61,7 @@ export default function Dashboard() {
   const fetchNews = async () => {
     setLoadingNews(true);
     try {
-      const res = await fetch("/api/market/news");
-      const json = await res.json();
+      const json = await fetchJson<NewsResponse>("/api/market/news");
       if (json.success) setNews(json.data);
     } catch (e) {
       console.error(e);
@@ -42,32 +77,29 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Top Section: Charts */}
       <div className="dashboard-grid">
         <ChartWidget title="IHSG INTRADAY" symbol="^JKSE" />
         <ChartWidget title="ASIAN MARKET (NIKKEI)" symbol="^N225" />
         <ChartWidget title="US FEAR INDICATOR (VIX)" symbol="^VIX" isNegativeMode={true} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '16px' }}>
-        {/* Middle Section: Top Gainers & Losers */}
+      <div className="dashboard-secondary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: '16px' }}>
         <div className="panel scanline-container" style={{ minHeight: '400px' }}>
           <div className="panel-header">
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <RefreshCw size={12} className={loadingMovers ? 'spin' : ''} style={{ color: 'var(--accent-green)' }} />
               Market Movers [IDX]
             </span>
-            <button 
-              onClick={fetchMovers} 
+            <button
+              onClick={fetchMovers}
               disabled={loadingMovers}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}
             >
               [ SYNC ]
             </button>
           </div>
-          
+
           <div className="movers-container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-            {/* Gainers */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-green)', marginBottom: '12px', fontSize: '0.65rem', fontWeight: '800', letterSpacing: '0.05em' }}>
                 <TrendingUp size={14} /> TOP GAINERS
@@ -88,7 +120,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Losers */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-red)', marginBottom: '12px', fontSize: '0.65rem', fontWeight: '800', letterSpacing: '0.05em' }}>
                 <TrendingDown size={14} /> TOP LOSERS
@@ -111,15 +142,14 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Bottom Section: Market News */}
         <div className="panel scanline-container" style={{ minHeight: '400px' }}>
           <div className="panel-header">
             <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent-red)', animation: 'pulse 2s infinite' }}></div>
               Terminal News Feed [INDONESIA]
             </span>
-            <button 
-              onClick={fetchNews} 
+            <button
+              onClick={fetchNews}
               disabled={loadingNews}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}
             >
@@ -136,10 +166,10 @@ export default function Dashboard() {
                 </div>
               ))
             ) : news.map((item, i) => (
-              <a 
-                key={i} 
-                href={item.link} 
-                target="_blank" 
+              <a
+                key={i}
+                href={item.link}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="news-item"
                 style={{ display: 'block', borderBottom: '1px solid var(--border-color)', padding: '12px 8px', margin: '0 -8px', transition: 'all 0.2s' }}
@@ -182,8 +212,15 @@ export default function Dashboard() {
           border-left: 2px solid var(--accent-green);
         }
         @media (max-width: 768px) {
+          .dashboard-secondary-grid {
+            gap: 12px !important;
+          }
           .movers-container {
             grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          .panel {
+            min-height: auto !important;
           }
         }
       `}</style>

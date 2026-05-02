@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/db";
-import { IndonesiaStockModel } from "@/lib/models/IndonesiaStock";
+import { loadIdxStocks } from "@/lib/idx-stock-file";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -277,15 +276,7 @@ export async function GET(req: Request) {
   const startedAt = new Date();
 
   try {
-    await connectToDatabase();
-
-    const query = IndonesiaStockModel.find({ active: true })
-      .select("ticker symbol name sector industry")
-      .sort({ ticker: 1 })
-      .lean<ActiveStock[]>();
-    if (limit) query.limit(limit);
-
-    const stocks = await query;
+    const stocks: ActiveStock[] = limit ? loadIdxStocks().slice(0, limit) : loadIdxStocks();
     const scanResults = await mapWithConcurrency(stocks, concurrency, stock => scanStock(
       stock,
       origin,
