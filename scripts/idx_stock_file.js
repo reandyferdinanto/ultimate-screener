@@ -1,6 +1,8 @@
 const fs = require('fs');
+const path = require('path');
 
-const DEFAULT_STOCK_FILE = 'C:\\Users\\eluon\\Downloads\\idx_stocks_with_sectors_20260501.json';
+const DEFAULT_STOCK_FILE = path.join(process.cwd(), 'data', 'idx_stocks_with_sectors.json');
+const LEGACY_STOCK_FILE = 'C:\\Users\\eluon\\Downloads\\idx_stocks_with_sectors_20260501.json';
 
 let cachedStocks = null;
 
@@ -16,7 +18,10 @@ function normalizeTicker(value) {
 function loadIdxStocks() {
   if (cachedStocks) return cachedStocks;
 
-  const filePath = process.env.IDX_STOCKS_FILE || DEFAULT_STOCK_FILE;
+  const filePath = process.env.IDX_STOCKS_FILE || (fs.existsSync(DEFAULT_STOCK_FILE) ? DEFAULT_STOCK_FILE : LEGACY_STOCK_FILE);
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`IDX stock universe file not found at ${filePath}.`);
+  }
   const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   const sourceDate = parsed && parsed.metadata && parsed.metadata.source_date ? parsed.metadata.source_date : new Date().toISOString();
   const rows = Array.isArray(parsed && parsed.stocks) ? parsed.stocks : [];
