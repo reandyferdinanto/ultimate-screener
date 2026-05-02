@@ -1,0 +1,6357 @@
+{
+  "metadata": {
+    "source_date": "2026-05-02T10:16:01.010Z",
+    "source": "indonesiastocks collection"
+  },
+  "stocks": [
+    {
+      "code": "AADI",
+      "company_name": "PT Adaro Andalan Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AALI",
+      "company_name": "PT Astra Agro Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ABBA",
+      "company_name": "PT Mahaka Media Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ABDA",
+      "company_name": "PT Asuransi Bina Dana Arta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ABMM",
+      "company_name": "PT ABM Investama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ACES",
+      "company_name": "PT Aspirasi Hidup Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ACRO",
+      "company_name": "PT Samcro Hyosung Adilestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ACST",
+      "company_name": "PT Acset Indonusa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ADCP",
+      "company_name": "PT Adhi Commuter Properti Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ADES",
+      "company_name": "PT Akasha Wira International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ADHI",
+      "company_name": "PT Adhi Karya (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ADMF",
+      "company_name": "PT Adira Dinamika Multi Finance Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ADMG",
+      "company_name": "PT. Polychem Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ADMR",
+      "company_name": "PT Alamtri Minerals Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ADRO",
+      "company_name": "PT Alamtri Resources Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AEGS",
+      "company_name": "PT. Anugerah Spareparts Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AGAR",
+      "company_name": "PT Asia Sejahtera Mina Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AGII",
+      "company_name": "PT Samator Indo Gas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AGRO",
+      "company_name": "PT Bank Raya Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AGRS",
+      "company_name": "PT Bank IBK Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AHAP",
+      "company_name": "PT Asuransi Harta Aman Pratama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AIMS",
+      "company_name": "PT Artha Mahiya Investama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AISA",
+      "company_name": "PT FKS Food Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AKKU",
+      "company_name": "PT Anugerah Kagum Karya Utama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AKPI",
+      "company_name": "PT Argha Karya Prima Industry Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AKRA",
+      "company_name": "PT AKR Corporindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AKSI",
+      "company_name": "PT Mineral Sumberdaya Mandiri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ALDO",
+      "company_name": "PT Alkindo Naratama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ALII",
+      "company_name": "PT Ancara Logistics Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ALKA",
+      "company_name": "PT Alakasa Industrindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ALMI",
+      "company_name": "PT Alumindo Light Metal Industry Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ALTO",
+      "company_name": "PT Tri Banyan Tirta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AMAG",
+      "company_name": "PT Asuransi Multi Artha Guna Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AMAN",
+      "company_name": "PT Makmur Berkah Amanda Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AMAR",
+      "company_name": "PT Bank Amar Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AMFG",
+      "company_name": "PT Asahimas Flat Glass Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AMIN",
+      "company_name": "PT Ateliers Mecaniques D'Indonesie Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AMMN",
+      "company_name": "PT Amman Mineral Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AMMS",
+      "company_name": "PT Agung Menjangan Mas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AMOR",
+      "company_name": "PT Ashmore Asset Management Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AMRT",
+      "company_name": "PT Sumber Alfaria Trijaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ANDI",
+      "company_name": "PT Andira Agro, Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ANJT",
+      "company_name": "PT Austindo Nusantara Jaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ANTM",
+      "company_name": "PT Aneka Tambang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "APEX",
+      "company_name": "PT Apexindo Pratama Duta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "APIC",
+      "company_name": "PT Pacific Strategic Financial Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "APII",
+      "company_name": "PT Arita Prima Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "APLI",
+      "company_name": "PT Asiaplast Industries Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "APLN",
+      "company_name": "PT Agung Podomoro Land Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ARCI",
+      "company_name": "PT Archi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AREA",
+      "company_name": "PT Dunia Virtual Online Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ARGO",
+      "company_name": "PT Argo Pantes Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ARII",
+      "company_name": "PT Atlas Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ARKA",
+      "company_name": "PT Arkha Jayanti Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ARKO",
+      "company_name": "PT Arkora Hydro Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ARNA",
+      "company_name": "PT Arwana Citramulia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ARTA",
+      "company_name": "PT Arthavest Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ARTO",
+      "company_name": "PT Bank Jago Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASBI",
+      "company_name": "PT Asuransi Bintang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASDM",
+      "company_name": "PT Asuransi Dayin Mitra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASGR",
+      "company_name": "PT Astra Graphia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASHA",
+      "company_name": "PT Cilacap Samudera Fishing Industry Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASII",
+      "company_name": "PT Astra International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASJT",
+      "company_name": "PT Asuransi Jasa Tania Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASLC",
+      "company_name": "PT Autopedia Sukses Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASLI",
+      "company_name": "PT Asri Karya Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASMI",
+      "company_name": "PT Asuransi Maximus Graha Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASPI",
+      "company_name": "PT Andalan Sakti Primaindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASPR",
+      "company_name": "PT Asia Pramulia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASRI",
+      "company_name": "PT Alam Sutera Realty Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASRM",
+      "company_name": "PT Asuransi Ramayana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ASSA",
+      "company_name": "PT Adi Sarana Armada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ATAP",
+      "company_name": "PT Trimitra Prawara Goldland Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ATIC",
+      "company_name": "PT Anabatic Technologies Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ATLA",
+      "company_name": "PT Atlantis Subsea Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AUTO",
+      "company_name": "PT Astra Otoparts Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AVIA",
+      "company_name": "PT Avia Avian Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AWAN",
+      "company_name": "PT Era Digital Media Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AXIO",
+      "company_name": "PT Tera Data Indonusa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AYAM",
+      "company_name": "PT Janu Putra Sejahtera Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "AYLS",
+      "company_name": "PT Agro Yasa Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BABP",
+      "company_name": "PT Bank MNC Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BABY",
+      "company_name": "PT Multitrend Indo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BACA",
+      "company_name": "PT Bank Capital Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BAIK",
+      "company_name": "PT Bersama Mencapai Puncak Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BAJA",
+      "company_name": "PT Saranacentral Bajatama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BALI",
+      "company_name": "PT Bali Towerindo Sentra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BANK",
+      "company_name": "PT Bank Aladin Syariah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BAPA",
+      "company_name": "PT Bekasi Asri Pemula Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BAPI",
+      "company_name": "PT Bhakti Agung Propertindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BATA",
+      "company_name": "PT Sepatu Bata Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BATR",
+      "company_name": "PT Benteng Api Technic Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BAUT",
+      "company_name": "PT Mitra Angkasa Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BAYU",
+      "company_name": "PT Bayu Buana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBCA",
+      "company_name": "PT Bank Central Asia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBHI",
+      "company_name": "PT Allo Bank Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBKP",
+      "company_name": "PT Bank KB Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBLD",
+      "company_name": "PT Buana Finance Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBMD",
+      "company_name": "PT Bank Mestika Dharma Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBNI",
+      "company_name": "PT Bank Negara Indonesia (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBRI",
+      "company_name": "PT Bank Rakyat Indonesia (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBRM",
+      "company_name": "PT Pelayaran Nasional Bina Buana Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBSI",
+      "company_name": "PT Krom Bank Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBSS",
+      "company_name": "PT Bumi Benowo Sukses Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBTN",
+      "company_name": "PT Bank Tabungan Negara (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BBYB",
+      "company_name": "PT Bank Neo Commerce Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BCAP",
+      "company_name": "PT MNC Kapital Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BCIC",
+      "company_name": "PT Bank JTrust Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BCIP",
+      "company_name": "PT Bumi Citra Permai Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BDKR",
+      "company_name": "PT Berdikari Pondasi Perkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BDMN",
+      "company_name": "PT Bank Danamon Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BEBS",
+      "company_name": "PT Berkah Beton Sadaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BEEF",
+      "company_name": "PT Estika Tata Tiara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BEER",
+      "company_name": "PT Jobubu Jarum Minahasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BEKS",
+      "company_name": "PT. Bank Pembangunan Daerah Banten, Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BELI",
+      "company_name": "PT Global Digital Niaga Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BELL",
+      "company_name": "PT Trisula Textile Industries Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BESS",
+      "company_name": "PT Batulicin Nusantara Maritim Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BEST",
+      "company_name": "PT Bekasi Fajar Industrial Estate Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BFIN",
+      "company_name": "PT BFI Finance Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BGTG",
+      "company_name": "PT Bank Ganesha Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BHAT",
+      "company_name": "PT Bhakti Multi Artha Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BHIT",
+      "company_name": "PT MNC Asia Holding Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BIKE",
+      "company_name": "PT Sepeda Bersama Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BIMA",
+      "company_name": "PT. Primarindo Asia Infrastructure, Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BINA",
+      "company_name": "PT Bank Ina Perdana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BINO",
+      "company_name": "PT Perma Plasindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BIPI",
+      "company_name": "PT Astrindo Nusantara Infrastruktur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BIPP",
+      "company_name": "PT Bhuwanatala Indah Permai Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BIRD",
+      "company_name": "PT Blue Bird Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BISI",
+      "company_name": "PT BISI International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BJBR",
+      "company_name": "PT Bank Pembangunan Daerah Jawa Barat dan Banten Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BJTM",
+      "company_name": "PT Bank Pembangunan Daerah Jawa Timur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BKDP",
+      "company_name": "PT Bukit Darmo Property Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BKSL",
+      "company_name": "PT Sentul City Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BKSW",
+      "company_name": "PT Bank QNB Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BLES",
+      "company_name": "PT Superior Prima Sukses Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BLOG",
+      "company_name": "PT Trimitra Trans Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BLTA",
+      "company_name": "PT Berlian Laju Tanker Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BLTZ",
+      "company_name": "PT Graha Layar Prima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BLUE",
+      "company_name": "PT Berkah Prima Perkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BMAS",
+      "company_name": "PT Bank Maspion Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BMBL",
+      "company_name": "PT Lavender Bina Cendikia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BMHS",
+      "company_name": "PT Bundamedik Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BMRI",
+      "company_name": "PT Bank Mandiri (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BMSR",
+      "company_name": "PT Bintang Mitra Semestaraya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BMTR",
+      "company_name": "PT Global Mediacom Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BNBA",
+      "company_name": "PT Bank Bumi Arta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BNBR",
+      "company_name": "PT Bakrie & Brothers Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BNGA",
+      "company_name": "PT Bank CIMB Niaga Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BNII",
+      "company_name": "PT Bank Maybank Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BNLI",
+      "company_name": "PT Bank Permata Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BOAT",
+      "company_name": "PT Newport Marine Services TBK",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BOBA",
+      "company_name": "PT Formosa Ingredient Factory Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BOGA",
+      "company_name": "PT Bintang Oto Global Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BOLA",
+      "company_name": "PT Bali Bintang Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BOLT",
+      "company_name": "PT Garuda Metalindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BPFI",
+      "company_name": "PT Woori Finance Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BPII",
+      "company_name": "PT Batavia Prosperindo Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BPTR",
+      "company_name": "PT Batavia Prosperindo Trans Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BRAM",
+      "company_name": "PT Indo Kordsa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BREN",
+      "company_name": "PT Barito Renewables Energy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BRIS",
+      "company_name": "PT Bank Syariah Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BRMS",
+      "company_name": "PT Bumi Resources Minerals Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BRNA",
+      "company_name": "PT Berlina Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BRPT",
+      "company_name": "PT Barito Pacific Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BRRC",
+      "company_name": "PT Raja Roti Cemerlang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BSBK",
+      "company_name": "PT Wulandari Bangun Laksana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BSDE",
+      "company_name": "PT Bumi Serpong Damai Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BSIM",
+      "company_name": "PT Bank Sinarmas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BSML",
+      "company_name": "PT Bintang Samudera Mandiri Lines Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BSSR",
+      "company_name": "PT Baramulti Suksessarana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BSWD",
+      "company_name": "PT Bank of India Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BTEK",
+      "company_name": "PT Bumi Teknokultura Unggul Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BTON",
+      "company_name": "PT Betonjaya Manunggal Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BTPN",
+      "company_name": "PT Bank SMBC Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BTPS",
+      "company_name": "PT Bank BTPN Syariah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BUAH",
+      "company_name": "PT Segar Kumala Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BUDI",
+      "company_name": "PT Budi Starch & Sweetener Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BUKA",
+      "company_name": "PT Bukalapak.com Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BUKK",
+      "company_name": "PT Bukaka Teknik Utama Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BULL",
+      "company_name": "PT Buana Lintas Lautan Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BUMI",
+      "company_name": "PT Bumi Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BUVA",
+      "company_name": "PT Bukit Uluwatu Villa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BVIC",
+      "company_name": "PT Bank Victoria International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BWPT",
+      "company_name": "PT Eagle High Plantations Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "BYAN",
+      "company_name": "PT Bayan Resources Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CAKK",
+      "company_name": "PT Cahayaputra Asa Keramik Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CAMP",
+      "company_name": "PT Campina Ice Cream Industry, Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CANI",
+      "company_name": "PT Capitol Nusantara Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CARE",
+      "company_name": "PT Metro Healthcare Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CARS",
+      "company_name": "PT Industri dan Perdagangan Bintraco Dharma Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CASA",
+      "company_name": "PT Capital Financial Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CASH",
+      "company_name": "PT Cashlez Worldwide Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CASS",
+      "company_name": "PT Cahaya Aero Services Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CBDK",
+      "company_name": "PT Bangun Kosambi Sukses Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CBPE",
+      "company_name": "PT Citra Buana Prasida Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CBRE",
+      "company_name": "PT Cakra Buana Resources Energi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CBUT",
+      "company_name": "PT Citra Borneo Utama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CCSI",
+      "company_name": "PT Communication Cable Systems Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CDIA",
+      "company_name": "PT Chandra Daya Investasi TBK.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CEKA",
+      "company_name": "PT Wilmar Cahaya Indonesia Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CENT",
+      "company_name": "PT Centratama Telekomunikasi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CFIN",
+      "company_name": "PT. Clipan Finance Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CGAS",
+      "company_name": "PT Citra Nusantara Gemilang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CHEK",
+      "company_name": "PT Diastika Biotekindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CHEM",
+      "company_name": "PT Chemstar Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CHIP",
+      "company_name": "PT Pelita Teknologi Global Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CINT",
+      "company_name": "PT Chitose Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CITA",
+      "company_name": "PT Cita Mineral Investindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CITY",
+      "company_name": "PT Natura City Developments Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CLAY",
+      "company_name": "PT Citra Putra Realty Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CLEO",
+      "company_name": "PT Sariguna Primatirta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CLPI",
+      "company_name": "PT Colorpak Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CMNP",
+      "company_name": "PT Citra Marga Nusaphala Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CMNT",
+      "company_name": "PT Cemindo Gemilang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CMPP",
+      "company_name": "PT AirAsia Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CMRY",
+      "company_name": "PT Cisarua Mountain Dairy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CNKO",
+      "company_name": "PT Exploitasi Energi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CNMA",
+      "company_name": "PT Nusantara Sejahtera Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "COAL",
+      "company_name": "PT Black Diamond Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "COCO",
+      "company_name": "PT Wahana Interfood Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "COIN",
+      "company_name": "PT Indokripto Koin Semesta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CPIN",
+      "company_name": "PT Charoen Pokphand Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CPRO",
+      "company_name": "PT Central Proteina Prima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CRAB",
+      "company_name": "PT Toba Surimi Industries Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CRSN",
+      "company_name": "PT Carsurin Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CSAP",
+      "company_name": "PT Catur Sentosa Adiprana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CSIS",
+      "company_name": "PT Cahayasakti Investindo Sukses Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CSMI",
+      "company_name": "PT Cipta Selera Murni Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CSRA",
+      "company_name": "PT Cisadane Sawit Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CTBN",
+      "company_name": "PT Citra Tubindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CTRA",
+      "company_name": "PT Ciputra Development Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CTTH",
+      "company_name": "PT Citatah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CUAN",
+      "company_name": "PT Petrindo Jaya Kreasi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "CYBR",
+      "company_name": "PT ITSEC Asia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DAAZ",
+      "company_name": "PT Daaz Bara Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DADA",
+      "company_name": "PT Diamond Citra Propertindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DART",
+      "company_name": "PT Duta Anggada Realty Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DATA",
+      "company_name": "PT Remala Abadi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DAYA",
+      "company_name": "PT Duta Intidaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DCII",
+      "company_name": "PT DCI Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DEFI",
+      "company_name": "PT Danasupra Erapacific Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DEPO",
+      "company_name": "PT Caturkarda Depo Bangunan Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DEWA",
+      "company_name": "PT Darma Henwa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DEWI",
+      "company_name": "PT Dewi Shri Farmindo Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DFAM",
+      "company_name": "PT Dafam Property Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DGIK",
+      "company_name": "PT Nusa Konstruksi Enjiniring Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DGNS",
+      "company_name": "PT Diagnos Laboratorium Utama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DGWG",
+      "company_name": "PT Delta Giri Wacana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DIGI",
+      "company_name": "PT Arkadia Digital Media Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DILD",
+      "company_name": "PT Intiland Development Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DIVA",
+      "company_name": "PT Distribusi Voucher Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DKFT",
+      "company_name": "PT Central Omega Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DKHH",
+      "company_name": "PT Cipta Sarana Medika Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DLTA",
+      "company_name": "PT Delta Djakarta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DMAS",
+      "company_name": "PT Puradelta Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DMMX",
+      "company_name": "PT Digital Mediatama Maxima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DMND",
+      "company_name": "PT Diamond Food Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DNAR",
+      "company_name": "PT Bank Oke Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DNET",
+      "company_name": "PT Indoritel Makmur Internasional Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DOID",
+      "company_name": "PT Buma Internasional Grup Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DOOH",
+      "company_name": "PT Era Media Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DOSS",
+      "company_name": "PT Global Sukses Digital Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DPNS",
+      "company_name": "PT Duta Pertiwi Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DPUM",
+      "company_name": "PT Dua Putra Utama Makmur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DRMA",
+      "company_name": "PT Dharma Polimetal Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DSFI",
+      "company_name": "PT Dharma Samudera Fishing Industries Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DSNG",
+      "company_name": "PT Dharma Satya Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DSSA",
+      "company_name": "PT Dian Swastatika Sentosa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DUTI",
+      "company_name": "PT Duta Pertiwi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DVLA",
+      "company_name": "PT Darya-Varia Laboratoria Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DWGL",
+      "company_name": "PT Dwi Guna Laksana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "DYAN",
+      "company_name": "PT Dyandra Media International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EAST",
+      "company_name": "PT Eastparc Hotel Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ECII",
+      "company_name": "PT Electronic City Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EDGE",
+      "company_name": "PT Indointernet Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EKAD",
+      "company_name": "PT Ekadharma International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ELIT",
+      "company_name": "PT Data Sinergitama Jaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ELPI",
+      "company_name": "PT Pelayaran Nasional Ekalya Purnamasari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ELSA",
+      "company_name": "PT Elnusa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ELTY",
+      "company_name": "PT Bakrieland Development Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EMAS",
+      "company_name": "PT Merdeka Gold Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EMDE",
+      "company_name": "PT Megapolitan Developments Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EMTK",
+      "company_name": "PT Elang Mahkota Teknologi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ENAK",
+      "company_name": "PT Champ Resto Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ENRG",
+      "company_name": "PT Energi Mega Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ENZO",
+      "company_name": "PT Morenzo Abadi Perkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EPAC",
+      "company_name": "PT Megalestari Epack Sentosaraya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EPMT",
+      "company_name": "PT Enseval Putera Megatrading Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ERAA",
+      "company_name": "PT Erajaya Swasembada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ERAL",
+      "company_name": "PT Sinar Eka Selaras Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ERTX",
+      "company_name": "PT Eratex Djaja Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ESIP",
+      "company_name": "PT Sinergi Inti Plastindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ESSA",
+      "company_name": "PT ESSA Industries Indonesia Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ESTA",
+      "company_name": "PT Esta Multi Usaha Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ESTI",
+      "company_name": "PT Ever Shine Tex Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EURO",
+      "company_name": "PT Estee Gold Feet Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "EXCL",
+      "company_name": "PT XLSMART Telecom Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FAPA",
+      "company_name": "PT FAP Agri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FAST",
+      "company_name": "PT Fast Food Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FASW",
+      "company_name": "PT Fajar Surya Wisesa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FILM",
+      "company_name": "PT.MD Entertainment Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FIMP",
+      "company_name": "PT Fimperkasa Utama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FIRE",
+      "company_name": "PT Alfa Energi Investama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FISH",
+      "company_name": "PT FKS Multi Agro Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FITT",
+      "company_name": "PT Hotel Fitra International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FLMC",
+      "company_name": "PT Falmaco Nonwoven Industri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FMII",
+      "company_name": "PT Fortune Mate Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FOLK",
+      "company_name": "PT Multi Garam Utama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FOOD",
+      "company_name": "PT Sentra Food Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FORE",
+      "company_name": "PT Fore Kopi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FORU",
+      "company_name": "PT Fortune Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FPNI",
+      "company_name": "PT Lotte Chemical Titan Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FUJI",
+      "company_name": "PT Fuji Finance Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FUTR",
+      "company_name": "PT Lini Imaji Kreasi Ekosistem Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "FWCT",
+      "company_name": "PT Wijaya Cahaya Timber Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GDST",
+      "company_name": "PT Gunawan Dianjaya Steel Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GDYR",
+      "company_name": "PT Goodyear Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GEMA",
+      "company_name": "PT Gema Grahasarana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GEMS",
+      "company_name": "PT Golden Energy Mines Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GGRM",
+      "company_name": "PT Gudang Garam Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GGRP",
+      "company_name": "PT Gunung Raja Paksi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GHON",
+      "company_name": "PT Gihon Telekomunikasi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GIAA",
+      "company_name": "PT. Garuda Indonesia (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GJTL",
+      "company_name": "PT. Gajah Tunggal Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GLOB",
+      "company_name": "PT Globe Kita Terang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GLVA",
+      "company_name": "PT Galva Technologies Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GMFI",
+      "company_name": "PT Garuda Maintenance Facility Aero Asia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GMTD",
+      "company_name": "PT Gowa Makassar Tourism Development Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GOLD",
+      "company_name": "PT Visi Telekomunikasi Infrastruktur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GOLF",
+      "company_name": "PT Intra Golflink Resorts Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GOOD",
+      "company_name": "PT Garudafood Putra Putri Jaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GOTO",
+      "company_name": "PT GoTo Gojek Tokopedia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GPRA",
+      "company_name": "PT Perdana Gapuraprima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GPSO",
+      "company_name": "PT Geoprima Solusi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GRIA",
+      "company_name": "PT Ingria Pratama Capitalindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GRPH",
+      "company_name": "PT Griptha Putra Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GRPM",
+      "company_name": "PT Graha Prima Mentari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GSMF",
+      "company_name": "PT Equity Development Investment Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GTBO",
+      "company_name": "PT Garda Tujuh Buana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GTRA",
+      "company_name": "PT Grahaprima Suksesmandiri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GTSI",
+      "company_name": "PT GTS Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GULA",
+      "company_name": "PT Aman Agrindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GUNA",
+      "company_name": "PT Gunanusa Eramandiri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GWSA",
+      "company_name": "PT Greenwood Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "GZCO",
+      "company_name": "PT Gozco Plantations Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HADE",
+      "company_name": "PT Himalaya Energi Perkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HAIS",
+      "company_name": "PT Hasnur Internasional Shipping Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HAJJ",
+      "company_name": "PT Arsy Buana Travelindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HALO",
+      "company_name": "PT Haloni Jane Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HATM",
+      "company_name": "PT Habco Trans Maritima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HBAT",
+      "company_name": "PT Minahasa Membangun Hebat Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HDFA",
+      "company_name": "PT Radana Bhaskara Finance Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HDIT",
+      "company_name": "PT Hensel Davest Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HEAL",
+      "company_name": "PT Medikaloka Hermina Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HELI",
+      "company_name": "PT Jaya Trishindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HERO",
+      "company_name": "PT DFI Retail Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HEXA",
+      "company_name": "PT Hexindo Adiperkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HGII",
+      "company_name": "PT Hero Global Investment Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HILL",
+      "company_name": "PT Hillcon Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HITS",
+      "company_name": "PT Humpuss Intermoda Transportasi Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HMSP",
+      "company_name": "PT Hanjaya Mandala Sampoerna Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HOKI",
+      "company_name": "PT Buyung Poetra Sembada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HOMI",
+      "company_name": "PT Grand House Mulia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HOPE",
+      "company_name": "PT Harapan Duta Pertiwi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HRME",
+      "company_name": "PT Menteng Heritage Realty Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HRTA",
+      "company_name": "PT Hartadinata Abadi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HRUM",
+      "company_name": "PT Harum Energy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HUMI",
+      "company_name": "PT Humpuss Maritim Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "HYGN",
+      "company_name": "PT Ecocare Indo Pasifik Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IATA",
+      "company_name": "PT MNC Energy Investments Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IBFN",
+      "company_name": "PT Intan Baru Prana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IBOS",
+      "company_name": "PT Indo Boga Sukses Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IBST",
+      "company_name": "PT Inti Bangun Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ICBP",
+      "company_name": "PT Indofood CBP Sukses Makmur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ICON",
+      "company_name": "PT Island Concepts Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IDEA",
+      "company_name": "PT Idea Indonesia Akademi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IDPR",
+      "company_name": "PT Indonesia Pondasi Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IFII",
+      "company_name": "PT Indonesia Fibreboard Industry Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IFSH",
+      "company_name": "PT Ifishdeco Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IGAR",
+      "company_name": "PT Champion Pacific Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IKAI",
+      "company_name": "PT Intikeramik Alamasri Industri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IKAN",
+      "company_name": "PT Era Mandiri Cemerlang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IKBI",
+      "company_name": "PT Sumi Indo Kabel Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IKPM",
+      "company_name": "PT Ikapharmindo Putramas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IMAS",
+      "company_name": "PT Indomobil Sukses Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IMJS",
+      "company_name": "PT Indomobil Multi Jasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IMPC",
+      "company_name": "PT Impack Pratama Industri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INAF",
+      "company_name": "PT Indofarma Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INAI",
+      "company_name": "PT Indal Aluminium Industry Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INCF",
+      "company_name": "PT Indo Komoditi Korpora Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INCI",
+      "company_name": "PT Intanwijaya Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INCO",
+      "company_name": "PT Vale Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INDF",
+      "company_name": "PT Indofood Sukses Makmur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INDO",
+      "company_name": "PT Royalindo Investa Wijaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INDR",
+      "company_name": "PT. Indo-Rama Synthetics Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INDS",
+      "company_name": "PT Indospring Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INDX",
+      "company_name": "PT Tanah Laut Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INDY",
+      "company_name": "PT. Indika Energy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INET",
+      "company_name": "PT Sinergi Inti Andalan Prima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INKP",
+      "company_name": "PT Indah Kiat Pulp & Paper Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INOV",
+      "company_name": "PT Inocycle Technology Group Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INPC",
+      "company_name": "PT Bank Artha Graha Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INPP",
+      "company_name": "PT Indonesian Paradise Property Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INPS",
+      "company_name": "PT Indah Prakasa Sentosa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INRU",
+      "company_name": "PT Toba Pulp Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INTA",
+      "company_name": "PT Intraco Penta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INTD",
+      "company_name": "PT Inter Delta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "INTP",
+      "company_name": "PT Indocement Tunggal Prakarsa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IOTF",
+      "company_name": "PT Sumber Sinergi Makmur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IPAC",
+      "company_name": "PT Era Graharealty Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IPCC",
+      "company_name": "PT Indonesia Kendaraan Terminal Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IPCM",
+      "company_name": "PT Jasa Armada Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IPOL",
+      "company_name": "PT Indopoly Swakarsa Industry Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IPPE",
+      "company_name": "PT Indo Pureco Pratama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IPTV",
+      "company_name": "PT MNC Vision Networks Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IRRA",
+      "company_name": "PT Itama Ranoraya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "IRSX",
+      "company_name": "PT Folago Global Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ISAP",
+      "company_name": "PT Isra Presisi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ISAT",
+      "company_name": "PT Indosat Ooredoo Hutchison Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ISEA",
+      "company_name": "PT Indo American Seafoods Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ISSP",
+      "company_name": "PT Steel Pipe Industry of Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ITIC",
+      "company_name": "PT Indonesian Tobacco Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ITMA",
+      "company_name": "PT Sumber Energi Andalan Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ITMG",
+      "company_name": "PT Indo Tambangraya Megah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JARR",
+      "company_name": "PT Jhonlin Agro Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JAST",
+      "company_name": "PT. Jasnita Telekomindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JATI",
+      "company_name": "PT Informasi Teknologi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JAWA",
+      "company_name": "PT Jaya Agra Wattie Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JAYA",
+      "company_name": "PT Armada Berjaya Trans Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JECC",
+      "company_name": "PT Jembo Cable Company Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JGLE",
+      "company_name": "PT Graha Andrasentra Propertindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JIHD",
+      "company_name": "PT Jakarta International Hotels & Development Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JKON",
+      "company_name": "PT Jaya Konstruksi Manggala Pratama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JMAS",
+      "company_name": "PT Asuransi Jiwa Syariah Jasa Mitra Abadi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JPFA",
+      "company_name": "PT Japfa Comfeed Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JRPT",
+      "company_name": "PT Jaya Real Property, Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JSMR",
+      "company_name": "PT Jasa Marga (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JSPT",
+      "company_name": "PT Jakarta Setiabudi Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "JTPE",
+      "company_name": "PT Jasuindo Tiga Perkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KAEF",
+      "company_name": "PT Kimia Farma Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KAQI",
+      "company_name": "PT Jantra Grupo Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KARW",
+      "company_name": "PT Meratus Jasa Prima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KBAG",
+      "company_name": "PT Karya Bersama Anugerah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KBLI",
+      "company_name": "PT KMI Wire and Cable Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KBLM",
+      "company_name": "PT Kabelindo Murni Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KBLV",
+      "company_name": "PT First Media Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KDSI",
+      "company_name": "PT Kedawung Setia Industrial Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KDTN",
+      "company_name": "PT Puri Sentul Permai Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KEEN",
+      "company_name": "PT Kencana Energi Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KEJU",
+      "company_name": "PT Mulia Boga Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KETR",
+      "company_name": "PT Ketrosden Triasmitra",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KIAS",
+      "company_name": "PT Keramika Indonesia Assosiasi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KICI",
+      "company_name": "PT Kedaung Indah Can Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KIJA",
+      "company_name": "PT Kawasan Industri Jababeka Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KING",
+      "company_name": "PT Hoffmen Cleanindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KINO",
+      "company_name": "PT Kino Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KIOS",
+      "company_name": "PT Kioson Komersial Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KJEN",
+      "company_name": "PT Krida Jaringan Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KKES",
+      "company_name": "PT Kusuma Kemindo Sentosa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KKGI",
+      "company_name": "PT Resource Alam Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KLAS",
+      "company_name": "PT Pelayaran Kurnia Lautan Semesta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KLBF",
+      "company_name": "PT Kalbe Farma Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KLIN",
+      "company_name": "PT Klinko Karya Imaji Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KMDS",
+      "company_name": "PT Kurniamitra Duta Sentosa, Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KMTR",
+      "company_name": "PT Kirana Megatara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KOBX",
+      "company_name": "PT Kobexindo Tractors Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KOCI",
+      "company_name": "PT Kokoh Exa Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KOIN",
+      "company_name": "PT Kokoh Inti Arebama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KOKA",
+      "company_name": "PT Koka Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KONI",
+      "company_name": "PT Perdana Bangun Pusaka Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KOPI",
+      "company_name": "PT Mitra Energi Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KOTA",
+      "company_name": "PT DMS Propertindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KPIG",
+      "company_name": "PT MNC Tourism Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KRAS",
+      "company_name": "PT Krakatau Steel (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KREN",
+      "company_name": "PT Quantum Clovera Investama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KRYA",
+      "company_name": "PT Bangun Karya Perkasa Jaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KSIX",
+      "company_name": "PT Kentanix Supra International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "KUAS",
+      "company_name": "PT Ace Oldfields Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LABA",
+      "company_name": "PT Green Power Group Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LABS",
+      "company_name": "PT UBC Medical Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LAJU",
+      "company_name": "PT Jasa Berdikari Logistics Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LAND",
+      "company_name": "PT Trimitra Propertindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LAPD",
+      "company_name": "PT Leyand International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LCKM",
+      "company_name": "PT LCK Global Kedaton Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LEAD",
+      "company_name": "PT Logindo Samudramakmur Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LFLO",
+      "company_name": "PT Imago Mulia Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LIFE",
+      "company_name": "PT MSIG Life Insurance Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LINK",
+      "company_name": "PT Link Net Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LION",
+      "company_name": "PT Lion Metal Works Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LIVE",
+      "company_name": "PT Homeco Victoria Makmur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LMAX",
+      "company_name": "PT Lupromax Pelumas Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LMPI",
+      "company_name": "PT Langgeng Makmur Industri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LMSH",
+      "company_name": "PT Lionmesh Prima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LOPI",
+      "company_name": "PT Logisticsplus International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LPCK",
+      "company_name": "PT Lippo Cikarang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LPGI",
+      "company_name": "PT Lippo General Insurance Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LPIN",
+      "company_name": "PT Multi Prima Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LPKR",
+      "company_name": "PT Lippo Karawaci Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LPLI",
+      "company_name": "PT Star Pacific Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LPPF",
+      "company_name": "PT Matahari Department Store Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LPPS",
+      "company_name": "PT Lenox Pasifik Investama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LRNA",
+      "company_name": "PT Eka Sari Lorena Transport Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LSIP",
+      "company_name": "PT Perusahaan Perkebunan London Sumatra Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LTLS",
+      "company_name": "PT Lautan Luas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LUCK",
+      "company_name": "PT Sentral Mitra Informatika Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "LUCY",
+      "company_name": "PT Lima Dua Lima Tiga Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MAHA",
+      "company_name": "PT Mandiri Herindo Adiperkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MAIN",
+      "company_name": "PT Malindo Feedmill Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MANG",
+      "company_name": "PT Manggung Polahraya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MAPA",
+      "company_name": "PT Map Aktif Adiperkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MAPB",
+      "company_name": "PT Map Boga Adiperkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MAPI",
+      "company_name": "PT. Mitra Adiperkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MARI",
+      "company_name": "PT Mahaka Radio Integra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MARK",
+      "company_name": "PT Mark Dynamics Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MASB",
+      "company_name": "PT Bank Multiarta Sentosa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MAXI",
+      "company_name": "PT Maxindo Karya Anugerah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MAYA",
+      "company_name": "PT Bank Mayapada Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MBAP",
+      "company_name": "PT Mitrabara Adiperdana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MBMA",
+      "company_name": "PT Merdeka Battery Materials Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MBSS",
+      "company_name": "PT Mitrabahtera Segara Sejati Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MBTO",
+      "company_name": "PT Martina Berto Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MCAS",
+      "company_name": "PT M Cash Integrasi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MCOL",
+      "company_name": "PT Prima Andalan Mandiri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MCOR",
+      "company_name": "PT Bank China Construction Bank Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MDIA",
+      "company_name": "PT Intermedia Capital Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MDIY",
+      "company_name": "PT Daya Intiguna Yasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MDKA",
+      "company_name": "PT Merdeka Copper Gold Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MDKI",
+      "company_name": "PT Emdeki Utama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MDLA",
+      "company_name": "PT Medela Potentia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MDLN",
+      "company_name": "PT Modernland Realty Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MDRN",
+      "company_name": "PT Modern Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MEDC",
+      "company_name": "PT Medco Energi Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MEDS",
+      "company_name": "PT Hetzer Medical Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MEGA",
+      "company_name": "PT Bank Mega Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MEJA",
+      "company_name": "PT Harta Djaya Karya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MENN",
+      "company_name": "PT Menn Teknologi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MERI",
+      "company_name": "PT Merry Riana Edukasi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MERK",
+      "company_name": "PT Merck Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MFMI",
+      "company_name": "PT Multifiling Mitra Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MGLV",
+      "company_name": "PT Panca Anugrah Wisesa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MGNA",
+      "company_name": "PT Magna Investama Mandiri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MGRO",
+      "company_name": "PT Mahkota Group Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MHKI",
+      "company_name": "PT Multi Hanna Kreasindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MICE",
+      "company_name": "PT Multi Indocitra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MIDI",
+      "company_name": "PT Midi Utama Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MIKA",
+      "company_name": "PT Mitra Keluarga Karyasehat Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MINA",
+      "company_name": "PT Sanurhasta Mitra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MINE",
+      "company_name": "PT SINAR TERANG MANDIRI Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MIRA",
+      "company_name": "PT Mitra International Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MITI",
+      "company_name": "PT Mitra Investindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MKAP",
+      "company_name": "PT Multikarya Asia Pasifik Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MKNT",
+      "company_name": "PT Mitra Komunikasi Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MKPI",
+      "company_name": "PT Metropolitan Kentjana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MKTR",
+      "company_name": "PT Menthobi Karyatama Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MLBI",
+      "company_name": "PT Multi Bintang Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MLIA",
+      "company_name": "PT Mulia Industrindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MLPL",
+      "company_name": "PT Multipolar Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MLPT",
+      "company_name": "PT Multipolar Technology Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MMIX",
+      "company_name": "PT Multi Medika Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MMLP",
+      "company_name": "PT Mega Manunggal Property Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MNCN",
+      "company_name": "PT. Media Nusantara Citra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MOLI",
+      "company_name": "PT Madusari Murni Indah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MORA",
+      "company_name": "PT Mora Telematika Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MPIX",
+      "company_name": "PT Mitra Pedagang Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MPMX",
+      "company_name": "PT Mitra Pinasthika Mustika Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MPOW",
+      "company_name": "PT Megapower Makmur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MPPA",
+      "company_name": "PT Matahari Putra Prima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MPRO",
+      "company_name": "PT Maha Properti Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MPXL",
+      "company_name": "PT MPX Logistics International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MRAT",
+      "company_name": "PT Mustika Ratu Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MREI",
+      "company_name": "PT Maskapai Reasuransi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MSIE",
+      "company_name": "PT Multisarana Intan Eduka Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MSIN",
+      "company_name": "PT MNC Digital Entertainment Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MSJA",
+      "company_name": "PT Multi Spunindo Jaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MSKY",
+      "company_name": "PT MNC Sky Vision Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MSTI",
+      "company_name": "PT Mastersystem Infotama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MTDL",
+      "company_name": "PT Metrodata Electronics Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MTEL",
+      "company_name": "PT Dayamitra Telekomunikasi Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MTFN",
+      "company_name": "PT Capitalinc Investment Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MTLA",
+      "company_name": "PT Metropolitan Land Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MTMH",
+      "company_name": "PT Murni Sadar Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MTPS",
+      "company_name": "PT Meta Epsi Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MTSM",
+      "company_name": "PT Metro Realty Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MTWI",
+      "company_name": "PT Malacca Trust Wuwungan Insurance Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MUTU",
+      "company_name": "PT Mutuagung Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MYOH",
+      "company_name": "PT Samindo Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MYOR",
+      "company_name": "PT Mayora Indah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "MYTX",
+      "company_name": "PT Asia Pacific Investama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NAIK",
+      "company_name": "PT Adiwarna Anugerah Abadi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NANO",
+      "company_name": "PT Nanotech Indonesia Global Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NASA",
+      "company_name": "PT Andalan Perkasa Abadi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NASI",
+      "company_name": "PT Wahana Inti Makmur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NATO",
+      "company_name": "PT Surya Permata Andalan Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NAYZ",
+      "company_name": "PT Hassana Boga Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NCKL",
+      "company_name": "PT Trimegah Bangun Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NELY",
+      "company_name": "PT Pelayaran Nelly Dwi Putri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NEST",
+      "company_name": "PT Esta Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NETV",
+      "company_name": "PT MDTV Media Technologies Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NFCX",
+      "company_name": "PT NFC Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NICE",
+      "company_name": "PT Adhi Kartiko Pratama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NICK",
+      "company_name": "PT Charnic Capital Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NICL",
+      "company_name": "PT PAM Mineral Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NIKL",
+      "company_name": "PT Pelat Timah Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NINE",
+      "company_name": "PT Techno9 Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NIRO",
+      "company_name": "PT City Retail Developments Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NISP",
+      "company_name": "PT Bank OCBC NISP Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NOBU",
+      "company_name": "PT Bank Nationalnobu Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NPGF",
+      "company_name": "PT Nusa Palapa Gemilang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NRCA",
+      "company_name": "PT Nusa Raya Cipta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NSSS",
+      "company_name": "PT Nusantara Sawit Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NTBK",
+      "company_name": "PT Nusatama Berkah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "NZIA",
+      "company_name": "PT Nusantara Almazia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "OASA",
+      "company_name": "PT Maharaksa Biru Energi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "OBAT",
+      "company_name": "PT Brigit Biofarmaka Technologi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "OBMD",
+      "company_name": "PT OBM Drilchem Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "OILS",
+      "company_name": "PT Indo Oil Perkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "OKAS",
+      "company_name": "PT Ancora Indonesia Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "OLIV",
+      "company_name": "PT Oscar Mitra Sukses Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "OMED",
+      "company_name": "PT Jayamas Medica Industri Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "OMRE",
+      "company_name": "PT Indonesia Prima Property Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "OPMS",
+      "company_name": "PT Optima Prima Metal Sinergi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PACK",
+      "company_name": "PT Abadi Nusantara Hijau Investama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PADA",
+      "company_name": "PT Personel Alih Daya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PADI",
+      "company_name": "PT Minna Padi Investama Sekuritas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PALM",
+      "company_name": "PT Provident Investasi Bersama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PAMG",
+      "company_name": "PT Bima Sakti Pertiwi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PANI",
+      "company_name": "PT Pantai Indah Kapuk Dua Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PANR",
+      "company_name": "PT Panorama Sentrawisata Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PANS",
+      "company_name": "PT Panin Sekuritas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PART",
+      "company_name": "PT Cipta Perdana Lancar Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PBID",
+      "company_name": "PT Panca Budi Idaman Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PBRX",
+      "company_name": "PT Pan Brothers Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PBSA",
+      "company_name": "PT Paramita Bangun Sarana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PCAR",
+      "company_name": "PT Prima Cakrawala Abadi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PDES",
+      "company_name": "PT Destinasi Tirta Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PDPP",
+      "company_name": "PT Primadaya Plastisindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PEGE",
+      "company_name": "PT Panca Global Kapital Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PEHA",
+      "company_name": "PT Phapros Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PEVE",
+      "company_name": "PT. Penta Valent Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PGAS",
+      "company_name": "PT Perusahaan Gas Negara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PGEO",
+      "company_name": "PT Pertamina Geothermal Energy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PGJO",
+      "company_name": "PT Bahtera Bumi Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PGLI",
+      "company_name": "PT Pembangunan Graha Lestari Indah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PGUN",
+      "company_name": "PT Pradiksi Gunatama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PICO",
+      "company_name": "PT Pelangi Indah Canindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PIPA",
+      "company_name": "PT. Multi Makmur Lemindo",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PJAA",
+      "company_name": "PT Pembangunan Jaya Ancol Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PJHB",
+      "company_name": "PT Pelayaran Jaya Hidup Baru TBK",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PKPK",
+      "company_name": "PT Paragon Karya Perkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PLAN",
+      "company_name": "PT Planet Properindo Jaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PLIN",
+      "company_name": "PT Plaza Indonesia Realty Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PMJS",
+      "company_name": "PT Putra Mandiri Jembar Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PMMP",
+      "company_name": "PT Panca Mitra Multiperdana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PMUI",
+      "company_name": "PT Prima Multi Usaha Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PNBN",
+      "company_name": "PT Bank Pan Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PNBS",
+      "company_name": "PT Bank Panin Dubai Syariah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PNGO",
+      "company_name": "PT PINAGO UTAMA Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PNIN",
+      "company_name": "PT Paninvest Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PNLF",
+      "company_name": "PT Panin Financial Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PNSE",
+      "company_name": "PT Pudjiadi and Sons Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "POLA",
+      "company_name": "PT Pool Advista Finance Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "POLI",
+      "company_name": "PT Pollux Hotels Group Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "POLU",
+      "company_name": "PT Golden Flower Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "POLY",
+      "company_name": "PT Asia Pacific Fibers Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PORT",
+      "company_name": "PT Nusantara Pelabuhan Handal Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "POWR",
+      "company_name": "PT Cikarang Listrindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PPGL",
+      "company_name": "PT Prima Globalindo Logistik Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PPRE",
+      "company_name": "PT PP Presisi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PPRI",
+      "company_name": "PT Paperocks Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PPRO",
+      "company_name": "PT Pembangunan Perumahan Properti Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PRAY",
+      "company_name": "PT Famon Awal Bros Sedaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PRDA",
+      "company_name": "PT Prodia Widyahusada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PRIM",
+      "company_name": "PT Royal Prima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PSAB",
+      "company_name": "PT J Resources Asia Pasifik Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PSAT",
+      "company_name": "PT Pancaran Samudera Transport Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PSDN",
+      "company_name": "PT Prasidha Aneka Niaga Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PSGO",
+      "company_name": "PT Palma Serasih Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PSKT",
+      "company_name": "PT Red Planet Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PSSI",
+      "company_name": "PT IMC Pelita Logistik Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTBA",
+      "company_name": "PT Bukit Asam (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTDU",
+      "company_name": "PT Djasa Ubersakti Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTIS",
+      "company_name": "PT Indo Straits Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTMP",
+      "company_name": "PT Mitra Pack Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTMR",
+      "company_name": "PT Master Print Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTPP",
+      "company_name": "PT PP (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTPS",
+      "company_name": "PT Pulau Subur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTPW",
+      "company_name": "PT Pratama Widya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTRO",
+      "company_name": "PT Petrosea Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTSN",
+      "company_name": "PT Sat Nusapersada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PTSP",
+      "company_name": "PT Pioneerindo Gourmet International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PUDP",
+      "company_name": "PT Pudjiadi Prestige Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PURA",
+      "company_name": "PT Putra Rajawali Kencana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PURI",
+      "company_name": "PT Puri Global Sukses Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PWON",
+      "company_name": "PT Pakuwon Jati Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PYFA",
+      "company_name": "PT Pyridam Farma Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "PZZA",
+      "company_name": "PT Sarimelati Kencana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RAAM",
+      "company_name": "PT Tripar Multivision Plus Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RAFI",
+      "company_name": "PT Sari Kreasi Boga Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RAJA",
+      "company_name": "PT Rukun Raharja Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RALS",
+      "company_name": "PT Ramayana Lestari Sentosa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RANC",
+      "company_name": "PT Supra Boga Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RATU",
+      "company_name": "PT Raharja Energi Cepu Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RBMS",
+      "company_name": "PT Ristia Bintang Mahkotasejati Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RCCC",
+      "company_name": "PT Utama Radar Cahaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RDTX",
+      "company_name": "PT Roda Vivatex Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "REAL",
+      "company_name": "PT Repower Asia Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RELF",
+      "company_name": "PT Graha Mitra Asia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RELI",
+      "company_name": "PT Reliance Sekuritas Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RGAS",
+      "company_name": "PT Kian Santang Muliatama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RICY",
+      "company_name": "PT Ricky Putra Globalindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RIGS",
+      "company_name": "PT Rig Tenders Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RISE",
+      "company_name": "PT Jaya Sukses Makmur Sentosa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RLCO",
+      "company_name": "PT Abadi Lestari Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RMKE",
+      "company_name": "PT RMK Energy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RMKO",
+      "company_name": "PT Royaltama Mulia Kontraktorindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ROCK",
+      "company_name": "PT Rockfields Properti Indonesia Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RODA",
+      "company_name": "PT Pikko Land Development Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RONY",
+      "company_name": "PT Aesler Grup Internasional Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ROTI",
+      "company_name": "PT Nippon Indosari Corpindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RSCH",
+      "company_name": "PT Charlie Hospital Semarang Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RSGK",
+      "company_name": "PT Kedoya Adyaraya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RUIS",
+      "company_name": "PT Radiant Utama Interinsco Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "RUNS",
+      "company_name": "PT Global Sukses Solusi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SAFE",
+      "company_name": "PT Steady Safe Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SAGE",
+      "company_name": "PT Saptausaha Gemilangindah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SAME",
+      "company_name": "PT Sarana Meditama Metropolitan Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SAMF",
+      "company_name": "PT Saraswanti Anugerah Makmur, Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SAPX",
+      "company_name": "PT Satria Antaran Prima Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SATU",
+      "company_name": "PT Kota Satu Properti Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SBMA",
+      "company_name": "PT Surya Biru Murni Acetylene Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SCCO",
+      "company_name": "PT Supreme Cable Manufacturing & Commerce Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SCMA",
+      "company_name": "PT Surya Citra Media Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SCNP",
+      "company_name": "PT Selaras Citra Nusantara Perkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SDMU",
+      "company_name": "PT Sidomulyo Selaras Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SDPC",
+      "company_name": "PT Millennium Pharmacon International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SDRA",
+      "company_name": "PT Bank Woori Saudara Indonesia 1906 Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SEMA",
+      "company_name": "PT Semacom Integrated Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SFAN",
+      "company_name": "PT Surya Fajar Capital Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SGER",
+      "company_name": "PT Sumber Global Energy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SGRO",
+      "company_name": "PT Prime Agri Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SHID",
+      "company_name": "PT Hotel Sahid Jaya International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SHIP",
+      "company_name": "PT Sillo Maritime Perdana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SICO",
+      "company_name": "PT Sigma Energy Compressindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SIDO",
+      "company_name": "PT Industri Jamu dan Farmasi Sido Muncul Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SILO",
+      "company_name": "PT Siloam International Hospitals Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SIMP",
+      "company_name": "PT Salim Ivomas Pratama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SINI",
+      "company_name": "PT Singaraja Putra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SIPD",
+      "company_name": "PT Sreeya Sewu Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SKBM",
+      "company_name": "PT Sekar Bumi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SKLT",
+      "company_name": "PT Sekar Laut Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SKRN",
+      "company_name": "PT Superkrane Mitra Utama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SLIS",
+      "company_name": "PT Gaya Abadi Sempurna Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMAR",
+      "company_name": "PT Sinar Mas Agro Resources and Technology Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMBR",
+      "company_name": "PT Semen Baturaja (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMCB",
+      "company_name": "PT Solusi Bangun Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMDM",
+      "company_name": "PT Suryamas Dutamakmur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMDR",
+      "company_name": "PT Samudera Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMGA",
+      "company_name": "PT Sumber Mineral Global Abadi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMGR",
+      "company_name": "PT Semen Indonesia (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMIL",
+      "company_name": "PT Sarana Mitra Luas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMKL",
+      "company_name": "PT Satyamitra Kemas Lestari Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMKM",
+      "company_name": "PT Sumber Mas Konstruksi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMLE",
+      "company_name": "PT Sinergi Multi Lestarindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMMA",
+      "company_name": "PT Sinar Mas Multiartha Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMMT",
+      "company_name": "PT Golden Eagle Energy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMRA",
+      "company_name": "PT Summarecon Agung Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SMSM",
+      "company_name": "PT Selamat Sempurna Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SNLK",
+      "company_name": "PT Sunter Lakeside Hotel Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SOCI",
+      "company_name": "PT Soechi Lines Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SOFA",
+      "company_name": "PT Boston Furniture Industries Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SOHO",
+      "company_name": "PT Soho Global Health Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SOLA",
+      "company_name": "PT Xolare RCR Energy TBK",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SONA",
+      "company_name": "PT Sona Topas Tourism Industry Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SOSS",
+      "company_name": "PT Shield On Service Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SOTS",
+      "company_name": "PT Satria Mega Kencana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SOUL",
+      "company_name": "PT Mitra Tirta Buwana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SPMA",
+      "company_name": "PT Suparma Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SPRE",
+      "company_name": "PT Soraya Berjaya Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SPTO",
+      "company_name": "PT Surya Pertiwi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SQMI",
+      "company_name": "PT Wilton Makmur Indonesia Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SRAJ",
+      "company_name": "PT Sejahteraraya Anugrahjaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SRSN",
+      "company_name": "PT Indo Acidatama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SRTG",
+      "company_name": "PT Saratoga Investama Sedaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SSIA",
+      "company_name": "PT Surya Semesta Internusa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SSMS",
+      "company_name": "PT Sawit Sumbermas Sarana Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SSTM",
+      "company_name": "PT Sunson Textile Manufacturer Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "STAA",
+      "company_name": "PT Sumber Tani Agung Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "STAR",
+      "company_name": "PT Buana Artha Anugerah Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "STRK",
+      "company_name": "PT Lovina Beach Brewery Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "STTP",
+      "company_name": "PT Siantar Top Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SULI",
+      "company_name": "PT SLJ Global Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SUNI",
+      "company_name": "PT Sunindo Pratama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SUPA",
+      "company_name": "PT Super Bank Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SUPR",
+      "company_name": "PT Solusi Tunas Pratama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SURE",
+      "company_name": "PT Super Energy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SURI",
+      "company_name": "PT Maja Agung Latexindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SWAT",
+      "company_name": "PT Sriwahana Adityakarta Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "SWID",
+      "company_name": "PT Saraswanti Indoland Development Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TALF",
+      "company_name": "PT Tunas Alfin Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TAMA",
+      "company_name": "PT Lancartama Sejati Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TAMU",
+      "company_name": "PT Pelayaran Tamarin Samudra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TAPG",
+      "company_name": "PT Triputra Agro Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TARA",
+      "company_name": "PT Agung Semesta Sejahtera Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TAXI",
+      "company_name": "PT Express Transindo Utama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TAYS",
+      "company_name": "PT Jaya Swarasa Agung Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TBIG",
+      "company_name": "PT Tower Bersama Infrastructure Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TBLA",
+      "company_name": "PT Tunas Baru Lampung Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TBMS",
+      "company_name": "PT Tembaga Mulia Semanan Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TCID",
+      "company_name": "PT. Mandom Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TCPI",
+      "company_name": "PT Transcoal Pacific Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TEBE",
+      "company_name": "PT Dana Brata Luhur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TELE",
+      "company_name": "PT Omni Inovasi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TFAS",
+      "company_name": "PT Telefast Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TFCO",
+      "company_name": "PT Tifico Fiber Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TGKA",
+      "company_name": "PT Tigaraksa Satria Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TGRA",
+      "company_name": "PT. Terregra Asia Energy Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TGUK",
+      "company_name": "PT Platinum Wahab Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TIFA",
+      "company_name": "PT KDB Tifa Finance Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TINS",
+      "company_name": "PT TIMAH Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TIRA",
+      "company_name": "PT Tira Austenite Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TIRT",
+      "company_name": "PT Tirta Mahakam Resources Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TKIM",
+      "company_name": "PT Pabrik Kertas Tjiwi Kimia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TLDN",
+      "company_name": "PT Teladan Prima Agro Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TLKM",
+      "company_name": "Perusahaan Perseroan (Persero) PT Telekomunikasi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TMAS",
+      "company_name": "PT Temas Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TMPO",
+      "company_name": "PT Tempo Inti Media Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TNCA",
+      "company_name": "PT Trimuda Nuansa Citra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TOBA",
+      "company_name": "PT TBS Energi Utama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TOOL",
+      "company_name": "PT Rohartindo Nusantara Luas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TOPS",
+      "company_name": "PT Totalindo Eka Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TOSK",
+      "company_name": "PT Topindo Solusi Komunika Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TOTL",
+      "company_name": "PT Total Bangun Persada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TOTO",
+      "company_name": "PT Surya Toto Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TOWR",
+      "company_name": "PT Sarana Menara Nusantara Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TPIA",
+      "company_name": "PT Chandra Asri Pacific Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TPMA",
+      "company_name": "PT Trans Power Marine Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRGU",
+      "company_name": "PT Cerestar Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRIM",
+      "company_name": "PT Trimegah Sekuritas Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRIN",
+      "company_name": "PT Perintis Triniti Properti Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRIS",
+      "company_name": "PT Trisula International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRJA",
+      "company_name": "PT Transkon Jaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRON",
+      "company_name": "PT Teknologi Karya Digital Nusa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRST",
+      "company_name": "PT Trias Sentosa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRUE",
+      "company_name": "PT Triniti Dinamik Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRUK",
+      "company_name": "PT Guna Timur Raya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TRUS",
+      "company_name": "PT Trust Finance Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TSPC",
+      "company_name": "PT Tempo Scan Pacific Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TUGU",
+      "company_name": "PT Asuransi Tugu Pratama Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "TYRE",
+      "company_name": "PT King Tire Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UANG",
+      "company_name": "PT Pakuan Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UCID",
+      "company_name": "PT Uni-Charm Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UDNG",
+      "company_name": "PT Agro Bahari Nusantara Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UFOE",
+      "company_name": "PT Damai Sejahtera Abadi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ULTJ",
+      "company_name": "PT Ultrajaya Milk Industry & Trading Company Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UNIC",
+      "company_name": "PT Unggul Indah Cahaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UNIQ",
+      "company_name": "PT Ulima Nitra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UNSP",
+      "company_name": "PT Bakrie Sumatera Plantations Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UNTD",
+      "company_name": "PT Terang Dunia Internusa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UNTR",
+      "company_name": "PT United Tractors Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UNVR",
+      "company_name": "PT Unilever Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "URBN",
+      "company_name": "PT Urban Jakarta Propertindo Tbk.",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "UVCR",
+      "company_name": "PT Trimegah Karya Pratama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VAST",
+      "company_name": "PT Vastland Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VERN",
+      "company_name": "PT Verona Indah Pictures Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VICI",
+      "company_name": "PT Victoria Care Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VICO",
+      "company_name": "PT Victoria Investama Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VINS",
+      "company_name": "PT Victoria Insurance Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VISI",
+      "company_name": "PT Satu Visi Putra Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VIVA",
+      "company_name": "PT Visi Media Asia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VKTR",
+      "company_name": "PT VKTR Teknologi Mobilitas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VOKS",
+      "company_name": "PT Voksel Electric Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VRNA",
+      "company_name": "PT Mizuho Leasing Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "VTNY",
+      "company_name": "PT Venteny Fortuna International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WAPO",
+      "company_name": "PT Wahana Pronatural Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WBSA",
+      "company_name": "PT BSA Logistics Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WEGE",
+      "company_name": "PT Wijaya Karya Bangunan Gedung Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WEHA",
+      "company_name": "PT WEHA Transportasi Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WGSH",
+      "company_name": "PT Wira Global Solusi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WICO",
+      "company_name": "Pt Wicaksana Overseas International Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WIDI",
+      "company_name": "PT Widiant Jaya Krenindo Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WIFI",
+      "company_name": "PT Solusi Sinergi Digital Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WIIM",
+      "company_name": "PT Wismilak Inti Makmur Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WIKA",
+      "company_name": "PT Wijaya Karya (Persero) Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WINE",
+      "company_name": "PT HATTEN BALI Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WINR",
+      "company_name": "PT Winner Nusantara Jaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WINS",
+      "company_name": "PT Wintermar Offshore Marine Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WIRG",
+      "company_name": "PT WIR ASIA Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WMPP",
+      "company_name": "PT Widodo Makmur Perkasa Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WMUU",
+      "company_name": "PT Widodo Makmur Unggas Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WOMF",
+      "company_name": "PT Wahana Ottomitra Multiartha Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WOOD",
+      "company_name": "PT Integra Indocabinet Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WOWS",
+      "company_name": "PT Ginting Jaya Energi Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WSBP",
+      "company_name": "PT Waskita Beton Precast Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "WTON",
+      "company_name": "PT Wijaya Karya Beton Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "XCIS",
+      "company_name": "DIRE Ciptadana Properti Ritel Indonesia",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "YELO",
+      "company_name": "PT Yelooo Integra Datanet Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "YOII",
+      "company_name": "PT Asuransi Digital Bersama TBK",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "YPAS",
+      "company_name": "PT Yanaprima Hastapersada Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "YULE",
+      "company_name": "PT Yulie Sekuritas Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "YUPI",
+      "company_name": "PT Yupi Indo Jelly Gum Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ZATA",
+      "company_name": "PT Bersama Zatta Jaya Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ZBRA",
+      "company_name": "PT Dosni Roha Indonesia Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ZINC",
+      "company_name": "PT Kapuas Prima Coal Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ZONE",
+      "company_name": "PT Mega Perintis Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    },
+    {
+      "code": "ZYRX",
+      "company_name": "PT Zyrexindo Mandiri Buana Tbk",
+      "sector": "",
+      "industry": "",
+      "listing_board": "IDX"
+    }
+  ]
+}

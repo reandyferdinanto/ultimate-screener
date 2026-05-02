@@ -8,7 +8,7 @@ export const revalidate = 0;
 
 import { SignalPerformanceModel } from "@/lib/models/SignalPerformance";
 import { StockSignalModel } from "@/lib/models/StockSignal";
-import { findIdxStocksByLookupKeys, loadIdxStocks } from "@/lib/idx-stock-file";
+import { findIdxStocksByLookupKeysAsync, getIdxStocksUniverse } from "@/lib/idx-stock-file";
 
 const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
@@ -333,7 +333,7 @@ export async function GET(req: Request) {
 
   try {
     if (getAll) {
-      const stocks = loadIdxStocks();
+      const stocks = await getIdxStocksUniverse();
       return NextResponse.json({ success: true, data: stocks });
     }
 
@@ -372,7 +372,7 @@ export async function GET(req: Request) {
     const stockLookupKeys = Array.from(new Set(
       activeSignals.flatMap((signal: any) => tickerLookupKeys(signal.ticker))
     ));
-    const latestStocks = findIdxStocksByLookupKeys(stockLookupKeys);
+    const latestStocks = await findIdxStocksByLookupKeysAsync(stockLookupKeys);
     const latestStockByTicker = new Map<string, any>();
     latestStocks.forEach((stock: any) => {
       tickerLookupKeys(stock.ticker).forEach(key => latestStockByTicker.set(key, stock));

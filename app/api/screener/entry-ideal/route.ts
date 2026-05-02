@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadIdxStocks } from "@/lib/idx-stock-file";
+import { getIdxStocksUniverse } from "@/lib/idx-stock-file";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -276,7 +276,8 @@ export async function GET(req: Request) {
   const startedAt = new Date();
 
   try {
-    const stocks: ActiveStock[] = limit ? loadIdxStocks().slice(0, limit) : loadIdxStocks();
+    const universe = await getIdxStocksUniverse();
+    const stocks: ActiveStock[] = limit ? universe.slice(0, limit) : universe;
     const scanResults = await mapWithConcurrency(stocks, concurrency, stock => scanStock(
       stock,
       origin,

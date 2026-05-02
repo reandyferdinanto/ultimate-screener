@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadIdxStocks } from "@/lib/idx-stock-file";
+import { getIdxStocksUniverse } from "@/lib/idx-stock-file";
 import YahooFinance from 'yahoo-finance2';
 
 const yahooFinance = new YahooFinance();
@@ -12,7 +12,7 @@ export async function GET() {
     // Get active stocks. To be efficient, we'll pick a decent sample or focus on liquid ones
     // for this feature, but the request was "all stock database".
     // We'll fetch them all but process in parallel batches.
-    const stocks = loadIdxStocks();
+    const stocks = await getIdxStocksUniverse();
     const tickers = stocks.map(s => s.ticker);
 
     // Yahoo Finance can handle multiple tickers in one quote call

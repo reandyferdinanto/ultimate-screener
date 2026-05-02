@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import YahooFinance from "yahoo-finance2";
-import { loadIdxStocks } from "@/lib/idx-stock-file";
+import { getIdxStocksUniverse } from "@/lib/idx-stock-file";
 
 export type ResearchQuote = {
   date: string;
@@ -714,7 +714,7 @@ export async function scanSimilarWinners(options: { limit?: number | null; concu
     throw new Error("Corpus winner masih kosong. Download beberapa saham pemenang di /research dulu.");
   }
 
-  const universe = loadIdxStocks();
+  const universe = await getIdxStocksUniverse();
   const stocks = typeof options.limit === "number" && options.limit > 0 ? universe.slice(0, options.limit) : universe;
   const periodYears = options.periodYears || 2;
   const concurrency = Math.max(1, Math.min(16, options.concurrency || 6));
