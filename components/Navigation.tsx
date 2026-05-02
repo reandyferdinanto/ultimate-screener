@@ -43,6 +43,10 @@ function SearchIcon(props: IconProps) {
   return <IconBase {...props}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></IconBase>;
 }
 
+function ResearchIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z" /><path d="M8 7h8" /><path d="M8 11h6" /></IconBase>;
+}
+
 function InfoIcon(props: IconProps) {
   return <IconBase {...props}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></IconBase>;
 }
@@ -52,6 +56,7 @@ const NAV_ITEMS = [
   { label: "SCREENER", href: "/screener", icon: ZapIcon },
   { label: "BREAKOUT", href: "/silent-flyer", icon: BreakoutIcon },
   { label: "ANALYSIS", href: "/search", icon: SearchIcon },
+  { label: "RESEARCH", href: "/research", icon: ResearchIcon },
 ];
 
 export default function Navigation() {
@@ -179,7 +184,7 @@ export default function Navigation() {
           .nav-items {
             width: 100%;
             display: grid !important;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 2px !important;
           }
           .nav-link {
