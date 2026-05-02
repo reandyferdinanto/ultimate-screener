@@ -44,6 +44,7 @@ next-env.d.ts
 *.log
 *.png
 .postgres-data/
+ecosystem.config.cjs
 scripts/check_signals*
 scripts/debug*
 scripts/analyze_requested_stocks.js
@@ -61,4 +62,3 @@ data/yfinance-research/*.json
 artifacts/secret-sauce-review/secret-sauce-review-*.json
 artifacts/secret-sauce-review/secret-sauce-walkforward-review-*.json
 artifacts/secret-sauce-walkforward/*.json
-
