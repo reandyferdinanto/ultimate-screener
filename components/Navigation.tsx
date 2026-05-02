@@ -35,6 +35,10 @@ function ZapIcon(props: IconProps) {
   return <IconBase {...props}><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8Z" /></IconBase>;
 }
 
+function BreakoutIcon(props: IconProps) {
+  return <IconBase {...props}><path d="M3 17 9 11l4 4 8-8" /><path d="M14 7h7v7" /></IconBase>;
+}
+
 function SearchIcon(props: IconProps) {
   return <IconBase {...props}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></IconBase>;
 }
@@ -43,14 +47,10 @@ function InfoIcon(props: IconProps) {
   return <IconBase {...props}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></IconBase>;
 }
 
-function BrainCircuitIcon(props: IconProps) {
-  return <IconBase {...props}><path d="M12 5a3 3 0 0 0-5.8 1" /><path d="M12 5a3 3 0 0 1 5.8 1" /><path d="M6.2 6A3 3 0 0 0 5 11.8" /><path d="M17.8 6A3 3 0 0 1 19 11.8" /><path d="M5 11.8A3 3 0 0 0 7.8 17" /><path d="M19 11.8A3 3 0 0 1 16.2 17" /><path d="M7.8 17A3 3 0 0 0 12 19" /><path d="M16.2 17A3 3 0 0 1 12 19" /><path d="M12 5v14" /><path d="M9 9h1" /><path d="M14 9h1" /><path d="M9 15h1" /><path d="M14 15h1" /></IconBase>;
-}
-
 const NAV_ITEMS = [
   { label: "DASHBOARD", href: "/", icon: TerminalIcon },
   { label: "SCREENER", href: "/screener", icon: ZapIcon },
-  { label: "RESEARCH", href: "/research", icon: BrainCircuitIcon },
+  { label: "BREAKOUT", href: "/silent-flyer", icon: BreakoutIcon },
   { label: "ANALYSIS", href: "/search", icon: SearchIcon },
 ];
 

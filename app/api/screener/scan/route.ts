@@ -13,9 +13,11 @@ export async function POST(): Promise<Response> {
   const scanStartedAt = new Date();
   const scriptPath = path.join(process.cwd(), "scripts/scan.js");
   const squeezeScriptPath = path.join(process.cwd(), "scripts/squeeze_divergence_scanner.js");
+  const breakoutScriptPath = path.join(process.cwd(), "scripts/technical_breakout_scanner.js");
+  const updateSignalsPath = path.join(process.cwd(), "scripts/update_signals.js");
 
   return new Promise((resolve) => {
-    exec(`node "${scriptPath}" && node "${squeezeScriptPath}"`, { maxBuffer: 1024 * 1024 * 8 }, (error, stdout) => {
+    exec(`node "${scriptPath}" && node "${squeezeScriptPath}" && node "${breakoutScriptPath}" && node "${updateSignalsPath}"`, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
       isScanning = false;
       const scanCompletedAt = new Date();
       if (error) {
@@ -30,7 +32,7 @@ export async function POST(): Promise<Response> {
         scanStartedAt,
         scanCompletedAt,
         dataSource: "YahooFinance.chart(1d) + YahooFinance.chart(1h aggregated 4h)",
-        latestDataPolicy: "RUN_SCAN fetches fresh Yahoo Finance data for EMA Bounce and Squeeze Divergence before updating screener signals.",
+        latestDataPolicy: "RUN_SCAN fetches fresh Yahoo Finance data, stores only active screener candidates, then evaluates pending signals after D+2.",
         stdout: stdout.split("\n").slice(-12).join("\n")
       }));
     });

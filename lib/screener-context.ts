@@ -1,4 +1,5 @@
 import { connectToDatabase } from "@/lib/db";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { StockSignalModel } from "@/lib/models/StockSignal";
 
 export interface ScreenerSignalContext {
@@ -66,6 +67,7 @@ function deriveSignalCategory(source = "", metadata?: Record<string, unknown>) {
   if (metadata?.category) return String(metadata.category);
   const normalized = source.toUpperCase();
   if (normalized.includes("EMA BOUNCE")) return "EMA_BOUNCE";
+  if (normalized.includes("TECHNICAL BREAKOUT")) return "TECHNICAL_BREAKOUT";
   if (normalized.includes("COOLDOWN")) return "COOLDOWN";
   if (normalized.includes("ARAHUNTER")) return "ARAHUNTER";
   if (normalized.includes("TURNAROUND")) return "TURNAROUND";
@@ -81,6 +83,9 @@ function deriveSignalVector(source = "", metadata?: Record<string, unknown>) {
   if (metadata?.vector) return String(metadata.vector);
   const normalized = source.toUpperCase();
   if (normalized.includes("SQZ_EMA20_EARLY_RELEASE")) return "SQZ_EMA20_EARLY_RELEASE";
+  if (normalized.includes("POWER IGNITION")) return "POWER_IGNITION_BREAKOUT";
+  if (normalized.includes("TIGHT-FLAT")) return "TIGHT_FLAT_ACCUMULATION";
+  if (normalized.includes("WINNER SIMILARITY")) return "WINNER_SIMILARITY_WATCHLIST";
   if (normalized.includes("EMA20_BREAKOUT_RETEST")) return "EMA20_BREAKOUT_RETEST_MOMENTUM";
   if (normalized.includes("EMA9_20")) return "EMA9_20_BULLISH_CROSS";
   if (normalized.includes("RSI")) return "RSI_OVERSOLD_20EMA_RECLAIM";

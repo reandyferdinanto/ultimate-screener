@@ -81,10 +81,29 @@ export default function AdvancedChart({
     isMounted.current = true;
     if (!chartContainerRef.current || data.length === 0) return;
 
-    const bgColor = "#050505";
-    const textColor = "#e0e0e0";
-    const gridColor = "rgba(60, 60, 80, 0.15)";
+    const bgColor = "rgba(5, 8, 12, 0)";
+    const textColor = "rgba(226, 232, 240, 0.82)";
+    const gridColor = "rgba(148, 163, 184, 0.075)";
     const isMobile = window.innerWidth < 768;
+    const compactTitle = (title: string) => {
+      if (!isMobile) return title;
+      const labels: Record<string, string> = {
+        "Screener Entry": "ENTRY",
+        "Entry": "ENTRY",
+        "Entry High": "E↑",
+        "Entry Low": "E↓",
+        "Ideal Buy": "BUY",
+        "Early Exit": "EXIT",
+        "Hard Stop": "SL",
+        "Target 1": "T1",
+        "Target 2": "T2",
+        "Pivot": "",
+        "Resistance": "",
+        "Support": "",
+        "Chandelier Stop": "",
+      };
+      return labels[title] ?? title;
+    };
     const hasSqueezePane = showSqueezeDeluxe;
     const macdPaneRatio = hasSqueezePane ? 0.2 : 0.26;
     const squeezePaneRatio = hasSqueezePane ? 0.22 : 0;
@@ -105,38 +124,42 @@ export default function AdvancedChart({
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: bgColor },
-        textColor: textColor
+        textColor,
+        fontFamily: "var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace",
       },
       grid: {
-        vertLines: { color: gridColor, style: 0 },
-        horzLines: { color: gridColor, style: 0 }
+        vertLines: { color: "rgba(148, 163, 184, 0.045)", style: LineStyle.Dotted },
+        horzLines: { color: gridColor, style: LineStyle.Dotted }
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
           width: 1,
-          color: "rgba(255, 255, 255, 0.3)",
-          style: 3
+          color: "rgba(125, 211, 252, 0.45)",
+          style: LineStyle.Dashed,
+          labelBackgroundColor: "#0f172a",
         },
         horzLine: {
           width: 1,
-          color: "rgba(255, 255, 255, 0.3)",
-          style: 3
+          color: "rgba(125, 211, 252, 0.45)",
+          style: LineStyle.Dashed,
+          labelBackgroundColor: "#0f172a",
         }
       },
       timeScale: {
-        borderColor: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(148, 163, 184, 0.12)",
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: 15,
-        barSpacing: isMobile ? 8 : 12
+        rightOffset: isMobile ? 32 : 78,
+        barSpacing: isMobile ? 8 : 12,
+        minBarSpacing: 4,
       },
       rightPriceScale: {
-        borderColor: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(148, 163, 184, 0.12)",
         textColor: textColor
       },
       leftPriceScale: {
-        borderColor: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(148, 163, 184, 0.12)",
         textColor: textColor
       },
       width: chartContainerRef.current.clientWidth,
@@ -146,12 +169,12 @@ export default function AdvancedChart({
     chartRef.current = chart;
     chart.priceScale("right").applyOptions({
       scaleMargins: { top: 0.02, bottom: priceBottomMargin },
-      borderColor: "rgba(255, 255, 255, 0.1)",
+      borderColor: "rgba(148, 163, 184, 0.12)",
     });
 
     chart.priceScale("left").applyOptions({
       scaleMargins: { top: 0.02, bottom: priceBottomMargin },
-      borderColor: "rgba(255, 255, 255, 0.1)",
+      borderColor: "rgba(148, 163, 184, 0.12)",
     });
 
     if (onLogicalRangeChange) {
@@ -160,31 +183,46 @@ export default function AdvancedChart({
 
     // --- 1. VOLUME ---
     const volumeSeries = chart.addSeries(HistogramSeries, { 
-      color: "#26a69a", priceFormat: { type: "volume" }, priceScaleId: "volume" 
+      color: "rgba(45, 212, 191, 0.22)", priceFormat: { type: "volume" }, priceScaleId: "volume" 
     });
     chart.priceScale("volume").applyOptions({ scaleMargins: { top: volumeTopMargin, bottom: priceBottomMargin } });
     volumeSeries.setData(data.map(d => ({
       time: d.time as UTCTimestamp,
       value: d.volume,
-      color: d.close >= d.open ? "rgba(38, 166, 154, 0.2)" : "rgba(239, 83, 80, 0.2)"
+      color: d.close >= d.open ? "rgba(45, 212, 191, 0.20)" : "rgba(244, 63, 94, 0.18)"
     })));
+
+    const priceAtmosphere = chart.addSeries(AreaSeries, {
+      topColor: "rgba(56, 189, 248, 0.11)",
+      bottomColor: "rgba(15, 23, 42, 0.00)",
+      lineColor: "rgba(56, 189, 248, 0.0)",
+      lineWidth: 1 as LineWidth,
+      lastValueVisible: false,
+      priceLineVisible: false,
+      crosshairMarkerVisible: false,
+    });
+    priceAtmosphere.setData(data.map(d => ({ time: d.time as UTCTimestamp, value: d.close })));
 
     // --- 2. MAIN SERIES (CANDLE / LINE) ---
     const mainSeries = chartType === 'candle'
         ? chart.addSeries(CandlestickSeries, {
-            upColor: "#22c55e",
-            downColor: "#ef4444",
-            borderUpColor: "#22c55e",
-            borderDownColor: "#ef4444",
-            wickUpColor: "#22c55e",
-            wickDownColor: "#ef4444",
+            upColor: "#16c784",
+            downColor: "#f43f5e",
+            borderUpColor: "rgba(52, 211, 153, 0.95)",
+            borderDownColor: "rgba(251, 113, 133, 0.95)",
+            wickUpColor: "rgba(94, 234, 212, 0.85)",
+            wickDownColor: "rgba(251, 113, 133, 0.85)",
+            borderVisible: true,
+            wickVisible: true,
           })
         : chart.addSeries(LineSeries, {
-            color: "rgba(255, 255, 255, 0.9)",
-            lineWidth: 2 as LineWidth,
+            color: "rgba(226, 232, 240, 0.96)",
+            lineWidth: 3 as LineWidth,
             lastValueVisible: true,
             priceLineVisible: true,
-            title: "Price"
+            priceLineColor: "rgba(125, 211, 252, 0.45)",
+            priceLineStyle: LineStyle.Dotted,
+            title: "Price",
         });
 
     if (chartType === 'candle') {
@@ -230,58 +268,58 @@ export default function AdvancedChart({
 
     if (showEMA9) {
         chart.addSeries(LineSeries, {
-            color: "#3b82f6",
+            color: "rgba(96, 165, 250, 0.92)",
             lineWidth: 2 as LineWidth,
             title: "EMA 9",
             lastValueVisible: false,
             priceLineVisible: false,
-            lineStyle: LineStyle.Solid
+            lineStyle: LineStyle.Solid,
         }).setData(sanitizeData(data, 'ema9'));
     }
     if (showEMA10) {
         chart.addSeries(LineSeries, {
-            color: "#10b981",
+            color: "rgba(6, 182, 212, 0.82)",
             lineWidth: 1.5 as LineWidth,
             title: "EMA 10",
             lastValueVisible: false,
-            priceLineVisible: false
+            priceLineVisible: false,
         }).setData(sanitizeData(data, 'ema10'));
     }
     if (showEMA20) {
         chart.addSeries(LineSeries, {
-            color: "#f59e0b",
-            lineWidth: 2 as LineWidth,
+            color: "rgba(245, 158, 11, 0.94)",
+            lineWidth: 3 as LineWidth,
             title: "EMA 20",
             lastValueVisible: false,
-            priceLineVisible: false
+            priceLineVisible: false,
         }).setData(sanitizeData(data, 'ema20'));
     }
     if (showEMA50) {
         chart.addSeries(LineSeries, {
-            color: "#ef4444",
+            color: "rgba(248, 113, 113, 0.78)",
             lineWidth: 2 as LineWidth,
             title: "EMA 50",
             lastValueVisible: false,
-            priceLineVisible: false
+            priceLineVisible: false,
         }).setData(sanitizeData(data, 'ema50'));
     }
     if (showEMA60) {
         chart.addSeries(LineSeries, {
-            color: "#8b5cf6",
+            color: "rgba(167, 139, 250, 0.84)",
             lineWidth: 2 as LineWidth,
             title: "EMA 60",
             lastValueVisible: false,
-            priceLineVisible: false
+            priceLineVisible: false,
         }).setData(sanitizeData(data, 'ema60'));
     }
     if (showEMA200) {
         chart.addSeries(LineSeries, {
-            color: "#ec4899",
+            color: "rgba(244, 114, 182, 0.58)",
             lineWidth: 1.5 as LineWidth,
             title: "EMA 200",
             lastValueVisible: false,
             priceLineVisible: false,
-            lineStyle: LineStyle.Dashed
+            lineStyle: LineStyle.Dashed,
         }).setData(sanitizeData(data, 'ema200'));
     }
 
@@ -321,8 +359,8 @@ export default function AdvancedChart({
         color: "rgba(248, 113, 113, 0.35)",
         lineWidth: 1 as LineWidth,
         lineStyle: LineStyle.Dashed,
-        title: "Chandelier Stop",
-        lastValueVisible: true,
+        title: compactTitle("Chandelier Stop"),
+        lastValueVisible: !isMobile,
         priceLineVisible: false,
       }).setData(chandelierLong);
     }
@@ -338,12 +376,12 @@ export default function AdvancedChart({
 
     // --- 5. BOLLINGER BANDS ---
     if (showBB) {
-        chart.addSeries(LineSeries, { lineWidth: 1 as LineWidth, lastValueVisible: false, priceLineVisible: false, color: "rgba(41, 98, 255, 0.3)", title: "BB Upper" })
+        chart.addSeries(LineSeries, { lineWidth: 1 as LineWidth, lastValueVisible: false, priceLineVisible: false, color: "rgba(148, 163, 184, 0.24)", title: "BB Upper" })
              .setData(data.map(d => ({ time: d.time as UTCTimestamp, value: d.bb?.upper })).filter(v => !!v.value));
-        chart.addSeries(LineSeries, { lineWidth: 1 as LineWidth, lastValueVisible: false, priceLineVisible: false, color: "rgba(41, 98, 255, 0.3)", title: "BB Lower" })
+        chart.addSeries(LineSeries, { lineWidth: 1 as LineWidth, lastValueVisible: false, priceLineVisible: false, color: "rgba(148, 163, 184, 0.24)", title: "BB Lower" })
              .setData(data.map(d => ({ time: d.time as UTCTimestamp, value: d.bb?.lower })).filter(v => !!v.value));
         
-        const bbBack = chart.addSeries(AreaSeries, { topColor: "rgba(41, 98, 255, 0.03)", bottomColor: "rgba(41, 98, 255, 0.03)", lineVisible: false, lastValueVisible: false, priceLineVisible: false });
+        const bbBack = chart.addSeries(AreaSeries, { topColor: "rgba(148, 163, 184, 0.045)", bottomColor: "rgba(15, 23, 42, 0.00)", lineVisible: false, lastValueVisible: false, priceLineVisible: false });
         bbBack.setData(data.map(d => ({ time: d.time as UTCTimestamp, value: d.bb?.upper, baseValue: d.bb?.lower })).filter(v => !!v.value));
     }
 
@@ -387,7 +425,7 @@ export default function AdvancedChart({
             lineStyle: 1,
             title: "VWAP", 
             lastValueVisible: false, 
-            priceLineVisible: false 
+            priceLineVisible: false,
         }).setData(sanitizeData(data, 'vwap'));
     }
 
@@ -411,12 +449,12 @@ export default function AdvancedChart({
           return {
             time: asChartTime(d.time),
             value,
-            color: value >= 0 ? "rgba(38, 166, 154, 0.55)" : "rgba(239, 83, 80, 0.55)",
+            color: value >= 0 ? "rgba(45, 212, 191, 0.48)" : "rgba(244, 63, 94, 0.46)",
           };
         })
       )
     );
-    chart.addSeries(LineSeries, { color: "#2962FF", lineWidth: 1.5 as LineWidth, ...macdScaleOptions })
+    chart.addSeries(LineSeries, { color: "rgba(96, 165, 250, 0.82)", lineWidth: 2 as LineWidth, ...macdScaleOptions })
       .setData(
         compactChartData<LineData<Time>>(
           data.map((d) => {
@@ -425,7 +463,7 @@ export default function AdvancedChart({
           })
         )
       );
-    chart.addSeries(LineSeries, { color: "#FF6D00", lineWidth: 1.5 as LineWidth, ...macdScaleOptions })
+    chart.addSeries(LineSeries, { color: "rgba(251, 146, 60, 0.84)", lineWidth: 2 as LineWidth, ...macdScaleOptions })
       .setData(
         compactChartData<LineData<Time>>(
           data.map((d) => {
@@ -614,12 +652,12 @@ export default function AdvancedChart({
       const lastTime = data[data.length - 1].time;
       const startTime = data[data.length - 20].time;
       const drawPivot = (val: number, color: string, title: string) => {
-        const series = chart.addSeries(LineSeries, { color, lineWidth: 1 as LineWidth, title, lineStyle: 3, lastValueVisible: true, priceLineVisible: false });
+        const series = chart.addSeries(LineSeries, { color, lineWidth: 1 as LineWidth, title: compactTitle(title), lineStyle: 3, lastValueVisible: !isMobile, priceLineVisible: false });
         series.setData([{ time: startTime as UTCTimestamp, value: val }, { time: lastTime as UTCTimestamp, value: val }]);
       };
-      drawPivot(pivots.p, "rgba(255,255,255,0.15)", "P");
-      drawPivot(pivots.r1, "rgba(34, 197, 94, 0.15)", "R1");
-      drawPivot(pivots.s1, "rgba(239, 68, 68, 0.15)", "S1");
+      drawPivot(pivots.p, "rgba(226, 232, 240, 0.18)", "Pivot");
+      drawPivot(pivots.r1, "rgba(45, 212, 191, 0.20)", "Resistance");
+      drawPivot(pivots.s1, "rgba(251, 113, 133, 0.20)", "Support");
     }
 
     // --- 8. EXECUTION RISK PLAN ---
@@ -638,7 +676,7 @@ export default function AdvancedChart({
           color,
           lineWidth: width,
           lineStyle: style,
-          title,
+          title: compactTitle(title),
           lastValueVisible: true,
           priceLineVisible: false,
         }).setData([{ time: startTime, value: price }, { time: endTime, value: price }]);
@@ -648,19 +686,19 @@ export default function AdvancedChart({
       const entryHigh = finiteChartNumber(riskPlan.entryHigh);
       const entryCollapsed = entryLow !== null && entryHigh !== null && Math.abs(entryHigh - entryLow) <= Math.max(1, entryHigh * 0.001);
       if (entryCollapsed) {
-        drawRiskLine(entryHigh, "rgba(56, 189, 248, 0.78)", riskPlan.screenerSynced ? "Screener Entry" : "Entry", LineStyle.Solid, 2 as LineWidth);
+        drawRiskLine(entryHigh, "rgba(56, 189, 248, 0.92)", riskPlan.screenerSynced ? "Screener Entry" : "Entry", LineStyle.Solid, 3 as LineWidth);
       } else {
-        drawRiskLine(riskPlan.entryHigh, "rgba(56, 189, 248, 0.65)", "Entry High", LineStyle.Dashed);
-        drawRiskLine(riskPlan.entryLow, "rgba(56, 189, 248, 0.45)", "Entry Low", LineStyle.Dashed);
+        drawRiskLine(riskPlan.entryHigh, "rgba(56, 189, 248, 0.72)", "Entry High", LineStyle.Dashed, 2 as LineWidth);
+        drawRiskLine(riskPlan.entryLow, "rgba(56, 189, 248, 0.52)", "Entry Low", LineStyle.Dashed, 2 as LineWidth);
       }
       const idealBuy = finiteChartNumber(riskPlan.idealBuy);
       if (!entryCollapsed || idealBuy === null || entryHigh === null || Math.abs(idealBuy - entryHigh) > Math.max(1, entryHigh * 0.001)) {
-        drawRiskLine(riskPlan.idealBuy, "rgba(255, 255, 255, 0.50)", "Ideal Buy", LineStyle.Dotted);
+        drawRiskLine(riskPlan.idealBuy, "rgba(226, 232, 240, 0.52)", "Ideal Buy", LineStyle.Dotted);
       }
-      drawRiskLine(riskPlan.earlyExit, "rgba(251, 191, 36, 0.70)", "Early Exit", LineStyle.Dashed, 2 as LineWidth);
-      drawRiskLine(riskPlan.hardStop, "rgba(239, 68, 68, 0.75)", "Hard Stop", LineStyle.Solid, 2 as LineWidth);
-      drawRiskLine(riskPlan.target1, "rgba(34, 197, 94, 0.70)", "Target 1", LineStyle.Dashed, 2 as LineWidth);
-      drawRiskLine(riskPlan.target2, "rgba(132, 204, 22, 0.55)", "Target 2", LineStyle.Dotted);
+      drawRiskLine(riskPlan.earlyExit, "rgba(251, 191, 36, 0.78)", "Early Exit", LineStyle.Dashed, 2 as LineWidth);
+      drawRiskLine(riskPlan.hardStop, "rgba(244, 63, 94, 0.88)", "Hard Stop", LineStyle.Solid, 3 as LineWidth);
+      drawRiskLine(riskPlan.target1, "rgba(45, 212, 191, 0.82)", "Target 1", LineStyle.Dashed, 2 as LineWidth);
+      drawRiskLine(riskPlan.target2, "rgba(132, 204, 22, 0.64)", "Target 2", LineStyle.Dotted);
 
       const markerSeries = chart.addSeries(LineSeries, {
         color: "transparent",
@@ -676,6 +714,18 @@ export default function AdvancedChart({
         text: riskPlan.stateLabel || riskPlan.action,
         size: 1 as const,
       }]);
+    }
+
+    const lastDataTime = Number(data[data.length - 1]?.time);
+    const oneYearAgo = lastDataTime - (365 * 24 * 60 * 60);
+    const firstVisibleIndex = data.findIndex((item) => Number(item.time) >= oneYearAgo);
+    if (!syncLogicalRange && Number.isFinite(lastDataTime) && firstVisibleIndex > 0) {
+      chart.timeScale().setVisibleRange({
+        from: data[firstVisibleIndex].time as UTCTimestamp,
+        to: data[data.length - 1].time as UTCTimestamp,
+      });
+    } else if (!syncLogicalRange) {
+      chart.timeScale().fitContent();
     }
 
     const resizeObserver = new ResizeObserver(() => {
@@ -715,10 +765,13 @@ export default function AdvancedChart({
   }, [syncLogicalRange]);
 
   return (
-    <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <span>TECHNICAL ANALYSIS: {ticker}</span>
-        <div className="mobile-hide" style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
+    <div className="panel premium-chart-panel">
+      <div className="premium-chart-header">
+        <div className="chart-title-block">
+          <span className="chart-eyebrow">Price Intelligence</span>
+          <strong>CHART HARGA: {ticker}</strong>
+        </div>
+        <div className="mobile-hide premium-chart-legend">
           {showEMA9 && <span style={{ color: '#3b82f6' }}>EMA 9</span>}
           {showEMA20 && <span style={{ color: '#f59e0b' }}>● EMA 20</span>}
           {showEMA50 && <span style={{ color: '#ef4444' }}>● EMA 50</span>}
@@ -726,13 +779,115 @@ export default function AdvancedChart({
           {showEMA60 && <span style={{ color: '#8b5cf6' }}>EMA 60</span>}
           <span style={{ color: '#26a69a' }}>MACD</span>
           {showSqueezeDeluxe && <span style={{ color: '#ffa600' }}>SQZ DELUXE</span>}
-          {riskPlan?.screenerSynced && <span style={{ color: '#38bdf8' }}>SCREENER SYNC</span>}
-          {riskPlan && <span style={{ color: riskPlan.stateColor || '#fbbf24' }}>{riskPlan.stateLabel || 'RISK PLAN'}</span>}
+          {riskPlan?.screenerSynced && <span style={{ color: '#38bdf8' }}>ENTRY/STOP DARI SCREENER</span>}
+          {riskPlan && <span style={{ color: riskPlan.stateColor || '#fbbf24' }}>{riskPlan.stateLabel || 'RENCANA RISIKO'}</span>}
         </div>
       </div>
       <div ref={chartContainerRef} className={`advanced-chart-canvas ${showSqueezeDeluxe ? 'with-squeeze' : ''}`} style={{ width: '100%', height: showSqueezeDeluxe ? '760px' : '660px' }} />
       <style jsx>{`
+        .premium-chart-panel {
+          position: relative;
+          padding: 0;
+          overflow: hidden;
+          background:
+            radial-gradient(circle at 18% 0%, rgba(56, 189, 248, 0.18), transparent 34%),
+            radial-gradient(circle at 86% 18%, rgba(34, 197, 94, 0.10), transparent 30%),
+            linear-gradient(180deg, #070b12 0%, #05070b 48%, #030406 100%);
+          border: 1px solid rgba(148, 163, 184, 0.18);
+          box-shadow:
+            0 30px 90px rgba(0, 0, 0, 0.42),
+            inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+
+        .premium-chart-panel::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 1;
+          background-image:
+            linear-gradient(90deg, rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+            linear-gradient(0deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px);
+          background-size: 56px 56px;
+          mask-image: linear-gradient(180deg, rgba(0,0,0,0.9), transparent 74%);
+        }
+
+        .premium-chart-panel::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 3;
+          box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.45);
+        }
+
+        .premium-chart-header {
+          position: relative;
+          z-index: 4;
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          align-items: center;
+          padding: 14px 16px;
+          border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.86), rgba(2, 6, 12, 0.52));
+          backdrop-filter: blur(14px);
+        }
+
+        .chart-title-block {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          min-width: 0;
+        }
+
+        .chart-eyebrow {
+          color: #7dd3fc;
+          font-size: 0.52rem;
+          font-weight: 1000;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+        }
+
+        .chart-title-block strong {
+          color: white;
+          font-size: 0.78rem;
+          letter-spacing: 0.08em;
+          overflow-wrap: anywhere;
+        }
+
+        .premium-chart-legend {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          font-size: 0.66rem;
+          font-weight: 900;
+        }
+
+        .premium-chart-legend span {
+          padding: 4px 7px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.72);
+          border: 1px solid rgba(148, 163, 184, 0.12);
+          white-space: nowrap;
+        }
+
+        .advanced-chart-canvas {
+          position: relative;
+          z-index: 2;
+        }
+
         @media (max-width: 768px) {
+          .premium-chart-header {
+            align-items: flex-start;
+            padding: 12px;
+          }
+
+          .chart-title-block strong {
+            font-size: 0.68rem;
+          }
+
           .advanced-chart-canvas {
             height: 460px !important;
           }

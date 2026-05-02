@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { connectToDatabase } from "@/lib/db";
 import YahooFinance from "yahoo-finance2";
 
@@ -15,6 +16,7 @@ function deriveSignalCategory(source = "", metadata?: any) {
   if (metadata?.category) return String(metadata.category);
   const normalized = source.toUpperCase();
   if (normalized.includes("EMA BOUNCE")) return "EMA_BOUNCE";
+  if (normalized.includes("TECHNICAL BREAKOUT")) return "TECHNICAL_BREAKOUT";
   if (normalized.includes("COOLDOWN")) return "COOLDOWN";
   if (normalized.includes("ARAHUNTER")) return "ARAHUNTER";
   if (normalized.includes("TURNAROUND")) return "TURNAROUND";
@@ -30,6 +32,9 @@ function deriveSignalVector(source = "", metadata?: any) {
   if (metadata?.vector) return String(metadata.vector);
   const normalized = source.toUpperCase();
   if (normalized.includes("SQZ_EMA20_EARLY_RELEASE")) return "SQZ_EMA20_EARLY_RELEASE";
+  if (normalized.includes("POWER IGNITION")) return "POWER_IGNITION_BREAKOUT";
+  if (normalized.includes("TIGHT-FLAT")) return "TIGHT_FLAT_ACCUMULATION";
+  if (normalized.includes("WINNER SIMILARITY")) return "WINNER_SIMILARITY_WATCHLIST";
   if (normalized.includes("EMA20_BREAKOUT_RETEST")) return "EMA20_BREAKOUT_RETEST_MOMENTUM";
   if (normalized.includes("EMA9_20")) return "EMA9_20_BULLISH_CROSS";
   if (normalized.includes("RSI")) return "RSI_OVERSOLD_20EMA_RECLAIM";
@@ -83,6 +88,106 @@ function signalDateTime(item: any) {
     dateTime(item.entryDate) ||
     dateTime(item.updatedAt) ||
     dateTime(item.lastScannedAt);
+}
+
+const ACTIVE_MARKET_MINUTES_PER_DAY = 330;
+const D2_ACTIVE_MARKET_MINUTES = ACTIVE_MARKET_MINUTES_PER_DAY * 2;
+
+function jakartaParts(value: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Jakarta",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(value);
+  const get = (type: string) => parts.find(part => part.type === type)?.value || "";
+  return {
+    weekday: get("weekday"),
+    minutes: (Number(get("hour")) * 60) + Number(get("minute")),
+  };
+}
+
+function isActiveIdxSession(value: Date) {
+  const { weekday, minutes } = jakartaParts(value);
+  if (["Sat", "Sun"].includes(weekday)) return false;
+  return (minutes >= 9 * 60 && minutes < 12 * 60) ||
+    (minutes >= (13 * 60) + 30 && minutes < 16 * 60);
+}
+
+function countActiveMarketMinutes(startTime: number, endTime: number) {
+  if (!startTime || !endTime || endTime <= startTime) return 0;
+  const stepMinutes = 15;
+  let activeMinutes = 0;
+
+  for (let cursor = startTime; cursor < endTime; cursor += stepMinutes * 60 * 1000) {
+    const nextCursor = Math.min(cursor + stepMinutes * 60 * 1000, endTime);
+    if (isActiveIdxSession(new Date(cursor))) {
+      activeMinutes += Math.round((nextCursor - cursor) / (60 * 1000));
+    }
+  }
+
+  return activeMinutes;
+}
+
+function buildEvaluationState(appearedAt: unknown, entryPrice: number, currentPrice: number, latestDataAt?: unknown) {
+  const appearedTime = dateTime(appearedAt);
+  const latestMarketDataTime = dateTime(latestDataAt);
+  const evaluationEndTime = appearedTime && latestMarketDataTime
+    ? Math.min(Date.now(), Math.max(appearedTime, latestMarketDataTime))
+    : 0;
+  const activeMarketMinutes = appearedTime && evaluationEndTime
+    ? countActiveMarketMinutes(appearedTime, evaluationEndTime)
+    : null;
+  const activeMarketHours = activeMarketMinutes === null ? null : Math.floor(activeMarketMinutes / 60);
+  const remainingActiveHours = activeMarketMinutes === null
+    ? null
+    : Math.max(0, Math.ceil((D2_ACTIVE_MARKET_MINUTES - activeMarketMinutes) / 60));
+  const deltaPct = isFinitePrice(entryPrice) && isFinitePrice(currentPrice)
+    ? Number((((currentPrice - entryPrice) / entryPrice) * 100).toFixed(2))
+    : null;
+
+  if (appearedTime === 0 || latestMarketDataTime === 0 || activeMarketMinutes === null || deltaPct === null) {
+    return {
+      status: "WAITING_DATA",
+      label: "Menunggu data harga",
+      description: "Evaluasi D+2 hanya menghitung jam bursa aktif. Hari libur atau data IHSG/quote yang tidak bergerak tidak ikut dihitung.",
+      ageHours: activeMarketHours,
+      activeMarketHours,
+      dueAt: null,
+    };
+  }
+
+  if (activeMarketMinutes < D2_ACTIVE_MARKET_MINUTES) {
+    return {
+      status: "WATCHING_D2",
+      label: `D+2 bursa dalam ${remainingActiveHours} jam aktif`,
+      description: "Sinyal masih dalam masa observasi jam bursa. Weekend, hari libur, dan quote yang tidak bergerak tidak mempercepat evaluasi.",
+      ageHours: activeMarketHours,
+      activeMarketHours,
+      dueAt: null,
+    };
+  }
+
+  if (deltaPct < 0) {
+    return {
+      status: "FAILED_D2",
+      label: "D+2 gagal bertahan",
+      description: "Setelah 2 hari bursa aktif harga berada di bawah entry, sinyal perlu dianggap gagal atau dihindari.",
+      ageHours: activeMarketHours,
+      activeMarketHours,
+      dueAt: null,
+    };
+  }
+
+  return {
+    status: "CONTINUE_D2",
+    label: "D+2 lanjut dipantau",
+    description: "Setelah 2 hari bursa aktif harga masih di atas entry. Sinyal tetap valid selama stop belum ditembus.",
+    ageHours: activeMarketHours,
+    activeMarketHours,
+    dueAt: null,
+  };
 }
 
 function latestDataDateTime(item: any) {
@@ -222,6 +327,7 @@ export async function GET(req: Request) {
   const getAll = searchParams.get("all") === "true";
   const priceRange = searchParams.get("priceRange") || "all";
   const dateFilter = searchParams.get("dateFilter") || "all";
+  const categoryFilter = searchParams.get("category");
   const livePrices = searchParams.get("livePrices") !== "false";
   const quoteConcurrency = parseIntegerParam(searchParams.get("quoteConcurrency"), 8, 1, 16);
 
@@ -320,10 +426,13 @@ export async function GET(req: Request) {
       const deltaPct = isFinitePrice(currentPrice) && isFinitePrice(entryPrice)
         ? Number((((currentPrice - entryPrice) / entryPrice) * 100).toFixed(2))
         : null;
+      const evaluation = buildEvaluationState(appearedAt, entryPrice, currentPrice, lastQuoteDate || lastScannedAt);
 
       // Calculate Score: Priority 1: Metadata Scores (Setup + Vol)
       let finalRelevanceScore = 0;
-      if (metadata?.setupScore !== undefined && metadata?.volScore !== undefined) {
+      if (category === "TECHNICAL_BREAKOUT" && metadata?.similarityScore !== undefined) {
+          finalRelevanceScore = Number(metadata.similarityScore) || signal.relevanceScore || 0;
+      } else if (metadata?.setupScore !== undefined && metadata?.volScore !== undefined) {
           finalRelevanceScore = Number(metadata.setupScore) + Number(metadata.volScore);
           // Add Turnaround bonus if applicable
           if (signal.signalSource.includes("TURNAROUND")) finalRelevanceScore += 50;
@@ -362,6 +471,7 @@ export async function GET(req: Request) {
           ? "IndonesiaStock.lastPrice"
           : (isFinitePrice(signalCurrentPrice) ? "StockSignal.currentPrice" : (latestHistory ? "StockSignal.priceHistory" : "StockSignal.entryPrice")),
         deltaPct,
+        evaluation,
         priceHistory: mappedPriceHistory,
         daysHeld: signal.daysHeld,
         relevanceScore: finalRelevanceScore,
@@ -391,7 +501,16 @@ export async function GET(req: Request) {
     }));
 
     // Latest qualifying signal scan first; relevance is only a tie-breaker.
-    const sortedResults = results.sort(sortLatestSignalScanFirst);
+    const categoryFilteredResults = categoryFilter
+      ? results.filter((item: any) => {
+        const target = categoryFilter.toUpperCase();
+        return String(item.category || "").toUpperCase() === target ||
+          String(item.vector || "").toUpperCase() === target ||
+          String(item.strategy || "").toUpperCase().includes(target);
+      })
+      : results;
+
+    const sortedResults = categoryFilteredResults.sort(sortLatestSignalScanFirst);
 
     // DIVERSIFY RESULTS: Ensure we see a mix of categories
     const categories = [
@@ -404,6 +523,7 @@ export async function GET(req: Request) {
         "TURNAROUND", 
         "EMA BOUNCE", 
         "CVD DIVERGENCE",
+        "Technical Breakout",
         "Squeeze Divergence",
         "Squeeze Explosion",
         "The Perfect Retest"

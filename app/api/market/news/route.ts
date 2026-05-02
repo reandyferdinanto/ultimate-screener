@@ -13,9 +13,8 @@ const parser = new Parser({
 });
 
 const SOURCES = [
-  { name: "Antara Ekonomi", url: "https://www.antaranews.com/rss/ekonomi.xml" },
   { name: "CNN Ekonomi", url: "https://www.cnnindonesia.com/ekonomi/rss" },
-  { name: "CNBC Market", url: "https://www.cnbcindonesia.com/market/rss" }
+  { name: "CNBC Market", url: "https://www.cnbcindonesia.com/market/rss/" }
 ];
 
 export async function GET() {
@@ -28,7 +27,8 @@ export async function GET() {
       const feed = await parser.parseURL(source.url);
       if (feed && feed.items) {
         return feed.items.map(item => ({
-          title: `[${source.name.split(' ')[0]}] ${item.title}`,
+          title: item.title,
+          source: source.name,
           link: item.link,
           date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
         }));

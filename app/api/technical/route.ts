@@ -803,15 +803,13 @@ function applyScreenerSync(analysis: any, activeScreenerSignals: ScreenerSignalC
   const liveRiskOff = String(analysis.tradePlan?.action || "").includes("SELL") ||
     String(analysis.verdict || "").includes("BEARISH REVERSAL");
   const color = screenerAccentColor(screenerContext.category);
-  const shouldLeadWithScreener = !liveRiskOff && [
-    "COOLDOWN",
-    "EMA_BOUNCE",
-    "ELITE_BOUNCE",
-    "BUY_ON_DIP",
-    "TURNAROUND",
-    "SQUEEZE",
-    "SQUEEZE_DIVERGENCE",
-  ].includes(screenerContext.category);
+  const shouldLeadWithScreener = !liveRiskOff && Boolean(screenerTradePlan);
+  const screenerSyncStatus = liveRiskOff
+    ? "BLOCKED_BY_LIVE_RISK"
+    : (screenerTradePlan ? "SYNCED_TO_CHART" : "CONTEXT_ONLY");
+  const screenerStatusText = liveRiskOff
+    ? `Screener aktif (${category}), tetapi chart live risk-off. Gunakan screener sebagai watchlist; jangan eksekusi sampai invalidation/reversal pulih.`
+    : `Screener aktif (${category}) dan sinkron dengan chart. Entry, stop, dan target report memakai data screener terbaru.`;
 
   return {
     ...analysis,
@@ -819,14 +817,18 @@ function applyScreenerSync(analysis: any, activeScreenerSignals: ScreenerSignalC
     color: shouldLeadWithScreener ? color : analysis.color,
     riskLevel: shouldLeadWithScreener && analysis.riskLevel === "VERY HIGH" ? "MEDIUM" : analysis.riskLevel,
     suggestion: shouldLeadWithScreener
-      ? `Sinyal screener terbaru: ${category} / ${screenerContext.vector}. ${screenerContext.thesis || analysis.suggestion} Gunakan entry, stop, dan target dari screener sync; batalkan jika candle terakhir menembus invalidation.`
-      : analysis.suggestion,
+      ? `${screenerStatusText} ${screenerContext.thesis || analysis.suggestion} Batalkan jika candle terakhir menembus stop/invalidation.`
+      : (liveRiskOff
+        ? `${analysis.suggestion} ${screenerStatusText}`
+        : analysis.suggestion),
     screenerContext,
     activeScreenerSignals,
     screenerTradePlan: liveRiskOff ? null : screenerTradePlan,
     details: {
       ...analysis.details,
       screener: `${screenerContext.category}/${screenerContext.vector}`,
+      screenerSyncStatus,
+      screenerStatusText,
     },
   };
 }
@@ -853,7 +855,7 @@ export async function GET(req: Request) {
     } else if (originalInterval === "1h") {
         period1.setDate(period1.getDate() - 90);
     } else {
-        period1.setFullYear(period1.getFullYear() - 1); 
+        period1.setFullYear(period1.getFullYear() - 5);
     }
 
     const result: any = await yahooFinance.chart(symbol, {

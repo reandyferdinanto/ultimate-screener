@@ -44,6 +44,14 @@ interface SignalData {
     quoteAgeHours?: number | null;
     isLikelyFreshDaily?: boolean;
   };
+  evaluation?: {
+    status?: string;
+    label?: string;
+    description?: string;
+    ageHours?: number | null;
+    activeMarketHours?: number | null;
+    dueAt?: string | null;
+  };
   priceHistory?: { date?: string; price: number }[];
   metadata?: Record<string, any>;
 }
@@ -121,6 +129,47 @@ interface ScanMeta {
   failures?: number;
 }
 
+type SortMode = 'latest' | 'deltaDesc' | 'deltaAsc' | 'priceAsc' | 'priceDesc';
+
+const viewCopy: Record<string, { label: string; plain: string; helper: string; risk: string }> = {
+  signals: {
+    label: 'EMA Bounce',
+    plain: 'Pantulan EMA & buy on dip',
+    helper: 'Saham yang baru masuk karena harga kembali menguat di area EMA/support. Cocok untuk entry bertahap dekat area beli.',
+    risk: 'Valid selama harga tidak tembus stop dan delta tidak memburuk setelah D+2.',
+  },
+  entry: {
+    label: 'Entry Ideal Live',
+    plain: 'Zona entry hari ini',
+    helper: 'Scan live untuk saham yang sedang berada di area beli ideal menurut trade plan teknikal.',
+    risk: 'Gunakan hanya jika risk/reward masih masuk dan candle terakhir tidak invalidasi.',
+  },
+  cooldown: {
+    label: 'Cooldown Reset',
+    plain: 'Pullback sehat',
+    helper: 'Saham yang sedang cooling down setelah naik. Fokusnya menunggu harga stabil sebelum lanjut.',
+    risk: 'Jangan kejar harga; tunggu reclaim atau base baru.',
+  },
+  breakout: {
+    label: 'Technical Breakout',
+    plain: 'Base rapat siap breakout',
+    helper: 'Kandidat yang masuk karena akumulasi rapat, power ignition, atau pola mirip pemenang historis.',
+    risk: 'Valid jika volume dan harga tidak kembali masuk ke bawah area entry.',
+  },
+  divergence: {
+    label: 'CVD Divergence',
+    plain: 'Divergensi orderflow',
+    helper: 'Kandidat dari ketidakseimbangan aliran volume terhadap harga.',
+    risk: 'Butuh konfirmasi harga; jangan pakai jika struktur chart melemah.',
+  },
+  sqz_div: {
+    label: 'Squeeze Divergence',
+    plain: 'Kompresi volatilitas',
+    helper: 'Saham yang masuk karena squeeze dan bullish divergence, dengan pilihan timeframe 1D atau 4H.',
+    risk: 'Valid jika kompresi mulai release ke atas, bukan breakdown.',
+  },
+};
+
 const formatDateTime = (value?: string) => {
   if (!value) return "-";
   const date = new Date(value);
@@ -141,6 +190,39 @@ const formatFreshness = (value?: string) => {
   if (hours < 1) return "<1H AGO";
   if (hours < 24) return `${hours.toFixed(1)}H AGO`;
   return `${Math.floor(hours / 24)}D AGO`;
+};
+
+const formatPrice = (value: unknown) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toLocaleString('id-ID', { maximumFractionDigits: 0 }) : '-';
+};
+
+const formatSignalAge = (hours?: number | null) => {
+  if (hours === null || hours === undefined) return 'jam bursa belum tersedia';
+  if (hours < 11) return `${hours} jam bursa aktif`;
+  return `${(hours / 5.5).toFixed(1)} hari bursa aktif`;
+};
+
+const formatCategory = (value?: string) => String(value || 'TECHNICAL').replace(/_/g, ' ');
+
+const evaluationTone = (status?: string) => {
+  if (status === 'FAILED_D2') return 'failed';
+  if (status === 'CONTINUE_D2') return 'continue';
+  return 'watching';
+};
+
+const sortSignals = (signals: SignalData[], sortMode: SortMode) => {
+  const sorted = [...signals];
+  const numeric = (value: unknown, fallback = 0) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  };
+
+  if (sortMode === 'deltaDesc') return sorted.sort((a, b) => numeric(b.deltaPct, -999) - numeric(a.deltaPct, -999));
+  if (sortMode === 'deltaAsc') return sorted.sort((a, b) => numeric(a.deltaPct, 999) - numeric(b.deltaPct, 999));
+  if (sortMode === 'priceAsc') return sorted.sort((a, b) => numeric(a.currentPrice || a.buyArea, 999999) - numeric(b.currentPrice || b.buyArea, 999999));
+  if (sortMode === 'priceDesc') return sorted.sort((a, b) => numeric(b.currentPrice || b.buyArea, -1) - numeric(a.currentPrice || a.buyArea, -1));
+  return sorted;
 };
 
 // PATCH 1: Enhanced Risk Management Functions
@@ -396,9 +478,10 @@ const applyAdvancedFilters = (signals: SignalData[], marketConditions?: MarketCo
 
 export default function ScreenerPage() {
   const [data, setData] = useState<SignalData[]>([]);
-  const [view, setView] = useState<'signals' | 'entry' | 'cooldown' | 'divergence' | 'sqz_div' | 'arahunter'>('signals');
+  const [view, setView] = useState<'signals' | 'entry' | 'cooldown' | 'breakout' | 'divergence' | 'sqz_div' | 'arahunter'>('signals');
   const [priceRange, setPriceRange] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [sortMode, setSortMode] = useState<SortMode>('latest');
   const [sqzTimeframe, setSqzTimeframe] = useState<'1d' | '4h'>('1d');
   const [vectorFilter, setVectorFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -431,12 +514,12 @@ export default function ScreenerPage() {
   const fetchData = async () => {
     if (view === 'entry') {
       setScanning(true);
-      setMsg("SCANNING_LIVE_ENTRY_ZONES...");
+      setMsg("Memindai zona entry live...");
       try {
         await loadCurrentData();
-        setMsg("ENTRY_SCAN_COMPLETE");
+        setMsg("Scan entry selesai. Cek delta, stop, dan target sebelum masuk.");
       } catch {
-        setMsg("ENTRY_SCAN_FAILED");
+        setMsg("Scan entry gagal. Coba ulang beberapa saat lagi.");
       } finally {
         setScanning(false);
         setTimeout(() => setMsg(""), 5000);
@@ -445,18 +528,18 @@ export default function ScreenerPage() {
     }
 
     setScanning(true);
-    setMsg("INITIALIZING_CONVICTION_SCAN...");
+    setMsg("Memperbarui screener dari data terbaru dan menyimpan hasil ke database...");
     try {
       const scanRes = await fetch("/api/screener/scan", { method: "POST" });
       const scanJson = await scanRes.json();
       if (scanJson.success) {
-        setMsg(`SCAN_COMPLETE // LATEST_YAHOO_DAILY_FETCHED @ ${formatDateTime(scanJson.scanCompletedAt)}`);
+        setMsg(`Scan selesai. Data terbaru tersimpan di DB pada ${formatDateTime(scanJson.scanCompletedAt)}.`);
         await loadCurrentData();
       } else {
-        setMsg("ERROR: " + scanJson.error);
+        setMsg("Scan gagal: " + scanJson.error);
       }
     } catch {
-      setMsg("NETWORK_FAILURE");
+      setMsg("Koneksi gagal saat menjalankan scan.");
     } finally {
       setScanning(false);
       setTimeout(() => setMsg(""), 5000);
@@ -540,6 +623,7 @@ export default function ScreenerPage() {
       const vector = String(s.vector || s.metadata?.vector || "").toUpperCase();
       if (view === 'entry') return category === 'ENTRY_IDEAL' || source.includes('ENTRY_IDEAL');
       if (view === 'cooldown') return category === 'COOLDOWN' || /COOLDOWN|EXTENDED_EMA20_COOLDOWN|PULLBACK|SIDEWAYS/.test(`${source} ${vector}`.toUpperCase());
+      if (view === 'breakout') return category === 'TECHNICAL_BREAKOUT' || /TECHNICAL_BREAKOUT|TIGHT_FLAT|POWER_IGNITION|WINNER_SIMILARITY|TECHNICAL BREAKOUT/.test(`${source} ${vector}`.toUpperCase());
       if (view === 'divergence') return source.includes('CVD');
       if (view === 'sqz_div') {
           const sourceLower = source.toLowerCase();
@@ -562,7 +646,7 @@ export default function ScreenerPage() {
     return [category, vector].filter(Boolean);
   }))).sort((a, b) => a.localeCompare(b));
 
-  const displayedSignals = vectorFilter === 'all'
+  const filteredSignals = vectorFilter === 'all'
     ? baseSignals
     : baseSignals.filter(s => {
       const source = String(s.signalSource || s.strategy || "").toUpperCase();
@@ -571,15 +655,16 @@ export default function ScreenerPage() {
       return [category, vector].some(value => value === vectorFilter) || source.includes(vectorFilter);
     });
 
+  const displayedSignals = sortSignals(filteredSignals, sortMode);
+
   const activeAccent = view === 'entry'
     ? 'oklch(0.78 0.2 115)'
-    : (view === 'cooldown' ? 'oklch(0.82 0.18 95)' : (view === 'sqz_div' ? 'oklch(0.82 0.18 145)' : 'var(--accent-emerald)'));
-  const activeViewLabel = view === 'entry'
-    ? 'ENTRY_IDEAL_LIVE'
-    : (view === 'cooldown' ? 'COOLDOWN_RESET' : (view === 'sqz_div' ? 'SQZ_DIVERGENCE' : (view === 'divergence' ? 'CVD_DIVERGENCE' : 'TECHNICAL_BOUNCE_ENHANCED')));
+    : (view === 'cooldown' ? 'oklch(0.82 0.18 95)' : (view === 'breakout' ? 'oklch(0.84 0.18 75)' : (view === 'sqz_div' ? 'oklch(0.82 0.18 145)' : 'var(--accent-emerald)')));
+  const activeViewCopy = viewCopy[view] || viewCopy.signals;
+  const activeViewLabel = activeViewCopy.label;
   const activeRiskBadge = view === 'entry'
-    ? 'FILTER: IN_ZONE + RR>=1.5R'
-    : (view === 'cooldown' ? 'PULLBACK: CONTROLLED_RESET' : (view === 'sqz_div' ? 'VOLATILITY_ENGINE' : 'RISK_LIMIT: < 5.5%'));
+    ? 'In zone + RR layak'
+    : (view === 'cooldown' ? 'Pullback terkontrol' : (view === 'breakout' ? 'Akumulasi rapat' : (view === 'sqz_div' ? 'Squeeze + divergence' : 'Risk terukur')));
 
   const saveSettings = () => {
     localStorage.setItem("botToken", botToken);
@@ -643,14 +728,19 @@ export default function ScreenerPage() {
       <main className="screener-container">
         <header className="screener-header">
           <div className="header-left">
-            <h1 className="main-title">ULTIMATE_SCREENER</h1>
+            <div className="eyebrow">Screener saham tersimpan</div>
+            <h1 className="main-title">Saham yang Baru Masuk Radar</h1>
+            <p className="page-subtitle">
+              Lihat kapan sinyal muncul, progres harga dari entry, dan keputusan evaluasi otomatis D+2 sebelum lanjut ke conviction report.
+            </p>
             <div className="tabs-container custom-scrollbar">
               {[
-                { id: 'signals', label: 'EMA_BOUNCE', color: 'var(--accent-emerald)' },
-                { id: 'entry', label: 'ENTRY_IDEAL', color: 'oklch(0.78 0.2 115)' },
-                { id: 'cooldown', label: 'COOLDOWN', color: 'oklch(0.82 0.18 95)' },
-                { id: 'divergence', label: 'CVD_DIVERGENCE', color: 'oklch(0.7 0.2 300)' },
-                { id: 'sqz_div', label: 'SQZ_DIVERGENCE', color: 'oklch(0.82 0.18 145)' }
+                { id: 'signals', label: 'EMA Bounce', color: 'var(--accent-emerald)' },
+                { id: 'entry', label: 'Entry Ideal', color: 'oklch(0.78 0.2 115)' },
+                { id: 'cooldown', label: 'Cooldown', color: 'oklch(0.82 0.18 95)' },
+                { id: 'breakout', label: 'Breakout', color: 'oklch(0.84 0.18 75)' },
+                { id: 'divergence', label: 'CVD Divergence', color: 'oklch(0.7 0.2 300)' },
+                { id: 'sqz_div', label: 'SQZ Divergence', color: 'oklch(0.82 0.18 145)' }
               ].map(tab => (
                 <button 
                   key={tab.id}
@@ -665,42 +755,57 @@ export default function ScreenerPage() {
           </div>
 
           <div className="controls-group">
+            <div className="filter-title"><Filter size={13} /> Filter & urutkan</div>
             <div className="filters-row">
               {view === 'sqz_div' && (
                 <div className="select-wrapper">
+                  <label>Timeframe</label>
                   <select value={sqzTimeframe} onChange={e => setSqzTimeframe(e.target.value as any)}>
-                    <option value="1d">1D_FRAME</option>
-                    <option value="4h">4H_FRAME</option>
+                    <option value="1d">1D</option>
+                    <option value="4h">4H</option>
                   </select>
                   <ChevronDown size={14} className="select-icon" />
                 </div>
               )}
               <div className="select-wrapper">
+                <label>Harga entry</label>
                 <select value={priceRange} onChange={e => setPriceRange(e.target.value)}>
-                    <option value="all">ALL_PRICES</option>
-                    <option value="under300">&lt; 300</option>
-                    <option value="under500">&lt; 500</option>
-                    <option value="above500">&gt; 500</option>
+                    <option value="all">Semua harga</option>
+                    <option value="under300">Di bawah 300</option>
+                    <option value="under500">Di bawah 500</option>
+                    <option value="above500">500 ke atas</option>
                 </select>
                 <ChevronDown size={14} className="select-icon" />
               </div>
               {view !== 'entry' && (
                 <div className="select-wrapper">
+                  <label>Waktu muncul</label>
                   <select value={dateFilter} onChange={e => setDateFilter(e.target.value)}>
-                      <option value="all">ALL_TIME</option>
-                      <option value="today">TODAY</option>
-                      <option value="3d">3_DAYS</option>
-                      <option value="7d">7_DAYS</option>
+                      <option value="all">Semua sinyal aktif</option>
+                      <option value="today">Hari ini</option>
+                      <option value="3d">3 hari terakhir</option>
+                      <option value="7d">7 hari terakhir</option>
                   </select>
                   <ChevronDown size={14} className="select-icon" />
                 </div>
               )}
+              <div className="select-wrapper">
+                <label>Urutkan</label>
+                <select value={sortMode} onChange={e => setSortMode(e.target.value as SortMode)}>
+                    <option value="latest">Sinyal terbaru</option>
+                    <option value="deltaDesc">Delta tertinggi</option>
+                    <option value="deltaAsc">Delta terendah</option>
+                    <option value="priceAsc">Harga termurah</option>
+                    <option value="priceDesc">Harga tertinggi</option>
+                </select>
+                <ChevronDown size={14} className="select-icon" />
+              </div>
             </div>
             
             <div className="actions-row">
               <button className="action-btn scan-btn" onClick={fetchData} disabled={loading || scanning}>
                 <RefreshCw size={14} className={scanning ? 'animate-spin' : ''} />
-                <span>{scanning ? "SCANNING..." : (view === 'entry' ? "RUN_ENTRY_SCAN" : "RUN_SCAN")}</span>
+                <span>{scanning ? "Memindai..." : (view === 'entry' ? "Scan entry" : "Scan terbaru")}</span>
               </button>
               <button className="action-btn icon-only" onClick={() => setShowSettings(!showSettings)}>
                 <Settings size={14} />
@@ -742,10 +847,11 @@ export default function ScreenerPage() {
           <div className="viewport-header">
             <div className="header-status">
               <div className="pulse-dot" style={{ backgroundColor: activeAccent }}></div>
-              <span className="view-label">
-                {activeViewLabel}
-              </span>
-              {(loading || scanning) && <span className="refreshing-tag animate-pulse">REFRESHING_VECTORS...</span>}
+              <div>
+                <span className="view-label">{activeViewLabel}</span>
+                <p className="view-helper">{activeViewCopy.helper}</p>
+              </div>
+              {(loading || scanning) && <span className="refreshing-tag animate-pulse">Memperbarui data...</span>}
             </div>
             <span className="risk-badge">
                {activeRiskBadge}
@@ -753,29 +859,35 @@ export default function ScreenerPage() {
           </div>
 
           <div className="scan-freshness-strip">
-            <span>DATA_SOURCE: {scanMeta?.source ? (view === 'entry' ? 'LIVE_TRADEPLAN' : 'STORED_SIGNALS') : 'LOADING'}</span>
-            {view !== 'entry' && scanMeta?.priceSource && <span>PRICE_SOURCE: {scanMeta.priceSource}</span>}
-            {scanMeta?.sortBy && <span>SORT: LATEST_SIGNAL</span>}
-            {view !== 'entry' && scanMeta?.livePriceRefreshed !== undefined && <span>LIVE_QUOTES: {scanMeta.livePriceRefreshed}</span>}
-            {view !== 'entry' && Boolean(scanMeta?.livePriceFailed) && <span className="fresh-warn">QUOTE_FAILED: {scanMeta?.livePriceFailed}</span>}
-            <span>LAST_SIGNAL: {formatFreshness(scanMeta?.latestSignalAt || scanMeta?.latestScannedAt || undefined)}</span>
-            <span>LAST_PRICE: {formatFreshness(scanMeta?.latestDataAt || scanMeta?.latestScannedAt || undefined)}</span>
-            {view !== 'entry' && <span>DB_SCAN: {formatFreshness(scanMeta?.latestScannedAt || undefined)}</span>}
-            {view === 'entry' && <span>MATCHED: {scanMeta?.matched ?? 0}/{scanMeta?.scanned ?? '-'}</span>}
-            {view === 'entry' && Boolean(scanMeta?.failures) && <span className="fresh-warn">FAILED_FETCH: {scanMeta?.failures}</span>}
+            <span>Data: {scanMeta?.source ? (view === 'entry' ? 'live trade plan' : 'sinyal tersimpan di DB') : 'memuat'}</span>
+            {view !== 'entry' && scanMeta?.priceSource && <span>Harga: {scanMeta.priceSource}</span>}
+            {scanMeta?.sortBy && <span>Default: sinyal terbaru</span>}
+            {view !== 'entry' && scanMeta?.livePriceRefreshed !== undefined && <span>Quote live: {scanMeta.livePriceRefreshed}</span>}
+            {view !== 'entry' && Boolean(scanMeta?.livePriceFailed) && <span className="fresh-warn">Quote gagal: {scanMeta?.livePriceFailed}</span>}
+            <span>Sinyal terakhir: {formatFreshness(scanMeta?.latestSignalAt || scanMeta?.latestScannedAt || undefined)}</span>
+            <span>Harga terakhir: {formatFreshness(scanMeta?.latestDataAt || scanMeta?.latestScannedAt || undefined)}</span>
+            {view !== 'entry' && <span>Scan DB: {formatFreshness(scanMeta?.latestScannedAt || undefined)}</span>}
+            {view === 'entry' && <span>Match: {scanMeta?.matched ?? 0}/{scanMeta?.scanned ?? '-'}</span>}
+            {view === 'entry' && Boolean(scanMeta?.failures) && <span className="fresh-warn">Fetch gagal: {scanMeta?.failures}</span>}
             <span className={(scanMeta?.isLatestSignalFresh ?? scanMeta?.isLatestScanFresh) ? 'fresh-ok' : 'fresh-warn'}>
-              {(scanMeta?.isLatestSignalFresh ?? scanMeta?.isLatestScanFresh) ? (view === 'entry' ? 'LIVE_SCAN_RECENT' : 'LATEST_SIGNAL_RECENT') : 'PRESS_RUN_SCAN_FOR_LATEST'}
+              {(scanMeta?.isLatestSignalFresh ?? scanMeta?.isLatestScanFresh) ? 'Data masih baru' : 'Klik Scan terbaru'}
             </span>
+          </div>
+
+          <div className="explain-strip">
+            <div><strong>Kapan masuk?</strong><span>Kolom muncul menunjukkan waktu sinyal pertama kali masuk kategori ini.</span></div>
+            <div><strong>Progress</strong><span>Delta dan mini chart membandingkan harga terbaru terhadap entry awal.</span></div>
+            <div><strong>Evaluasi D+2</strong><span>Hanya menghitung jam bursa aktif. Weekend, libur, atau quote/IHSG tidak bergerak tidak dihitung.</span></div>
           </div>
 
           {(loading || scanning) && data.length === 0 ? (
             <div className="loading-container">
               <div className="scanner-glow"></div>
-              <div className="loading-text">{scanning ? (view === 'entry' ? "SCANNING_ENTRY_WINDOWS..." : "MAPPING_MARKET_DNA...") : "ESTABLISHING_DATA_LINK..."}</div>
-              <div className="loading-sub">{view === 'entry' ? "REPLAYING /api/technical TRADE PLANS" : "ANALYZING 900+ CANDIDATES"}</div>
+              <div className="loading-text">{scanning ? (view === 'entry' ? "Memindai area entry..." : "Membaca ulang pasar...") : "Menghubungkan data..."}</div>
+              <div className="loading-sub">{view === 'entry' ? "Menyinkronkan trade plan teknikal" : "Memakai sinyal DB dan hanya memperbarui kandidat terbaru"}</div>
             </div>
           ) : displayedSignals.length === 0 ? (
-            <div className="empty-viewport">NO_SIGNALS_DETECTED_IN_THIS_VECTOR</div>
+            <div className="empty-viewport">Tidak ada sinyal aktif untuk filter ini.</div>
           ) : (
             <div className={`table-responsive custom-scrollbar ${(loading || scanning) ? 'opacity-50' : ''}`}>
               <table className="signals-table">
@@ -784,23 +896,23 @@ export default function ScreenerPage() {
                     <th style={{width: '14%'}}>TICKER</th>
                     <th style={{width: '16%'}}>
                       <div className="vector-header-filter">
-                        <span>VECTOR</span>
+                        <span>KATEGORI / VECTOR</span>
                         <select value={vectorFilter} onChange={e => setVectorFilter(e.target.value)} className="vector-column-select">
-                          <option value="all">ALL_VECTOR</option>
+                          <option value="all">Semua kategori</option>
                           {vectorOptions.map(option => (
-                            <option key={option} value={option}>{option}</option>
+                            <option key={option} value={option}>{formatCategory(option)}</option>
                           ))}
                         </select>
                       </div>
                     </th>
-                    <th className="hide-tablet" style={{width: '10%'}}>APPEARED</th>
-                    <th className="hide-tablet text-right" style={{width: '8%'}}>{view === 'entry' ? 'RISK/RR' : 'RISK%'}</th>
-                    <th className="text-right" style={{width: '10%'}}>{view === 'entry' ? 'ENTRY_ZONE' : 'ENTRY'}</th>
-                    <th className="text-right" style={{width: '12%'}}>{view === 'entry' ? 'TARGET_1' : 'PIVOT_TP'}</th>
-                    <th className="hide-tablet text-right" style={{width: '10%'}}>{view === 'entry' ? 'HARD_STOP' : 'ABORT_SL'}</th>
+                    <th className="hide-tablet" style={{width: '10%'}}>MUNCUL</th>
+                    <th className="hide-tablet text-right" style={{width: '8%'}}>RISK / RR</th>
+                    <th className="text-right" style={{width: '10%'}}>ENTRY</th>
+                    <th className="text-right" style={{width: '12%'}}>TARGET</th>
+                    <th className="hide-tablet text-right" style={{width: '10%'}}>STOP</th>
                     <th className="text-right" style={{width: '8%'}}>DELTA</th>
-                    <th className="hide-mobile text-center" style={{width: '12%'}}>PATH</th>
-                    <th className="text-center" style={{width: '5%'}}>OPS</th>
+                    <th className="hide-mobile text-center" style={{width: '12%'}}>MINI CHART</th>
+                    <th className="text-center" style={{width: '5%'}}>CHART</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -811,12 +923,17 @@ export default function ScreenerPage() {
                     const profit = row.deltaPct ?? ((hasCurrentPrice && referencePrice) ? ((row.currentPrice! - referencePrice) / referencePrice) * 100 : null);
                     const history = row.priceHistory || [];
                     const pathData = history.length > 1 ? history : (referencePrice && hasCurrentPrice ? [{ price: referencePrice }, { price: row.currentPrice! }] : []);
+                    const pathFirst = pathData[0]?.price;
+                    const pathLast = pathData[pathData.length - 1]?.price;
+                    const pathDirection = Number(pathLast) >= Number(pathFirst) ? 'naik' : 'turun';
                     const entryDisplay = view === 'entry' && row.entryLow && row.entryHigh
                       ? `${row.entryLow}-${row.entryHigh}`
-                      : row.buyArea;
+                      : formatPrice(row.buyArea);
                     const riskDisplay = view === 'entry'
                       ? `${row.maxLossPct?.toFixed(1) || row.riskPct || '-'}%/${row.rewardRisk?.toFixed(2) || '-'}R`
                       : (row.riskPct ? `${row.riskPct}%` : '-');
+                    const evaluation = row.evaluation || row.metadata?.evaluation;
+                    const tone = evaluationTone(evaluation?.status);
                     
                     return (
                       <tr key={i} className="signal-row">
@@ -830,7 +947,7 @@ export default function ScreenerPage() {
                               </div>
                             )}
                             <div className="ticker-metadata">
-                              <span>{row.category || row.metadata?.category || 'TECHNICAL'}</span>
+                              <span>{formatCategory(row.category || row.metadata?.category)}</span>
                               <span>QUOTE: {formatFreshness(row.lastQuoteDate || row.metadata?.lastQuoteDate)}</span>
                               {row.state && <span>{row.stateLabel || row.state}</span>}
                               {row.metadata?.confidenceLevel && (
@@ -887,21 +1004,23 @@ export default function ScreenerPage() {
                         <td className="hide-tablet">
                           <div className="appeared-cell">
                             <span>{formatDateTime(row.appearedAt || row.createdAt || row.entryDate)}</span>
-                            <small>SCAN {formatFreshness(row.lastScannedAt || row.updatedAt || row.metadata?.lastScannedAt || row.metadata?.scanRunAt)}</small>
+                            <small>{formatSignalAge(evaluation?.activeMarketHours ?? evaluation?.ageHours)}</small>
+                            <small>Scan: {formatFreshness(row.lastScannedAt || row.updatedAt || row.metadata?.lastScannedAt || row.metadata?.scanRunAt)}</small>
                           </div>
                         </td>
                         <td className="hide-tablet text-right risk-cell">{riskDisplay}</td>
                         <td className="text-right weight-700">{entryDisplay}</td>
-                        <td className="text-right weight-700 text-emerald">{targetPrice ? Number(targetPrice).toFixed(Number(targetPrice) % 1 !== 0 ? 2 : 0) : '-'}</td>
-                        <td className="text-right hide-tablet text-rose weight-700">{row.sl ?? '-'}</td>
+                        <td className="text-right weight-700 text-emerald">{formatPrice(targetPrice)}</td>
+                        <td className="text-right hide-tablet text-rose weight-700">{formatPrice(row.sl)}</td>
                         <td className="text-right">
                           <div className="profit-cell">
                             <span className={`profit-val ${profit === null || profit >= 0 ? 'pos' : 'neg'}`}>
                               {profit === null ? '-' : `${profit >= 0 ? '+' : ''}${profit.toFixed(1)}%`}
                             </span>
                             <span className="time-val">
-                              {hasCurrentPrice ? `CUR ${row.currentPrice}` : 'CUR -'}
+                              {hasCurrentPrice ? `harga ${formatPrice(row.currentPrice)}` : 'harga -'}
                             </span>
+                            <span className={`evaluation-pill ${tone}`}>{evaluation?.label || 'Menunggu evaluasi'}</span>
                           </div>
                         </td>
                         <td className="hide-mobile">
@@ -924,12 +1043,13 @@ export default function ScreenerPage() {
                                 />
                               </svg>
                             )}
+                            {pathData.length > 1 && <small className={`sparkline-caption ${pathDirection}`}>trend {pathDirection}</small>}
                           </div>
                         </td>
                         <td className="text-center">
                           <Link href={`/search?symbol=${row.ticker}`} className="analyze-link">
                               <BarChart2 size={14} />
-                              <span className="hide-tablet">INTEL</span>
+                              <span className="hide-tablet">Report</span>
                           </Link>
                         </td>
                       </tr>
@@ -976,13 +1096,30 @@ export default function ScreenerPage() {
             min-width: 300px;
         }
 
+        .eyebrow {
+            color: var(--accent-emerald);
+            font-size: 0.68rem;
+            font-weight: 1000;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
         .main-title {
-            font-size: 1.5rem;
+            font-size: clamp(1.4rem, 3vw, 2.4rem);
             font-weight: 1000;
             color: white;
-            letter-spacing: 0.15em;
-            margin-bottom: 20px;
+            letter-spacing: -0.03em;
+            margin-bottom: 8px;
             text-shadow: 0 0 20px oklch(1 0 0 / 0.1);
+        }
+
+        .page-subtitle {
+            color: oklch(0.74 0.02 240);
+            max-width: 720px;
+            line-height: 1.6;
+            font-size: 0.86rem;
+            margin: 0 0 20px;
         }
 
         .tabs-container {
@@ -1019,6 +1156,22 @@ export default function ScreenerPage() {
             flex-direction: column;
             gap: 12px;
             align-items: flex-end;
+            background: oklch(0.12 0.015 240 / 0.78);
+            border: 1px solid var(--border-tactical);
+            border-radius: 14px;
+            padding: 14px;
+        }
+
+        .filter-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            width: 100%;
+            font-size: 0.68rem;
+            font-weight: 1000;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         .filters-row, .actions-row {
@@ -1030,7 +1183,18 @@ export default function ScreenerPage() {
             position: relative;
             background: oklch(0.12 0.01 240);
             border: 1px solid var(--border-tactical);
-            border-radius: 6px;
+            border-radius: 10px;
+            min-width: 168px;
+        }
+
+        .select-wrapper label {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.52rem;
+            font-weight: 1000;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 8px 32px 0 12px;
         }
 
         .select-wrapper select {
@@ -1038,13 +1202,25 @@ export default function ScreenerPage() {
             background: transparent;
             border: none;
             color: white;
-            font-size: 0.7rem;
+            font-size: 0.72rem;
             font-weight: 800;
-            padding: 6px 32px 6px 12px;
+            padding: 3px 32px 8px 12px;
             cursor: pointer;
             width: 100%;
             font-family: inherit;
-            min-height: 40px;
+            min-height: 34px;
+        }
+
+        .select-wrapper select option,
+        .vector-column-select option {
+            background: #11131a;
+            color: #f8fafc;
+        }
+
+        .select-wrapper select:focus,
+        .vector-column-select:focus {
+            outline: 2px solid oklch(0.75 0.2 200 / 0.55);
+            outline-offset: 2px;
         }
 
         .select-icon {
@@ -1209,10 +1385,50 @@ export default function ScreenerPage() {
         }
 
         .view-label {
-            font-size: 0.8rem;
+            display: block;
+            font-size: 0.9rem;
             font-weight: 1000;
             color: white;
             letter-spacing: 0.05em;
+        }
+
+        .view-helper {
+            margin: 4px 0 0;
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            font-weight: 700;
+            line-height: 1.5;
+            max-width: 760px;
+            letter-spacing: 0;
+        }
+
+        .explain-strip {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1px;
+            background: var(--border-tactical);
+            border-bottom: 1px solid var(--border-tactical);
+        }
+
+        .explain-strip div {
+            background: oklch(0.13 0.016 240);
+            padding: 14px 18px;
+        }
+
+        .explain-strip strong {
+            display: block;
+            color: white;
+            font-size: 0.68rem;
+            font-weight: 1000;
+            margin-bottom: 4px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .explain-strip span {
+            color: oklch(0.7 0.02 240);
+            font-size: 0.68rem;
+            line-height: 1.45;
         }
 
         .refreshing-tag {
@@ -1299,7 +1515,7 @@ export default function ScreenerPage() {
             width: 100%;
             min-width: 170px;
             appearance: none;
-            background: oklch(0.11 0.012 240);
+            background: #11131a;
             border: 1px solid var(--border-tactical);
             color: white;
             border-radius: 5px;
@@ -1408,10 +1624,44 @@ export default function ScreenerPage() {
         .profit-val.neg { color: var(--accent-rose); }
         .time-val { font-size: 0.65rem; color: var(--text-muted); font-weight: 800; }
 
-        .sparkline-container { width: 100px; height: 30px; margin: 0 auto; }
+        .evaluation-pill {
+            display: inline-flex;
+            margin-top: 5px;
+            padding: 3px 6px;
+            border-radius: 999px;
+            font-size: 0.52rem;
+            font-weight: 1000;
+            line-height: 1.2;
+            max-width: 150px;
+            text-align: left;
+        }
+
+        .evaluation-pill.watching {
+            color: oklch(0.82 0.18 95);
+            background: oklch(0.82 0.18 95 / 0.12);
+            border: 1px solid oklch(0.82 0.18 95 / 0.22);
+        }
+
+        .evaluation-pill.continue {
+            color: var(--accent-emerald);
+            background: oklch(0.7 0.2 150 / 0.12);
+            border: 1px solid oklch(0.7 0.2 150 / 0.24);
+        }
+
+        .evaluation-pill.failed {
+            color: var(--accent-rose);
+            background: oklch(0.6 0.2 25 / 0.14);
+            border: 1px solid oklch(0.6 0.2 25 / 0.25);
+        }
+
+        .sparkline-container { width: 110px; min-height: 42px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        .sparkline-container svg { width: 100px; height: 30px; }
         .sparkline-path { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
         .sparkline-path.pos { stroke: var(--accent-emerald); filter: drop-shadow(0 0 4px oklch(0.7 0.2 150 / 0.4)); }
         .sparkline-path.neg { stroke: var(--accent-rose); filter: drop-shadow(0 0 4px oklch(0.6 0.2 25 / 0.4)); }
+        .sparkline-caption { color: var(--text-muted); font-size: 0.5rem; font-weight: 1000; text-transform: uppercase; }
+        .sparkline-caption.naik { color: var(--accent-emerald); }
+        .sparkline-caption.turun { color: var(--accent-rose); }
 
         .analyze-link {
             display: inline-flex;
@@ -1450,6 +1700,7 @@ export default function ScreenerPage() {
             .controls-group { width: 100%; align-items: stretch; }
             .filters-row, .actions-row { flex-wrap: wrap; }
             .select-wrapper { flex: 1; min-width: 120px; }
+            .explain-strip { grid-template-columns: 1fr; }
             .settings-grid { grid-template-columns: 1fr; }
             .hide-tablet { display: none; }
             .signals-table td, .signals-table th { padding: 12px 16px; }
@@ -1462,7 +1713,8 @@ export default function ScreenerPage() {
             .header-left { min-width: 0; width: 100%; }
             .hide-mobile { display: none; }
             .ticker-name { font-size: 0.95rem; }
-            .main-title { font-size: 1.05rem; margin-bottom: 12px; letter-spacing: 0.1em; }
+            .main-title { font-size: 1.35rem; margin-bottom: 8px; letter-spacing: -0.02em; }
+            .page-subtitle { font-size: 0.76rem; margin-bottom: 12px; }
             .tabs-container { padding-bottom: 10px; margin-inline: -10px; padding-inline: 10px; scroll-snap-type: x proximity; }
             .tab-item { padding: 10px 12px; font-size: 0.62rem; min-height: 42px; scroll-snap-align: start; }
             .filters-row, .actions-row { display: grid; grid-template-columns: 1fr 1fr; width: 100%; gap: 8px; }
@@ -1472,9 +1724,11 @@ export default function ScreenerPage() {
             .viewport-header { padding: 14px 12px; align-items: flex-start; flex-direction: column; gap: 8px; }
             .header-status { align-items: flex-start; gap: 8px; flex-wrap: wrap; }
             .view-label { font-size: 0.72rem; }
+            .view-helper { font-size: 0.62rem; }
             .risk-badge { font-size: 0.58rem; }
             .scan-freshness-strip { padding: 10px 12px; gap: 8px; font-size: 0.55rem; flex-wrap: nowrap; overflow-x: auto; }
             .scan-freshness-strip span { flex: 0 0 auto; }
+            .explain-strip div { padding: 12px; }
             .table-responsive { overflow: visible; }
             .signals-table { min-width: 0; width: 100%; display: block; white-space: normal; }
             .signals-table thead { display: none; }
@@ -1484,11 +1738,11 @@ export default function ScreenerPage() {
             .signals-table td:last-child { border-bottom: none; }
             .signals-table td::before { color: var(--text-muted); font-size: 0.55rem; font-weight: 1000; letter-spacing: 0.08em; }
             .signals-table td:nth-child(1)::before { content: 'TICKER'; }
-            .signals-table td:nth-child(2)::before { content: 'VECTOR'; }
+            .signals-table td:nth-child(2)::before { content: 'KATEGORI'; }
             .signals-table td:nth-child(5)::before { content: 'ENTRY'; }
             .signals-table td:nth-child(6)::before { content: 'TARGET'; }
             .signals-table td:nth-child(8)::before { content: 'DELTA'; }
-            .signals-table td:nth-child(10)::before { content: 'OPS'; }
+            .signals-table td:nth-child(10)::before { content: 'CHART'; }
             .strategy-badge { max-width: 100%; overflow-wrap: anywhere; }
             .ticker-metadata { gap: 6px; }
             .analyze-link { min-height: 40px; justify-content: center; }
