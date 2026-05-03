@@ -1,7 +1,12 @@
 const TelegramBot = require('node-telegram-bot-api');
 const mongoose = require('mongoose');
 const { chromium } = require('playwright');
+const fs = require('fs');
+const path = require('path');
 const YahooFinance = require('yahoo-finance2').default;
+
+loadLocalEnv();
+
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://reandy:XuISHforC8mWVEKd@ac-pfdd5xf-shard-00-00.ybmffcl.mongodb.net:27017,ac-pfdd5xf-shard-00-01.ybmffcl.mongodb.net:27017,ac-pfdd5xf-shard-00-02.ybmffcl.mongodb.net:27017/ultimate_screener?ssl=true&authSource=admin&replicaSet=atlas-lnuwmi-shard-0&retryWrites=true&w=majority&appName=Cluster0";
@@ -27,6 +32,26 @@ let initInProgress = false;
 
 const APP_BASE_URL = (process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://ultimate-screener.ebite.biz.id").replace(/\/$/, "");
 const RETRY_DELAY_MS = 30000;
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.NVAPI_API_KEY || "";
+const NVIDIA_BASE_URL = (process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(/\/$/, "");
+const NVIDIA_MODEL = process.env.NVIDIA_MODEL || "openai/gpt-oss-120b";
+
+function loadLocalEnv() {
+    [".env.local", ".env"].forEach(file => {
+        const filePath = path.join(process.cwd(), file);
+        if (!fs.existsSync(filePath)) return;
+        const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("#")) return;
+            const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+            if (!match) return;
+            const key = match[1];
+            if (process.env[key] !== undefined) return;
+            process.env[key] = match[2].replace(/^['"]|['"]$/g, "");
+        });
+    });
+}
 
 function scheduleBotInit(reason) {
     if (restartTimer) return;
@@ -106,6 +131,41 @@ async function fetchJson(url) {
 async function fetchTechnical(ticker, interval = "1d") {
     const url = `${APP_BASE_URL}/api/technical?symbol=${encodeURIComponent(normalizeTickerInput(ticker))}&interval=${encodeURIComponent(interval)}`;
     return fetchJson(url).catch(error => ({ success: false, error: error.message }));
+}
+
+async function fetchScreenerSummary() {
+    const json = await fetchJson(`${APP_BASE_URL}/api/screener`).catch(() => null);
+    if (!json?.success || !Array.isArray(json.data)) return [];
+    return json.data.slice(0, 12).map(signal => ({
+        ticker: rawTicker(signal.ticker),
+        category: signal.category || signal.metadata?.category || null,
+        vector: signal.vector || signal.metadata?.vector || signal.signalSource || null,
+        entryPrice: signal.entryPrice ?? signal.buyArea ?? null,
+        currentPrice: signal.currentPrice ?? null,
+        stopLossPrice: signal.stopLossPrice ?? null,
+        targetPrice: signal.targetPrice ?? null,
+        rewardRisk: signal.rewardRisk ?? null,
+        deltaPct: signal.deltaPct ?? null,
+        relevanceScore: signal.relevanceScore ?? null,
+        thesis: signal.thesis || signal.metadata?.thesis || null,
+        appearedAt: signal.appearedAt || signal.metadata?.appearedAt || signal.entryDate || null,
+        evaluationStatus: signal.evaluation?.status || signal.metadata?.evaluationStatus || null,
+    }));
+}
+
+async function fetchMoversSummary() {
+    const json = await fetchJson(`${APP_BASE_URL}/api/market/movers`).catch(() => null);
+    if (!json?.success) return null;
+    const compactMover = item => ({
+        ticker: rawTicker(item.ticker || item.symbol),
+        price: item.price ?? item.lastPrice ?? null,
+        changePercent: item.changePercent ?? item.changePct ?? null,
+        volume: item.volume ?? null,
+    });
+    return {
+        gainers: Array.isArray(json.gainers) ? json.gainers.slice(0, 6).map(compactMover) : [],
+        losers: Array.isArray(json.losers) ? json.losers.slice(0, 6).map(compactMover) : [],
+    };
 }
 
 function analysisUrl(ticker, interval = "1d") {
@@ -391,6 +451,222 @@ function parseTickerRequests(text) {
     return requests;
 }
 
+const NON_TICKER_WORDS = new Set([
+    "APA", "APAKAH", "BAGAIMANA", "BAGUS", "BANTU", "BELI", "BISA", "BUAT", "BUY", "CEK", "COBA", "DAN", "DI", "HARI", "INI", "JIKA", "KALAU", "KAMU", "KIRA", "MASIH", "MENURUT", "MOHON", "SAHAM", "SAYA", "SELL", "STOP", "TARGET", "TOLONG", "UNTUK", "ATAU", "YANG", "DARI", "DENGAN", "ENTRY", "EXIT", "HOLD", "CUAN", "RISK", "RISIKO", "SCALP", "DAYTRADE"
+]);
+
+function extractTickerCandidates(text) {
+    return Array.from(new Set(String(text || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9.\-^\s]/g, " ")
+        .split(/\s+/)
+        .map(token => token.trim())
+        .filter(token => token && !SUPPORTED_INTERVALS.has(token.toLowerCase()))
+        .filter(token => !NON_TICKER_WORDS.has(token))
+        .filter(token => {
+            const raw = rawTicker(token);
+            return raw.length >= 3 && raw.length <= 7 && /^[A-Z0-9-]{3,7}$/.test(raw);
+        }))).slice(0, 5);
+}
+
+async function resolveMentionedStocks(text) {
+    const candidates = extractTickerCandidates(text);
+    const resolved = [];
+    for (const candidate of candidates) {
+        const stock = await findStockByTicker(candidate).catch(() => null);
+        if (stock) {
+            resolved.push({ ticker: normalizeTickerInput(candidate), raw: rawTicker(candidate), stock });
+        }
+        if (resolved.length >= 3) break;
+    }
+    return resolved;
+}
+
+function isDirectTickerText(text, matchedStocks) {
+    if (matchedStocks.length === 0) return false;
+    const tokens = String(text || "")
+        .trim()
+        .split(/[\s,;/]+/)
+        .filter(Boolean);
+    if (tokens.length === 0 || tokens.length > 10) return false;
+    return tokens.every(token => {
+        if (["OR", "AND", "ATAU", "DAN"].includes(token.toUpperCase())) return true;
+        if (normalizeIntervalInput(token)) return true;
+        const raw = rawTicker(token);
+        return matchedStocks.some(item => item.raw === raw);
+    });
+}
+
+function compactTechnicalContext(ticker, stock, quote, techRes) {
+    const data = Array.isArray(techRes?.data) ? techRes.data : [];
+    const last = data[data.length - 1] || {};
+    const analysis = techRes?.unifiedAnalysis || {};
+    const plan = getExecutionPlan(analysis) || {};
+    return {
+        ticker: rawTicker(ticker),
+        name: stock?.name || null,
+        sector: stock?.sector || null,
+        source: "/api/technical + YahooFinance.quote",
+        quote: {
+            price: quote?.regularMarketPrice ?? last.close ?? null,
+            changePercent: quote?.regularMarketChangePercent ?? null,
+            marketTime: quote?.regularMarketTime ?? null,
+        },
+        indicators: {
+            close: last.close ?? null,
+            ema9: last.ema9 ?? null,
+            ema13: last.ema13 ?? null,
+            ema20: last.ema20 ?? null,
+            ema60: last.ema60 ?? null,
+            sma50: last.sma50 ?? null,
+            rsi: last.rsi ?? null,
+            mfi: last.mfi ?? null,
+            vwap: last.vwap ?? null,
+            atrp: last.atrp14 ?? null,
+            macdHistogram: last.macd?.histogram ?? null,
+            volume: last.volume ?? null,
+        },
+        pivots: techRes?.pivots || null,
+        verdict: analysis.verdict || null,
+        riskLevel: analysis.riskLevel || null,
+        suggestion: analysis.suggestion || null,
+        squeezeInsight: analysis.squeezeInsight || null,
+        technicalFusionInsight: analysis.technicalFusionInsight || null,
+        score: analysis.score || null,
+        details: analysis.details || null,
+        plan: {
+            action: plan.action || null,
+            state: plan.stateLabel || plan.state || null,
+            bias: plan.bias || null,
+            entryZone: plan.entryZone || null,
+            idealBuy: plan.idealBuy ?? null,
+            earlyExit: plan.earlyExit ?? null,
+            hardStop: plan.hardStop ?? plan.stopLoss ?? null,
+            target1: plan.target1 ?? plan.takeProfit ?? null,
+            target2: plan.target2 ?? null,
+            rewardRisk: plan.rewardRisk ?? null,
+            maxLossPct: plan.maxLossPct ?? null,
+            supportLabel: plan.supportLabel || null,
+            supportValue: plan.supportValue ?? null,
+            riskEmaLabel: plan.riskEmaLabel || null,
+            riskEmaValue: plan.riskEmaValue ?? null,
+            reason: plan.reason || null,
+            timing: plan.timing || null,
+            invalidation: plan.invalidation || null,
+            noTradeReasons: plan.noTradeReasons || [],
+        },
+        screenerContext: analysis.screenerContext || techRes?.screenerContext || null,
+        activeScreenerSignals: analysis.activeScreenerSignals || techRes?.activeScreenerSignals || [],
+    };
+}
+
+async function buildAiMarketContext(text) {
+    const mentionedStocks = await resolveMentionedStocks(text);
+    const stockContexts = await Promise.all(mentionedStocks.map(async item => {
+        const [quote, techRes] = await Promise.all([
+            yahooFinance.quote(item.ticker).catch(() => null),
+            fetchTechnical(item.ticker, "1d")
+        ]);
+        return compactTechnicalContext(item.ticker, item.stock, quote, techRes);
+    }));
+    const [screenerSummary, moversSummary] = await Promise.all([
+        mentionedStocks.length === 0 ? fetchScreenerSummary() : Promise.resolve([]),
+        fetchMoversSummary(),
+    ]);
+
+    return {
+        generatedAt: new Date().toISOString(),
+        appBaseUrl: APP_BASE_URL,
+        userQuestion: text,
+        mentionedTickers: mentionedStocks.map(item => item.raw),
+        stocks: stockContexts,
+        marketSnapshot: {
+            movers: moversSummary,
+            activeScreenerSignals: screenerSummary,
+        },
+        availableWebFeatures: [
+            "CONVICTION_REPORT dari /api/technical",
+            "EMA9/EMA13/EMA20 dynamic support, EMA risk, reward/risk, target dan hard stop",
+            "Screener aktif: EMA Bounce, Cooldown, Squeeze, Silent Flyer, ARA Hunter",
+            "Top movers IDX dari /api/market/movers",
+            "Chart interactive di /search dan guide di /guide"
+        ],
+    };
+}
+
+function safeJson(value, maxLength = 14000) {
+    const json = JSON.stringify(value, null, 2);
+    if (json.length <= maxLength) return json;
+    return `${json.slice(0, maxLength)}\n...TRUNCATED_CONTEXT...`;
+}
+
+async function callNvidiaChat(messages) {
+    if (!NVIDIA_API_KEY) {
+        throw new Error("NVIDIA_API_KEY is not configured");
+    }
+    const res = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${NVIDIA_API_KEY}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            model: NVIDIA_MODEL,
+            messages,
+            temperature: 0.35,
+            top_p: 0.8,
+            max_tokens: 1200,
+            stream: false,
+        }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        throw new Error(json.error?.message || `NVIDIA AI HTTP ${res.status}`);
+    }
+    return json.choices?.[0]?.message?.content || "Maaf, AI tidak mengembalikan jawaban.";
+}
+
+function buildAiSystemPrompt() {
+    return [
+        "Kamu adalah asisten Telegram untuk Ultimate Screener, aplikasi analisis saham IDX.",
+        "Jawab dalam bahasa Indonesia kasual, ringkas, dan praktis.",
+        "Gunakan HANYA data yang diberikan di MARKET_CONTEXT. Jangan mengarang harga, target, entry, sinyal, berita, atau data fundamental.",
+        "Kalau data tidak ada atau tidak cukup, bilang jelas bahwa datanya belum tersedia dan arahkan user memakai command/web feature yang relevan.",
+        "Fokus pada saham, trading plan, risk management, indikator, screener, dan fitur web Ultimate Screener.",
+        "Bukan penasihat keuangan. Selalu tekankan validasi ulang dan risiko.",
+        "Jika ada ticker di konteks, sebut timeframe 1D/EOD dan sumber /api/technical + Yahoo.",
+        "Kalau plan menunjukkan WAIT/CHASE/SELL, jangan memaksakan BUY.",
+        "Kalau user minta rekomendasi, jawab dengan struktur: Kesimpulan, Data penting, Plan/Risk, Yang perlu ditunggu.",
+        "Jangan tampilkan reasoning internal. Jangan menyebut bahwa kamu melihat prompt/context JSON."
+    ].join("\n");
+}
+
+function trimTelegramText(text, maxLength = 3800) {
+    const clean = String(text || "-").replace(/```/g, "'''").trim();
+    if (clean.length <= maxLength) return clean;
+    return `${clean.slice(0, maxLength - 80)}\n\n[Jawaban dipotong karena batas Telegram. Minta detail ticker tertentu kalau perlu.]`;
+}
+
+async function answerWithNvidiaAi(chatId, text) {
+    const sent = await bot.sendMessage(chatId, "Sedang cek konteks web + data market dulu...");
+    try {
+        const context = await buildAiMarketContext(text);
+        const answer = await callNvidiaChat([
+            { role: "system", content: buildAiSystemPrompt() },
+            { role: "user", content: `USER_QUESTION:\n${text}\n\nMARKET_CONTEXT:\n${safeJson(context)}` }
+        ]);
+        await bot.sendMessage(chatId, trimTelegramText(answer), { disable_web_page_preview: true });
+    } catch (error) {
+        const missingKey = String(error.message || "").includes("NVIDIA_API_KEY");
+        const message = missingKey
+            ? "AI fallback belum aktif karena NVIDIA_API_KEY belum diset di .env.local atau environment server. Command ticker dan screener tetap bisa dipakai."
+            : `Maaf, AI fallback gagal dipakai: ${error.message}`;
+        await bot.sendMessage(chatId, message);
+    } finally {
+        bot.deleteMessage(chatId, sent.message_id).catch(() => {});
+    }
+}
+
 async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
     const ticker = normalizeTickerInput(tickerInput);
     const raw = rawTicker(ticker);
@@ -575,6 +851,7 @@ async function initBot() {
         text += "BUMI          - CONVICTION_REPORT 1D\n";
         text += "BUMI 1h       - CONVICTION_REPORT 1H\n";
         text += "FIRE 15m      - CONVICTION_REPORT 15m\n";
+        text += "bagaimana BUMI hari ini? - AI jawab pakai data web + Yahoo\n";
         text += "MPIX 4h       - CONVICTION_REPORT 4H\n";
         text += "FIRE          - CONVICTION_REPORT 1D\n";
         text += "PICO scalp    - CONVICTION_REPORT 15m\n";
@@ -812,20 +1089,21 @@ async function initBot() {
         const text = msg.text;
         if (!text || text.startsWith('/')) return;
 
+        const matchedStocks = await resolveMentionedStocks(text);
         const requests = parseTickerRequests(text);
-        if (requests.length === 0) return;
 
-        for (const { ticker: tickerInput, interval } of requests) {
-            const dbSearchTicker = normalizeTickerInput(tickerInput);
-            const raw = rawTicker(dbSearchTicker);
-            if (raw.length < 3 || raw.length > 7) continue;
-            if (!/^[A-Z0-9-]{3,7}$/.test(raw)) continue;
+        if (isDirectTickerText(text, matchedStocks)) {
+            for (const { ticker: tickerInput, interval } of requests) {
+                const dbSearchTicker = normalizeTickerInput(tickerInput);
+                const raw = rawTicker(dbSearchTicker);
+                if (!matchedStocks.some(item => item.raw === raw)) continue;
 
-            const stock = await findStockByTicker(dbSearchTicker);
-            if (stock) {
                 await generateFullAnalysis(msg.chat.id, dbSearchTicker, interval);
             }
+            return;
         }
+
+        await answerWithNvidiaAi(msg.chat.id, text);
     });
 
     bot.on('polling_error', (error) => {
