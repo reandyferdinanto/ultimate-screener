@@ -35,6 +35,8 @@ const RETRY_DELAY_MS = 30000;
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.NVAPI_API_KEY || "";
 const NVIDIA_BASE_URL = (process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1").replace(/\/$/, "");
 const NVIDIA_MODEL = process.env.NVIDIA_MODEL || "openai/gpt-oss-120b";
+const AI_CONTEXT_FETCH_TIMEOUT_MS = 9000;
+const NVIDIA_TIMEOUT_MS = 45000;
 
 function loadLocalEnv() {
     [".env.local", ".env"].forEach(file => {
@@ -122,8 +124,21 @@ async function findStockByTicker(value) {
     });
 }
 
-async function fetchJson(url) {
-    const res = await fetch(url);
+function fetchTimeoutSignal(timeoutMs) {
+    return typeof AbortSignal !== "undefined" && AbortSignal.timeout
+        ? AbortSignal.timeout(timeoutMs)
+        : undefined;
+}
+
+function withTimeout(promise, timeoutMs, fallbackValue) {
+    return Promise.race([
+        promise,
+        new Promise(resolve => setTimeout(() => resolve(fallbackValue), timeoutMs))
+    ]);
+}
+
+async function fetchJson(url, timeoutMs = AI_CONTEXT_FETCH_TIMEOUT_MS) {
+    const res = await fetch(url, { signal: fetchTimeoutSignal(timeoutMs) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
 }
@@ -136,25 +151,40 @@ async function fetchTechnical(ticker, interval = "1d") {
 async function fetchScreenerSummary() {
     const json = await fetchJson(`${APP_BASE_URL}/api/screener`).catch(() => null);
     if (!json?.success || !Array.isArray(json.data)) return [];
-    return json.data.slice(0, 12).map(signal => ({
-        ticker: rawTicker(signal.ticker),
-        category: signal.category || signal.metadata?.category || null,
-        vector: signal.vector || signal.metadata?.vector || signal.signalSource || null,
-        entryPrice: signal.entryPrice ?? signal.buyArea ?? null,
-        currentPrice: signal.currentPrice ?? null,
-        stopLossPrice: signal.stopLossPrice ?? null,
-        targetPrice: signal.targetPrice ?? null,
-        rewardRisk: signal.rewardRisk ?? null,
-        deltaPct: signal.deltaPct ?? null,
-        relevanceScore: signal.relevanceScore ?? null,
-        thesis: signal.thesis || signal.metadata?.thesis || null,
-        appearedAt: signal.appearedAt || signal.metadata?.appearedAt || signal.entryDate || null,
-        evaluationStatus: signal.evaluation?.status || signal.metadata?.evaluationStatus || null,
-    }));
+    return json.data
+        .map(signal => {
+            const entryPrice = signal.entryPrice ?? signal.buyArea ?? null;
+            const currentPrice = signal.currentPrice ?? null;
+            const distanceFromEntryPct = Number.isFinite(Number(entryPrice)) && Number(entryPrice) > 0 && Number.isFinite(Number(currentPrice))
+                ? Number((((Number(currentPrice) - Number(entryPrice)) / Number(entryPrice)) * 100).toFixed(2))
+                : null;
+            return {
+                ticker: rawTicker(signal.ticker),
+                category: signal.category || signal.metadata?.category || null,
+                vector: signal.vector || signal.metadata?.vector || signal.signalSource || null,
+                entryPrice,
+                currentPrice,
+                distanceFromEntryPct,
+                stopLossPrice: signal.stopLossPrice ?? null,
+                targetPrice: signal.targetPrice ?? null,
+                rewardRisk: signal.rewardRisk ?? null,
+                deltaPct: signal.deltaPct ?? null,
+                relevanceScore: signal.relevanceScore ?? null,
+                thesis: signal.thesis || signal.metadata?.thesis || null,
+                appearedAt: signal.appearedAt || signal.metadata?.appearedAt || signal.entryDate || null,
+                evaluationStatus: signal.evaluation?.status || signal.metadata?.evaluationStatus || null,
+            };
+        })
+        .sort((a, b) => {
+            const distanceA = Number.isFinite(Number(a.distanceFromEntryPct)) ? Math.abs(Number(a.distanceFromEntryPct)) : 999;
+            const distanceB = Number.isFinite(Number(b.distanceFromEntryPct)) ? Math.abs(Number(b.distanceFromEntryPct)) : 999;
+            return distanceA - distanceB || (Number(b.relevanceScore) || 0) - (Number(a.relevanceScore) || 0);
+        })
+        .slice(0, 12);
 }
 
 async function fetchMoversSummary() {
-    const json = await fetchJson(`${APP_BASE_URL}/api/market/movers`).catch(() => null);
+    const json = await fetchJson(`${APP_BASE_URL}/api/market/movers`, 6000).catch(() => null);
     if (!json?.success) return null;
     const compactMover = item => ({
         ticker: rawTicker(item.ticker || item.symbol),
@@ -563,24 +593,42 @@ function compactTechnicalContext(ticker, stock, quote, techRes) {
     };
 }
 
+function extractUserPosition(text, mentionedStocks) {
+    const rawText = String(text || "");
+    const buyMatch = rawText.match(/\b(?:beli|buy|entry|masuk)\s+(?:di\s+|harga\s+)?(?:rp\s*)?([0-9][0-9.,]*)/i)
+        || rawText.match(/\b(?:di|harga)\s+(?:rp\s*)?([0-9][0-9.,]*)/i);
+    if (!buyMatch) return null;
+
+    const entryPrice = Number(String(buyMatch[1]).replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(entryPrice) || entryPrice <= 0) return null;
+
+    return {
+        ticker: mentionedStocks[0]?.raw || null,
+        entryPrice,
+        note: "Jika current price lebih rendah dari entryPrice, posisi user sedang floating loss. Jika current price lebih tinggi, posisi user sedang floating profit."
+    };
+}
+
 async function buildAiMarketContext(text) {
     const mentionedStocks = await resolveMentionedStocks(text);
     const stockContexts = await Promise.all(mentionedStocks.map(async item => {
         const [quote, techRes] = await Promise.all([
-            yahooFinance.quote(item.ticker).catch(() => null),
+            withTimeout(yahooFinance.quote(item.ticker).catch(() => null), 6000, null),
             fetchTechnical(item.ticker, "1d")
         ]);
         return compactTechnicalContext(item.ticker, item.stock, quote, techRes);
     }));
+    const needsBroadMarket = mentionedStocks.length === 0 || /\b(support|screener|market|pasar|top|gainer|loser|watchlist|saham apa)\b/i.test(text);
     const [screenerSummary, moversSummary] = await Promise.all([
         mentionedStocks.length === 0 ? fetchScreenerSummary() : Promise.resolve([]),
-        fetchMoversSummary(),
+        needsBroadMarket ? fetchMoversSummary() : Promise.resolve(null),
     ]);
 
     return {
         generatedAt: new Date().toISOString(),
         appBaseUrl: APP_BASE_URL,
         userQuestion: text,
+        userPosition: extractUserPosition(text, mentionedStocks),
         mentionedTickers: mentionedStocks.map(item => item.raw),
         stocks: stockContexts,
         marketSnapshot: {
@@ -597,7 +645,7 @@ async function buildAiMarketContext(text) {
     };
 }
 
-function safeJson(value, maxLength = 14000) {
+function safeJson(value, maxLength = 8000) {
     const json = JSON.stringify(value, null, 2);
     if (json.length <= maxLength) return json;
     return `${json.slice(0, maxLength)}\n...TRUNCATED_CONTEXT...`;
@@ -609,6 +657,7 @@ async function callNvidiaChat(messages) {
     }
     const res = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
         method: "POST",
+        signal: fetchTimeoutSignal(NVIDIA_TIMEOUT_MS),
         headers: {
             "Authorization": `Bearer ${NVIDIA_API_KEY}`,
             "Content-Type": "application/json",
@@ -616,9 +665,9 @@ async function callNvidiaChat(messages) {
         body: JSON.stringify({
             model: NVIDIA_MODEL,
             messages,
-            temperature: 0.35,
+            temperature: 0.2,
             top_p: 0.8,
-            max_tokens: 1200,
+            max_tokens: 650,
             stream: false,
         }),
     });
@@ -632,14 +681,18 @@ async function callNvidiaChat(messages) {
 function buildAiSystemPrompt() {
     return [
         "Kamu adalah asisten Telegram untuk Ultimate Screener, aplikasi analisis saham IDX.",
-        "Jawab dalam bahasa Indonesia kasual, ringkas, dan praktis.",
+        "Jawab dalam bahasa Indonesia kasual, ringkas, tegas, dan praktis.",
         "Gunakan HANYA data yang diberikan di MARKET_CONTEXT. Jangan mengarang harga, target, entry, sinyal, berita, atau data fundamental.",
         "Kalau data tidak ada atau tidak cukup, bilang jelas bahwa datanya belum tersedia dan arahkan user memakai command/web feature yang relevan.",
         "Fokus pada saham, trading plan, risk management, indikator, screener, dan fitur web Ultimate Screener.",
         "Bukan penasihat keuangan. Selalu tekankan validasi ulang dan risiko.",
         "Jika ada ticker di konteks, sebut timeframe 1D/EOD dan sumber /api/technical + Yahoo.",
         "Kalau plan menunjukkan WAIT/CHASE/SELL, jangan memaksakan BUY.",
-        "Kalau user minta rekomendasi, jawab dengan struktur: Kesimpulan, Data penting, Plan/Risk, Yang perlu ditunggu.",
+        "Jika user menyebut harga beli, hitung floating P/L dengan rumus (currentPrice - entryPrice) / entryPrice * 100. Kalau currentPrice lebih rendah dari entryPrice, itu floating loss. Jangan sampai terbalik.",
+        "Jangan menghitung rugi lebih dari 100% untuk posisi saham biasa tanpa leverage.",
+        "Jangan gunakan tabel markdown, garis pemisah panjang, emoji, atau heading berlebihan. Telegram harus mudah dibaca.",
+        "Format jawaban maksimal 10 baris: Kesimpulan, Data, Plan, Risiko, Trigger validasi. Gunakan bullet pendek.",
+        "Jangan menutup dengan pertanyaan follow-up generik.",
         "Jangan tampilkan reasoning internal. Jangan menyebut bahwa kamu melihat prompt/context JSON."
     ].join("\n");
 }
@@ -652,17 +705,26 @@ function trimTelegramText(text, maxLength = 3800) {
 
 async function answerWithNvidiaAi(chatId, text) {
     const sent = await bot.sendMessage(chatId, "Sedang cek konteks web + data market dulu...");
+    const startedAt = Date.now();
     try {
+        const contextStartedAt = Date.now();
         const context = await buildAiMarketContext(text);
+        const contextMs = Date.now() - contextStartedAt;
+        const nvidiaStartedAt = Date.now();
         const answer = await callNvidiaChat([
             { role: "system", content: buildAiSystemPrompt() },
             { role: "user", content: `USER_QUESTION:\n${text}\n\nMARKET_CONTEXT:\n${safeJson(context)}` }
         ]);
+        console.log(`[Telegram AI] context=${contextMs}ms nvidia=${Date.now() - nvidiaStartedAt}ms total=${Date.now() - startedAt}ms`);
         await bot.sendMessage(chatId, trimTelegramText(answer), { disable_web_page_preview: true });
     } catch (error) {
         const missingKey = String(error.message || "").includes("NVIDIA_API_KEY");
+        const timeout = error.name === "TimeoutError" || error.name === "AbortError";
+        console.warn(`[Telegram AI] failed after ${Date.now() - startedAt}ms: ${error.message}`);
         const message = missingKey
             ? "AI fallback belum aktif karena NVIDIA_API_KEY belum diset di .env.local atau environment server. Command ticker dan screener tetap bisa dipakai."
+            : timeout
+                ? "AI terlalu lama merespons. Coba lagi dengan pertanyaan lebih spesifik, misalnya: /ask BUMI dekat support atau tidak?"
             : `Maaf, AI fallback gagal dipakai: ${error.message}`;
         await bot.sendMessage(chatId, message);
     } finally {
@@ -854,7 +916,7 @@ async function initBot() {
         text += "BUMI          - CONVICTION_REPORT 1D\n";
         text += "BUMI 1h       - CONVICTION_REPORT 1H\n";
         text += "FIRE 15m      - CONVICTION_REPORT 15m\n";
-        text += "bagaimana BUMI hari ini? - AI jawab pakai data web + Yahoo\n";
+        text += "/ask bagaimana BUMI hari ini? - AI jawab pakai data web + Yahoo\n";
         text += "MPIX 4h       - CONVICTION_REPORT 4H\n";
         text += "FIRE          - CONVICTION_REPORT 1D\n";
         text += "PICO scalp    - CONVICTION_REPORT 15m\n";
@@ -869,6 +931,15 @@ async function initBot() {
         text += "Buttons: View Chart, Refresh, Execution Plan.\n";
         text += "```";
         bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown' });
+    });
+
+    bot.onText(/\/ask(?:@\w+)?(?:\s+(.+))?$/i, async (msg, match) => {
+        const question = String(match?.[1] || "").trim();
+        if (!question) {
+            bot.sendMessage(msg.chat.id, "Pakai format: /ask pertanyaan kamu. Contoh: /ask Saya beli TRON harga 390, apakah aman?");
+            return;
+        }
+        await answerWithNvidiaAi(msg.chat.id, question);
     });
 
     bot.onText(/\/scalp/, async (msg) => {
@@ -1105,8 +1176,6 @@ async function initBot() {
             }
             return;
         }
-
-        await answerWithNvidiaAi(msg.chat.id, text);
     });
 
     bot.on('polling_error', (error) => {
