@@ -65,6 +65,19 @@ const formatRiskText = (value?: string) => {
 };
 
 const formatReportCopy = (value?: unknown) => String(value || "-")
+  .replace(/Price previously stretched far above EMA20, pulled back in a controlled way, then moved sideways with lower volatility\/volume while trend support held\./gi, "Harga sebelumnya sudah jauh dari EMA20, lalu pullback dengan rapi. Setelah itu geraknya mulai sideways, volatilitas dan volume turun, tapi support tren masih dijaga.")
+  .replace(/VOLATILITY ENGINE: EXPANSION PHASE\. Energy is being released aggressively\./gi, "Mesin volatilitas lagi fase ekspansi. Energinya sedang keluar cukup agresif.")
+  .replace(/VOLATILITY ENGINE: BREAKOUT INITIALIZED \((\d+) Bars\)\. Tension is resolving upwards\./gi, "Mesin volatilitas mulai breakout ($1 candle). Tekanan mulai lepas ke atas.")
+  .replace(/VOLATILITY ENGINE: NEUTRAL\. Seeking new range\./gi, "Mesin volatilitas lagi netral. Harga masih cari range baru.")
+  .replace(/VOLATILITY ENGINE:/gi, "Mesin volatilitas:")
+  .replace(/HIGH_COMPRESSION/gi, "kompresi tinggi")
+  .replace(/NORMAL_COMPRESSION/gi, "kompresi normal")
+  .replace(/LOW_COMPRESSION/gi, "kompresi ringan")
+  .replace(/NO_SQUEEZE/gi, "belum squeeze")
+  .replace(/\((\d+) Bars\)/gi, "($1 candle)")
+  .replace(/Flux is/gi, "Flux lagi")
+  .replace(/Momentum is ACCELERATING\./gi, "Momentum lagi akselerasi.")
+  .replace(/Momentum is DECELERATING\./gi, "Momentum mulai melambat.")
   .replace(/chart live sedang risk-off/gi, "chart live lagi risk-off")
   .replace(/chart live risk-off/gi, "chart live lagi risk-off")
   .replace(/\s+/g, " ")
@@ -450,6 +463,8 @@ function SearchContent() {
                     const plan = executionPlan;
                       const planRows = [
                         ["Area entry", plan.entryZone],
+                        ["Support aktif", plan.supportLabel ? `${plan.supportLabel} ${formatPrice(plan.supportValue)}` : "-"],
+                        ["Risk EMA", plan.riskEmaLabel ? `${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}` : "-"],
                         ["Beli ideal", plan.idealBuy ?? "-"],
                         ["Batas waspada", plan.earlyExit ?? "-"],
                         ["Stop batal", plan.hardStop ?? plan.stopLoss ?? "-"],

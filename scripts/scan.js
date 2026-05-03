@@ -512,7 +512,7 @@ async function analyzeTicker(stock) {
                 scanRunAt: scanRunAt.toISOString(),
                 dataSource: "YahooFinance.chart(1d) + EMA20/ATR/Bollinger-style volatility reset",
                 lastQuoteDate: marketDateIso,
-                thesis: "Price previously stretched far above EMA20, pulled back in a controlled way, then moved sideways with lower volatility/volume while trend support held.",
+                thesis: "Harga sebelumnya sudah jauh dari EMA20, lalu pullback dengan rapi. Setelah itu geraknya mulai sideways, volatilitas dan volume turun, tapi support tren masih dijaga.",
                 peakHigh: peakHigh.toFixed(2),
                 peakDist20: peakDist20.toFixed(2),
                 barsSincePeak,

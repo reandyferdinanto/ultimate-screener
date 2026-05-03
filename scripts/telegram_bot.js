@@ -152,6 +152,19 @@ function cleanMarkdownText(value, maxLength = 700) {
 
 function formatReportCopy(value, maxLength = 700) {
     return cleanMarkdownText(value, maxLength)
+        .replace(/Price previously stretched far above EMA20, pulled back in a controlled way, then moved sideways with lower volatility\/volume while trend support held\./gi, "Harga sebelumnya sudah jauh dari EMA20, lalu pullback dengan rapi. Setelah itu geraknya mulai sideways, volatilitas dan volume turun, tapi support tren masih dijaga.")
+        .replace(/VOLATILITY ENGINE: EXPANSION PHASE\. Energy is being released aggressively\./gi, "Mesin volatilitas lagi fase ekspansi. Energinya sedang keluar cukup agresif.")
+        .replace(/VOLATILITY ENGINE: BREAKOUT INITIALIZED \((\d+) Bars\)\. Tension is resolving upwards\./gi, "Mesin volatilitas mulai breakout ($1 candle). Tekanan mulai lepas ke atas.")
+        .replace(/VOLATILITY ENGINE: NEUTRAL\. Seeking new range\./gi, "Mesin volatilitas lagi netral. Harga masih cari range baru.")
+        .replace(/VOLATILITY ENGINE:/gi, "Mesin volatilitas:")
+        .replace(/HIGH_COMPRESSION/gi, "kompresi tinggi")
+        .replace(/NORMAL_COMPRESSION/gi, "kompresi normal")
+        .replace(/LOW_COMPRESSION/gi, "kompresi ringan")
+        .replace(/NO_SQUEEZE/gi, "belum squeeze")
+        .replace(/\((\d+) Bars\)/gi, "($1 candle)")
+        .replace(/Flux is/gi, "Flux lagi")
+        .replace(/Momentum is ACCELERATING\./gi, "Momentum lagi akselerasi.")
+        .replace(/Momentum is DECELERATING\./gi, "Momentum mulai melambat.")
         .replace(/chart live sedang risk-off/gi, "chart live lagi risk-off")
         .replace(/chart live risk-off/gi, "chart live lagi risk-off")
         .replace(/\s+/g, " ")
@@ -219,6 +232,8 @@ function buildConvictionReport(raw, interval, price, changePct, techRes) {
         md += `- RR             : ${plan.rewardRisk ?? "-"}R\n`;
         md += `- Maks. rugi     : ${plan.maxLossPct ?? "-"}%\n`;
         md += `- Area entry     : ${plan.entryZone || "-"}\n`;
+        if (plan.supportLabel) md += `- Support aktif  : ${plan.supportLabel} ${formatPrice(plan.supportValue)}\n`;
+        if (plan.riskEmaLabel) md += `- Risk EMA       : ${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}\n`;
         md += `- Beli ideal     : ${formatPrice(plan.idealBuy)}\n`;
         md += `- Batas waspada  : ${formatPrice(plan.earlyExit)}\n`;
         md += `- Stop batal     : ${formatPrice(plan.hardStop ?? plan.stopLoss)}\n`;
@@ -253,7 +268,7 @@ function buildConvictionReport(raw, interval, price, changePct, techRes) {
 
     md += "## FLOW_METRICS\n";
     const details = analysis.details || {};
-    ["mfi", "obv", "vwap", "rsi", "emaFast", "emaSwing", "emaBounce", "cooldown", "squeeze", "flux", "execution", "rewardRisk", "maxLoss", "atrp"].forEach(key => {
+    ["mfi", "obv", "vwap", "rsi", "emaFast", "emaSwing", "emaBounce", "emaSupport", "cooldown", "squeeze", "flux", "execution", "rewardRisk", "maxLoss", "atrp"].forEach(key => {
         if (details[key] !== undefined) md += `- ${key.padEnd(10)}: ${details[key]}\n`;
     });
     md += "```";
@@ -275,6 +290,8 @@ function buildExecutionPlanReport(ticker, interval, techRes) {
     if (screener) md += `Signal : ${formatSignalLabel(screener.category)} / ${screener.vector || "-"}\n`;
     md += "\n";
     md += `ENTRY_ZONE : ${plan.entryZone || "-"}\n`;
+    if (plan.supportLabel) md += `SUPPORT    : ${plan.supportLabel} ${formatPrice(plan.supportValue)}\n`;
+    if (plan.riskEmaLabel) md += `RISK_EMA   : ${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}\n`;
     md += `IDEAL_BUY  : ${formatPrice(plan.idealBuy)}\n`;
     md += `EARLY_EXIT : ${formatPrice(plan.earlyExit)}\n`;
     md += `HARD_STOP  : ${formatPrice(plan.hardStop ?? plan.stopLoss)}\n`;
