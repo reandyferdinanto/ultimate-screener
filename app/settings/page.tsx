@@ -28,11 +28,14 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/telegram/settings", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config)
       });
       const json = await res.json();
       if (json.success) {
         setMessage("SETTINGS_SAVED_SUCCESSFULLY");
+      } else {
+        setMessage(`ERROR: ${json.error || "INVALID_CONFIGURATION"}`);
       }
     } catch {
       setMessage("ERROR_SAVING_SETTINGS");

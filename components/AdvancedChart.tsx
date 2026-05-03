@@ -117,6 +117,7 @@ export default function AdvancedChart({
     const chartHeight = isMobile
       ? (hasSqueezePane ? 560 : 460)
       : (hasSqueezePane ? 760 : 660);
+    const rightOffsetBars = isMobile ? 30 : 50;
 
     // Clear container
     chartContainerRef.current.innerHTML = '';
@@ -150,7 +151,7 @@ export default function AdvancedChart({
         borderColor: "rgba(148, 163, 184, 0.12)",
         timeVisible: true,
         secondsVisible: false,
-        rightOffset: isMobile ? 32 : 78,
+        rightOffset: rightOffsetBars,
         barSpacing: isMobile ? 8 : 12,
         minBarSpacing: 4,
       },
@@ -720,12 +721,13 @@ export default function AdvancedChart({
     const oneYearAgo = lastDataTime - (365 * 24 * 60 * 60);
     const firstVisibleIndex = data.findIndex((item) => Number(item.time) >= oneYearAgo);
     if (!syncLogicalRange && Number.isFinite(lastDataTime) && firstVisibleIndex > 0) {
-      chart.timeScale().setVisibleRange({
-        from: data[firstVisibleIndex].time as UTCTimestamp,
-        to: data[data.length - 1].time as UTCTimestamp,
+      chart.timeScale().setVisibleLogicalRange({
+        from: firstVisibleIndex,
+        to: data.length - 1 + rightOffsetBars,
       });
     } else if (!syncLogicalRange) {
       chart.timeScale().fitContent();
+      chart.timeScale().scrollToPosition(rightOffsetBars, false);
     }
 
     const resizeObserver = new ResizeObserver(() => {

@@ -22,8 +22,51 @@ const SignalPerformance = mongoose.models.SignalPerformance || mongoose.model("S
 
 let bot;
 let botToken = "";
+let restartTimer;
+let initInProgress = false;
 
 const APP_BASE_URL = (process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://ultimate-screener.ebite.biz.id").replace(/\/$/, "");
+const RETRY_DELAY_MS = 30000;
+
+function scheduleBotInit(reason) {
+    if (restartTimer) return;
+    console.log(`[Telegram] ${reason} Retrying in ${RETRY_DELAY_MS / 1000}s.`);
+    restartTimer = setTimeout(() => {
+        restartTimer = null;
+        initBot().catch(error => {
+            console.error("[Telegram] Retry failed:", error.message);
+            scheduleBotInit("Bot initialization failed.");
+        });
+    }, RETRY_DELAY_MS);
+}
+
+async function telegramApi(method, token) {
+    const res = await fetch(`https://api.telegram.org/bot${token}/${method}`);
+    const json = await res.json().catch(() => ({}));
+    return { status: res.status, json };
+}
+
+async function validateBotToken(token) {
+    if (!token) return { ok: false, reason: "missing token" };
+    const result = await telegramApi("getMe", token);
+    if (result.json.ok) return { ok: true, bot: result.json.result };
+    return {
+        ok: false,
+        reason: result.json.description || `Telegram API HTTP ${result.status}`,
+        status: result.status,
+        errorCode: result.json.error_code
+    };
+}
+
+function pollingErrorMessage(error) {
+    const response = error.response?.body || error.response || {};
+    return [
+        error.code,
+        response.error_code,
+        response.description,
+        error.message
+    ].filter(Boolean).join(" | ");
+}
 
 function normalizeTickerInput(value) {
     const input = String(value || "").trim().toUpperCase();
@@ -267,12 +310,13 @@ async function captureChart(ticker, interval) {
                 container.style.background = '#0a0a0a';
             }
 
-            const mainChart = document.querySelector('.chart-wrapper');
+            const mainChart = document.querySelector('.chart-wrapper.main-viz');
             if (mainChart) mainChart.scrollIntoView();
         });
 
+        await page.waitForSelector('.chart-wrapper.main-viz', { state: 'visible', timeout: 30000 });
         await page.waitForTimeout(3500);
-        return page.locator('.charts-column').screenshot({ type: 'png' });
+        return await page.locator('.chart-wrapper.main-viz').screenshot({ type: 'png' });
     } finally {
         await browser.close();
     }
@@ -317,12 +361,16 @@ async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
             console.warn(`[Telegram] Chart screenshot failed for ${ticker}:`, error.message);
             return null;
         });
+        if (buffer) {
+            console.log(`[Telegram] Chart screenshot ready for ${ticker}: ${buffer.length} bytes`);
+        }
 
         if (buffer && fullReport.length > 1024) {
             await bot.sendPhoto(chatId, buffer, {
                 caption: caption,
                 parse_mode: 'Markdown'
             });
+            console.log(`[Telegram] Chart photo sent for ${ticker}`);
 
             const opts = {
                 parse_mode: 'Markdown',
@@ -336,6 +384,7 @@ async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
                 reply_markup: replyMarkup
             };
             await bot.sendPhoto(chatId, buffer, opts);
+            console.log(`[Telegram] Chart photo sent for ${ticker}`);
         } else {
             await bot.sendMessage(chatId, `${fullReport}\n\nChart: ${url}`, {
                 parse_mode: 'Markdown',
@@ -353,18 +402,32 @@ async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
 }
 
 async function initBot() {
+    if (initInProgress) return;
+    initInProgress = true;
+
     await mongoose.connect(MONGODB_URI);
     const config = await Settings.findOne({ key: "telegram_config" });
 
-    if (!config || !config.value.botToken) {
-        console.log("No bot token found in settings. Waiting...");
-        setTimeout(initBot, 30000);
+    botToken = process.env.TELEGRAM_BOT_TOKEN || config?.value?.botToken || "";
+    const tokenStatus = await validateBotToken(botToken).catch(error => ({
+        ok: false,
+        reason: error.message
+    }));
+
+    if (!tokenStatus.ok) {
+        initInProgress = false;
+        scheduleBotInit(`Telegram bot token is not usable: ${tokenStatus.reason}.`);
         return;
     }
 
-    botToken = config.value.botToken;
+    if (bot) {
+        await bot.stopPolling().catch(() => {});
+        bot.removeAllListeners();
+    }
+
     bot = new TelegramBot(botToken, { polling: true });
-    console.log("Telegram Bot started.");
+    initInProgress = false;
+    console.log(`Telegram Bot started as @${tokenStatus.bot.username}.`);
 
     // Handle Callback Queries (Buttons)
     bot.on('callback_query', async (query) => {
@@ -710,7 +773,12 @@ async function initBot() {
     });
 
     bot.on('polling_error', (error) => {
-        console.error("Polling error:", error.code);
+        console.error("Polling error:", pollingErrorMessage(error));
+        const statusCode = error.response?.statusCode || error.response?.body?.error_code;
+        if (statusCode === 401) {
+            bot.stopPolling().catch(() => {});
+            scheduleBotInit("Telegram rejected the current bot token.");
+        }
     });
 }
 
