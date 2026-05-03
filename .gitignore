@@ -43,6 +43,10 @@ next-env.d.ts
 # logs and temporary files
 *.log
 *.png
+!public/
+!public/docs/
+!public/docs/screenshots/
+!public/docs/screenshots/*.png
 .postgres-data/
 ecosystem.config.cjs
 scripts/check_signals*
