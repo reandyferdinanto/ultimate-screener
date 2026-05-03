@@ -562,6 +562,14 @@ export default function Dashboard() {
           background: oklch(0.82 0.18 145 / 0.045);
           transform: translateX(3px);
         }
+        @media (max-width: 1100px) {
+          .dashboard-secondary-grid {
+            grid-template-columns: 1fr;
+          }
+          .dashboard-card {
+            min-height: auto;
+          }
+        }
         @media (max-width: 768px) {
           .dashboard-hero,
           .card-heading {
@@ -585,6 +593,41 @@ export default function Dashboard() {
           }
           .panel {
             min-height: auto !important;
+          }
+        }
+        @media (max-width: 520px) {
+          .dashboard-shell {
+            gap: 12px;
+          }
+          .dashboard-hero {
+            padding: 16px;
+          }
+          .hero-copy h1 {
+            font-size: 1.65rem;
+            line-height: 1.05;
+          }
+          .hero-copy p,
+          .news-main-row span {
+            font-size: 0.78rem;
+          }
+          .hero-actions,
+          .hero-actions button,
+          .card-heading button {
+            width: 100%;
+            align-items: stretch;
+            justify-content: center;
+          }
+          .market-glance {
+            gap: 10px;
+          }
+          .glance-card {
+            padding: 14px;
+          }
+          .mover-column {
+            padding: 12px;
+          }
+          .mover-table table {
+            font-size: 0.72rem;
           }
         }
       `}</style>

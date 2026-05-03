@@ -80,7 +80,7 @@ export default function SilentFlyerReplacementPage() {
       <section className="breakout-hero scanline-container">
         <div>
           <div className="eyebrow">SILENT FLYER REPLACEMENT</div>
-          <h1>Technical Breakout Pattern</h1>
+            <h1>Technical Breakout Pattern</h1>
           <p>
             Screener berbasis research TECHNICAL-BREAKOUT-PATTERNS: tight-flat accumulation base,
             higher lows, volume expansion, RSI kuat, dan breakout yang belum terlalu extended.
@@ -171,6 +171,7 @@ export default function SilentFlyerReplacementPage() {
         .metric-grid span { display: block; color: var(--accent-green); font-size: 1.8rem; font-weight: 900; }
         .metric-grid small { color: var(--text-secondary); }
         .empty-state { padding: 32px 12px; color: var(--text-secondary); text-align: center; }
+        .table-container table { min-width: 1120px; }
         .pattern-pill { border: 1px solid var(--border-color); padding: 4px 6px; font-size: 0.62rem; font-weight: 900; color: var(--accent-amber); }
         .intel-link { color: var(--accent-green); font-size: 0.68rem; font-weight: 900; }
         @media (max-width: 900px) {
@@ -180,6 +181,10 @@ export default function SilentFlyerReplacementPage() {
           .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         @media (max-width: 520px) {
+          .breakout-hero { padding: 16px; }
+          h1 { font-size: clamp(2rem, 15vw, 3.2rem); }
+          p { font-size: 0.78rem; }
+          .hero-actions > * { flex-basis: 100%; }
           .metric-grid { grid-template-columns: 1fr; }
         }
       `}</style>

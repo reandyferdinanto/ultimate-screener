@@ -291,6 +291,16 @@ tr:hover td {
     flex-wrap: wrap;
   }
 
+  .table-container {
+    margin-inline: -2px;
+    max-width: calc(100vw - 20px);
+  }
+
+  .table-container table {
+    width: max-content;
+    min-width: 100%;
+  }
+
   .data-value {
     font-size: 1.5rem;
   }

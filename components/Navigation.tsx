@@ -209,7 +209,8 @@ export default function Navigation() {
         }
         @media (max-width: 420px) {
           .nav-link {
-            font-size: 0.5rem !important;
+            font-size: 0.46rem !important;
+            padding: 0 2px !important;
           }
         }
         @keyframes pulse {

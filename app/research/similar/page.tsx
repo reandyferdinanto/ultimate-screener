@@ -236,6 +236,7 @@ export default function SimilarWinnersPage() {
         .metric-grid span { display: block; color: var(--accent-green); font-size: 1.8rem; font-weight: 900; }
         small { color: var(--text-secondary); white-space: normal; }
         .candidate-table { max-height: 620px; }
+        .candidate-table table { min-width: 1280px; }
         .state-pill { border: 1px solid var(--border-color); padding: 4px 6px; font-size: 0.62rem; font-weight: 900; }
         .state-pill.breakout, .state-pill.near_breakout { color: var(--accent-green); border-color: var(--accent-green); }
         .state-pill.extended { color: var(--accent-red); border-color: var(--accent-red); }
@@ -256,7 +257,13 @@ export default function SimilarWinnersPage() {
           .candidate-table { max-height: 560px; }
         }
         @media (max-width: 480px) {
+          .similar-hero { padding: 16px; }
+          .back-link { width: 100%; justify-content: center; }
           .metric-grid { grid-template-columns: 1fr; }
+          .control-grid input,
+          .control-grid select,
+          .control-grid button { width: 100%; }
+          .check-line { padding-bottom: 0; }
           .ai-panel pre { font-size: 0.68rem; }
         }
       `}</style>

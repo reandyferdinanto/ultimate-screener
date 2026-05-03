@@ -41,7 +41,7 @@ const formatSignalLabel = (value?: string) => {
     EMA_BOUNCE: "EMA bounce",
     ELITE_BOUNCE: "Elite bounce",
     BUY_ON_DIP: "Buy on dip",
-    TECHNICAL_BREAKOUT: "Breakout teknikal",
+    TECHNICAL_BREAKOUT: "Technical breakout",
     TURNAROUND: "Turnaround",
     SQUEEZE: "Squeeze",
     SQUEEZE_DIVERGENCE: "Squeeze divergence",
@@ -54,11 +54,24 @@ const formatSignalLabel = (value?: string) => {
 const formatVerdictText = (value?: string) => {
   const text = String(value || "Belum ada verdict");
   if (text.startsWith("SCREENER SYNC:")) {
-    return `Screener aktif: ${formatSignalLabel(text.replace("SCREENER SYNC:", "").trim())}`;
+    return `SCREENER SYNC: ${formatSignalLabel(text.replace("SCREENER SYNC:", "").trim())}`;
   }
 
   return text.replace(/_/g, " ");
 };
+
+const formatRiskText = (value?: string) => {
+  return String(value || "-").replace(/_/g, " ");
+};
+
+const formatReportCopy = (value?: unknown) => String(value || "-")
+  .replace(/chart live sedang risk-off/gi, "chart live lagi risk-off")
+  .replace(/chart live risk-off/gi, "chart live lagi risk-off")
+  .replace(/\s+/g, " ")
+  .trim();
+
+const formatExecutionState = (value?: unknown) => formatReportCopy(value)
+  .replace(/_/g, " ");
 
 const formatPlanValue = (value: unknown) => {
   if (value === null || value === undefined || value === "") return "-";
@@ -68,16 +81,16 @@ const formatPlanValue = (value: unknown) => {
 const getReportDetailRows = (details?: Record<string, unknown>) => {
   if (!details) return [];
   const rows = [
-    ["Arah EMA cepat", details.emaFast],
-    ["Arah EMA swing", details.emaSwing],
+    ["Fast EMA trend", details.emaFast],
+    ["Swing EMA trend", details.emaSwing],
     ["RSI", details.rsi],
     ["MFI", details.mfi],
     ["OBV", details.obv],
     ["VWAP", details.vwap],
     ["Squeeze", details.squeeze],
-    ["Eksekusi chart", details.execution],
+    ["Chart execution", details.execution],
     ["Reward/risk", details.rewardRisk],
-    ["Maks. rugi", details.maxLoss],
+    ["Max loss", details.maxLoss],
     ["Time stop", details.timeStop],
   ];
 
@@ -137,7 +150,6 @@ function SearchContent() {
   const executionPlan = data?.unifiedAnalysis?.screenerTradePlan || data?.unifiedAnalysis?.tradePlan;
   const analysisDetails = data?.unifiedAnalysis?.details || {};
   const screenerSyncStatus = analysisDetails.screenerSyncStatus;
-  const screenerStatusText = analysisDetails.screenerStatusText;
   const reportDetailRows = getReportDetailRows(analysisDetails);
   const isScreenerBlocked = screenerSyncStatus === "BLOCKED_BY_LIVE_RISK";
 
@@ -190,7 +202,7 @@ function SearchContent() {
     : null;
   const chartSyncLabel = screenerSyncStatus === "BLOCKED_BY_LIVE_RISK"
     ? "Chart risk-off"
-    : (screenerSyncStatus === "SYNCED_TO_CHART" ? "Sinkron screener" : "Analisis teknikal");
+    : (screenerSyncStatus === "SYNCED_TO_CHART" ? "Screener synced" : "Technical analysis");
   const chartSyncTone = screenerSyncStatus === "BLOCKED_BY_LIVE_RISK" ? "warn" : "ok";
   const candleChangeTone = typeof candleChangePct === "number"
     ? (candleChangePct >= 0 ? "stat-up" : "stat-down")
@@ -274,7 +286,7 @@ function SearchContent() {
                         <div>
                           <div className="chart-kicker"><Activity size={14} /> Live chart context</div>
                           <h2>{displayTicker} <span>{interval.toUpperCase()}</span></h2>
-                          <p>Fokus baca chart: harga sekarang, area entry, stop invalidasi, lalu target. Jika status sync aktif, garis di chart mengikuti screener.</p>
+                          <p>Read current price, entry area, invalidation stop, and target first. When sync is active, chart lines follow the screener plan.</p>
                         </div>
                         <div className={`chart-sync-badge ${chartSyncTone}`}>{chartSyncLabel}</div>
                       </div>
@@ -288,17 +300,17 @@ function SearchContent() {
                         <div className="chart-stat-card entry">
                           <span>Entry utama</span>
                           <strong>{formatPrice(executionPlan?.idealBuy ?? executionPlan?.entryHigh ?? screenerContext?.entryPrice)}</strong>
-                          <small>Area biru di chart</small>
+                          <small>Blue area on chart</small>
                         </div>
                         <div className="chart-stat-card stop">
                           <span>Stop / invalidasi</span>
                           <strong>{formatPrice(executionPlan?.hardStop ?? executionPlan?.stopLoss ?? screenerContext?.stopLossPrice)}</strong>
-                          <small>Jika ditembus, skenario batal</small>
+                          <small>Scenario is invalid if breached</small>
                         </div>
                         <div className="chart-stat-card target">
                           <span>Target dekat</span>
                           <strong>{formatPrice(executionPlan?.target1 ?? executionPlan?.takeProfit ?? screenerContext?.targetPrice)}</strong>
-                          <small>Area hijau/resistance</small>
+                          <small>Green area / resistance</small>
                         </div>
                       </div>
                     </section>
@@ -342,15 +354,15 @@ function SearchContent() {
                     </section>
 
                     <section className="chart-guide panel">
-                      <div><Target size={15} /><strong>Entry</strong><span>Garis biru adalah area beli yang boleh dipakai jika candle belum invalidasi.</span></div>
-                      <div><Shield size={15} /><strong>Stop</strong><span>Garis merah adalah batas batal. Jangan paksa hold jika ditembus.</span></div>
-                      <div><TrendingUp size={15} /><strong>Target</strong><span>Garis hijau adalah target terdekat untuk take profit atau evaluasi.</span></div>
-                      <div><Clock3 size={15} /><strong>Time stop</strong><span>Jika harga tidak bergerak sesuai rencana dalam batas waktu, skenario melemah.</span></div>
+                      <div><Target size={15} /><strong>Entry</strong><span>Blue line marks the entry area if the candle has not invalidated.</span></div>
+                      <div><Shield size={15} /><strong>Stop</strong><span>Red line marks invalidation. Do not force a hold after it breaks.</span></div>
+                      <div><TrendingUp size={15} /><strong>Target</strong><span>Green line marks the nearest take-profit or evaluation area.</span></div>
+                      <div><Clock3 size={15} /><strong>Time stop</strong><span>If price does not move within the time limit, the setup weakens.</span></div>
                     </section>
 
                     {showSqueezeDeluxe && data.unifiedAnalysis?.squeezeInsight && (
                         <div className="compression-callout">
-                            <div>Insight kompresi</div>
+                            <div>Compression insight</div>
                             <p>
                                 {data.unifiedAnalysis.squeezeInsight}
                             </p>
@@ -358,23 +370,23 @@ function SearchContent() {
                     )}
                 </div>
 
-            {/* RIGHT COLUMN: ANALYSIS */}
+                  {/* RIGHT COLUMN: ANALYSIS */}
             <div className="analysis-column">
               {data.unifiedAnalysis && (
                 <div className="conviction-panel panel" style={{ '--accent-color': data.unifiedAnalysis.color } as any}>
                   <div className="panel-header report-header">
                     <div>
                       <span>Conviction Report</span>
-                      <small>Verdict, rencana aksi, dan konteks screener dalam satu alur.</small>
+                      <small>Verdict, execution plan, screener context, and validation in one flow.</small>
                     </div>
                     <div className={`report-sync-pill ${isScreenerBlocked ? "warn" : "ok"}`}>
-                      {isScreenerBlocked ? "Tunggu chart pulih" : (screenerContext ? "Sinkron" : "Chart only")}
+                      {isScreenerBlocked ? "Wait for recovery" : (screenerContext ? "Synced" : "Chart only")}
                     </div>
                   </div>
                   
                   <div className="verdict-hero">
                     <div className="v-header">
-  <div className="v-label">Kesimpulan sekarang</div>
+  <div className="v-label">Current verdict</div>
   <div className="verdict-icon">
     {data.unifiedAnalysis.verdict.includes('BUY') || data.unifiedAnalysis.verdict.includes('BULLISH') ? (
       <TrendingUp size={20} />
@@ -389,39 +401,39 @@ function SearchContent() {
                       {formatVerdictText(data.unifiedAnalysis.verdict)}
                     </div>
                     <div className="v-meta">
-                        <span>Risiko: <strong>{data.unifiedAnalysis.riskLevel}</strong></span>
+                        <span>Risk: <strong>{formatRiskText(data.unifiedAnalysis.riskLevel)}</strong></span>
                     </div>
                   </div>
 
                   {screenerContext && (
                     <div className={`screener-sync-panel ${isScreenerBlocked ? "blocked" : "synced"}`}>
                       <div className="sync-title-row">
-                        <div className="sync-title"><Info size={14} /> Sinkronisasi screener</div>
+                         <div className="sync-title"><Info size={14} /> Screener sync</div>
                         <div className="sync-badge">{formatSignalLabel(screenerContext.category)}</div>
                       </div>
                       {screenerSyncStatus === "BLOCKED_BY_LIVE_RISK" ? (
-                        <div className="sync-warning">{screenerStatusText || "Screener aktif, tetapi chart live sedang risk-off. Pakai sebagai watchlist sampai invalidasi pulih."}</div>
+                        <div className="sync-warning">Active screener signal exists, but live chart is risk-off. Treat it as watchlist until invalidation recovers.</div>
                       ) : screenerSyncStatus === "SYNCED_TO_CHART" ? (
-                        <div className="sync-ok">{screenerStatusText || "Chart dan report memakai entry, stop, dan target yang sama dari screener."}</div>
+                        <div className="sync-ok">Chart and report use the same screener entry, stop, and target.</div>
                       ) : null}
-                      <div className="sync-vector">Alasan screener: {screenerContext.vector || screenerContext.signalSource || "-"}</div>
+                      <div className="sync-vector">Screener reason: {formatReportCopy(screenerContext.vector || screenerContext.signalSource || "-")}</div>
                       <div className="sync-grid">
-                        <div><span>Masuk radar</span><strong>{formatDateTime(screenerContext.appearedAt || screenerContext.entryDate)}</strong></div>
-                        <div><span>Update terakhir</span><strong>{formatDateTime(screenerContext.lastScannedAt || screenerContext.updatedAt)}</strong></div>
-                        <div><span>Entry screener</span><strong>{formatPrice(screenerContext.entryPrice)}</strong></div>
-                        <div><span>Stop batal</span><strong>{formatPrice(screenerContext.stopLossPrice)}</strong></div>
-                        <div><span>Target awal</span><strong>{formatPrice(screenerContext.targetPrice)}</strong></div>
+                        <div><span>Appeared</span><strong>{formatDateTime(screenerContext.appearedAt || screenerContext.entryDate)}</strong></div>
+                        <div><span>Last update</span><strong>{formatDateTime(screenerContext.lastScannedAt || screenerContext.updatedAt)}</strong></div>
+                        <div><span>Screener entry</span><strong>{formatPrice(screenerContext.entryPrice)}</strong></div>
+                        <div><span>Stop loss</span><strong>{formatPrice(screenerContext.stopLossPrice)}</strong></div>
+                        <div><span>Initial target</span><strong>{formatPrice(screenerContext.targetPrice)}</strong></div>
                         <div><span>RR / Delta</span><strong>{screenerContext.rewardRisk ?? "-"}R / {formatPct(screenerContext.deltaPct)}</strong></div>
                       </div>
-                      {screenerContext.thesis && <p className="sync-thesis">{screenerContext.thesis}</p>}
+                      {screenerContext.thesis && <p className="sync-thesis">{formatReportCopy(screenerContext.thesis)}</p>}
                       {activeScreenerSignals.length > 0 && (
                         <div className="sync-stack-list">
-                          <div className="mini-section-title">Semua sinyal aktif</div>
+                          <div className="mini-section-title">Other active signals</div>
                           {activeScreenerSignals.slice(0, 5).map((signal: any) => (
                             <div className="sync-signal-card" key={`${signal.category}-${signal.vector}-${signal.lastScannedAt || signal.appearedAt}`}>
                               <div>
                                 <strong>{formatSignalLabel(signal.category)}</strong>
-                                <span>{signal.vector || signal.signalSource || "-"}</span>
+                                <span>{formatReportCopy(signal.vector || signal.signalSource || "-")}</span>
                               </div>
                               <div>
                                 <small>Entry {formatPrice(signal.entryPrice)}</small>
@@ -450,7 +462,7 @@ function SearchContent() {
                           <div className="execution-header">
                             <div>
                               <div className="execution-kicker">Rencana aksi</div>
-                              <div className="execution-state">{plan.stateLabel || plan.action}</div>
+                              <div className="execution-state">{formatExecutionState(plan.stateLabel || plan.action)}</div>
                             </div>
                             <div className="execution-rr">
                               <span>{plan.rewardRisk ?? "-"}R</span>
@@ -459,7 +471,7 @@ function SearchContent() {
                           </div>
 
                           {isScreenerBlocked && (
-                            <div className="execution-block-note">Screener tidak dipakai untuk entry karena chart live risk-off. Rencana di bawah mengikuti kondisi chart sekarang.</div>
+                            <div className="execution-block-note">Screener belum jadi lampu hijau karena chart live masih risk-off. Pakai rencana chart di bawah dulu.</div>
                           )}
 
                           <div className="execution-grid">
@@ -473,12 +485,12 @@ function SearchContent() {
 
                           <div className="execution-rule">
                             <strong>Batas waktu</strong>
-                            <span>{plan.timeStopRule}</span>
+                            <span>{formatReportCopy(plan.timeStopRule)}</span>
                           </div>
 
                           <div className="execution-rule">
                             <strong>Ukuran posisi</strong>
-                            <span>{plan.positionSizing}</span>
+                            <span>{formatReportCopy(plan.positionSizing)}</span>
                           </div>
 
                       </div>
@@ -487,12 +499,12 @@ function SearchContent() {
 
                   {data.historicalSignals && data.historicalSignals.length > 0 && (
                     <div className="historical-signals-section">
-                        <div className="section-title">Riwayat alert</div>
+                    <div className="section-title">Historical alerts</div>
                         <div className="signals-mini-list">
                             {data.historicalSignals.slice(0, 3).map((sig: any, idx: number) => (
                                 <div key={idx} className="sig-item">
                                     <span className="sig-date">{new Date(sig.createdAt).toLocaleDateString('id-ID')}</span>
-                                    <span className="sig-range">{Number(sig.entryPrice || 0).toFixed(0)} sampai {Number(sig.targetPrice || 0).toFixed(0)}</span>
+                                    <span className="sig-range">{Number(sig.entryPrice || 0).toFixed(0)} to {Number(sig.targetPrice || 0).toFixed(0)}</span>
                                     <span className={`sig-status ${String(sig.status).toLowerCase()}`}>{String(sig.status).toUpperCase()}</span>
                                 </div>
                             ))}
@@ -502,26 +514,26 @@ function SearchContent() {
 
                   <div className="analysis-section">
                     <div className="section-title">Ringkasan keputusan</div>
-                    <p className="suggestion-text">{data.unifiedAnalysis.suggestion}</p>
+                    <p className="suggestion-text">{formatReportCopy(data.unifiedAnalysis.suggestion)}</p>
 
                     {executionPlan?.reason && (
                         <div className="insight-box decision">
                             <div className="box-label">Kenapa verdict ini muncul</div>
-                            <p>{executionPlan.reason}</p>
+                            <p>{formatReportCopy(executionPlan.reason)}</p>
                         </div>
                     )}
 
                     {executionPlan?.timing && (
                         <div className="insight-box action">
                             <div className="box-label">Aksi berikutnya</div>
-                            <p>{executionPlan.timing}</p>
+                            <p>{formatReportCopy(executionPlan.timing)}</p>
                         </div>
                     )}
                     
                     {showSqueezeDeluxe && data.unifiedAnalysis.squeezeInsight && (
                         <div className="insight-box squeeze">
                             <div className="box-label">Insight kompresi</div>
-                            <p>{data.unifiedAnalysis.squeezeInsight}</p>
+                            <p>{formatReportCopy(data.unifiedAnalysis.squeezeInsight)}</p>
                         </div>
                     )}
 
@@ -529,12 +541,12 @@ function SearchContent() {
 
                   <div className="analysis-section metrics">
                     <div className="metrics-header">
-                      <div className="metrics-title">Skor kualitas</div>
-                      <div className="metrics-subtitle">Validasi setup dan volume</div>
+                      <div className="metrics-title">Quality metrics</div>
+                      <div className="metrics-subtitle">Setup and volume validation</div>
                     </div>
                     <div className="metric-row">
                       <div className="m-info">
-                        <span>Kualitas setup</span>
+                        <span>Setup quality</span>
                         <div className="m-value-wrapper">
                           <span className="m-val">{data.unifiedAnalysis.score.setup}%</span>
                           <div className="m-grade">
@@ -557,7 +569,7 @@ function SearchContent() {
                     </div>
                     <div className="metric-row">
                       <div className="m-info">
-                        <span>Keyakinan volume</span>
+                        <span>Volume conviction</span>
                         <div className="m-value-wrapper">
                           <span className="m-val">{data.unifiedAnalysis.score.volume.toFixed(0)}%</span>
                           <div className="m-grade">
@@ -581,12 +593,12 @@ function SearchContent() {
 
                   {reportDetailRows.length > 0 && (
                   <div className="analysis-section flow">
-                    <div className="section-title">Validasi cepat</div>
+                    <div className="section-title">Quick validation</div>
                     <div className="flow-grid">
                       {reportDetailRows.map(([label, value]) => (
                         <div key={String(label)} className="flow-item">
                           <span className="f-label">{String(label)}</span>
-                          <span className="f-value">{String(value)}</span>
+                          <span className="f-value">{formatReportCopy(value)}</span>
                         </div>
                       ))}
                     </div>
@@ -596,13 +608,13 @@ function SearchContent() {
               )}
 
               <div className="pivots-panel panel">
-                <div className="panel-header">PIVOT_TARGETS</div>
+                <div className="panel-header">Pivot Targets</div>
                 <div className="pivots-list">
-                  <div className="pivot-row pos"><span>T2_RESISTANCE</span><strong>{data.pivots.r3.toFixed(0)}</strong></div>
-                  <div className="pivot-row pos"><span>T1_RESISTANCE</span><strong>{data.pivots.r2.toFixed(0)}</strong></div>
-                  <div className="pivot-row base"><span>BASE_PIVOT</span><strong>{data.pivots.p.toFixed(0)}</strong></div>
-                  <div className="pivot-row neg"><span>S1_SUPPORT</span><strong>{data.pivots.s1.toFixed(0)}</strong></div>
-                  <div className="pivot-row neg"><span>S2_SUPPORT</span><strong>{data.pivots.s2.toFixed(0)}</strong></div>
+                  <div className="pivot-row pos"><span>R3 Resistance</span><strong>{data.pivots.r3.toFixed(0)}</strong></div>
+                  <div className="pivot-row pos"><span>R2 Resistance</span><strong>{data.pivots.r2.toFixed(0)}</strong></div>
+                  <div className="pivot-row base"><span>Base Pivot</span><strong>{data.pivots.p.toFixed(0)}</strong></div>
+                  <div className="pivot-row neg"><span>S1 Support</span><strong>{data.pivots.s1.toFixed(0)}</strong></div>
+                  <div className="pivot-row neg"><span>S2 Support</span><strong>{data.pivots.s2.toFixed(0)}</strong></div>
                 </div>
               </div>
             </div>

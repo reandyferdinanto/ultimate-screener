@@ -107,6 +107,14 @@ function cleanMarkdownText(value, maxLength = 700) {
     return `${text.slice(0, maxLength - 3)}...`;
 }
 
+function formatReportCopy(value, maxLength = 700) {
+    return cleanMarkdownText(value, maxLength)
+        .replace(/chart live sedang risk-off/gi, "chart live lagi risk-off")
+        .replace(/chart live risk-off/gi, "chart live lagi risk-off")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
 function getExecutionPlan(analysis) {
     return analysis?.screenerTradePlan || analysis?.tradePlan || null;
 }
@@ -151,42 +159,43 @@ function buildConvictionReport(raw, interval, price, changePct, techRes) {
         md += `- RR/Delta : ${screener.rewardRisk ?? "-"}R / ${formatPct(screener.deltaPct)}\n`;
         if (screener.thesis) md += `- Thesis   : ${cleanMarkdownText(screener.thesis, 260)}\n`;
         if (activeSignals.length > 1) {
-            md += `- Stack    : ${activeSignals.slice(1, 4).map(s => formatSignalLabel(s.category)).join(", ")}\n`;
+            md += `- Stack    : ${activeSignals.slice(0, 5).map(s => formatSignalLabel(s.category)).join(", ")}\n`;
         }
         md += "\n";
     }
 
     if (plan) {
-        md += "## EXECUTION_STATE\n";
-        md += `- State    : ${plan.stateLabel || plan.action || "-"}\n`;
-        md += `- RR       : ${plan.rewardRisk ?? "-"}R\n`;
-        md += `- Max Loss : ${plan.maxLossPct ?? "-"}%\n`;
-        md += `- Entry    : ${plan.entryZone || "-"}\n`;
-        md += `- Ideal Buy: ${formatPrice(plan.idealBuy)}\n`;
-        md += `- EarlyExit: ${formatPrice(plan.earlyExit)}\n`;
-        md += `- Hard Stop: ${formatPrice(plan.hardStop ?? plan.stopLoss)}\n`;
-        md += `- Target 1 : ${formatPrice(plan.target1 ?? plan.takeProfit)}\n`;
-        md += `- Target 2 : ${formatPrice(plan.target2)}\n`;
-        if (plan.timeStopRule) md += `- TimeStop : ${cleanMarkdownText(plan.timeStopRule, 220)}\n`;
+        md += "## Rencana aksi\n";
+        md += `- State          : ${plan.stateLabel || plan.action || "-"}\n`;
+        md += `- RR             : ${plan.rewardRisk ?? "-"}R\n`;
+        md += `- Maks. rugi     : ${plan.maxLossPct ?? "-"}%\n`;
+        md += `- Area entry     : ${plan.entryZone || "-"}\n`;
+        md += `- Beli ideal     : ${formatPrice(plan.idealBuy)}\n`;
+        md += `- Batas waspada  : ${formatPrice(plan.earlyExit)}\n`;
+        md += `- Stop batal     : ${formatPrice(plan.hardStop ?? plan.stopLoss)}\n`;
+        md += `- Target 1       : ${formatPrice(plan.target1 ?? plan.takeProfit)}\n`;
+        md += `- Target 2       : ${formatPrice(plan.target2)}\n`;
+        if (plan.timeStopRule) md += `- Batas waktu    : ${formatReportCopy(plan.timeStopRule, 240)}\n`;
+        if (plan.positionSizing) md += `- Ukuran posisi  : ${formatReportCopy(plan.positionSizing, 240)}\n`;
         md += "\n";
     }
 
-    md += "## DECISION_SUMMARY\n";
-    md += `${cleanMarkdownText(analysis.suggestion, 500)}\n\n`;
+    md += "## Ringkasan keputusan\n";
+    md += `${formatReportCopy(analysis.suggestion, 500)}\n\n`;
 
     if (plan?.reason) {
-        md += "## WHY_THIS_DECISION\n";
-        md += `${cleanMarkdownText(plan.reason, 360)}\n\n`;
+        md += "## Kenapa verdict ini muncul\n";
+        md += `${formatReportCopy(plan.reason, 360)}\n\n`;
     }
 
     if (plan?.timing) {
-        md += "## NEXT_ACTION\n";
-        md += `${cleanMarkdownText(plan.timing, 360)}\n\n`;
+        md += "## Aksi berikutnya\n";
+        md += `${formatReportCopy(plan.timing, 360)}\n\n`;
     }
 
     if (analysis.squeezeInsight) {
-        md += "## COMPRESSION_INSIGHT\n";
-        md += `${cleanMarkdownText(analysis.squeezeInsight, 320)}\n\n`;
+        md += "## Insight kompresi\n";
+        md += `${formatReportCopy(analysis.squeezeInsight, 320)}\n\n`;
     }
 
     md += "## QUALITY_METRICS\n";
@@ -679,15 +688,24 @@ async function initBot() {
             interval = "15m";
         }
 
-        const dbSearchTicker = normalizeTickerInput(input);
+        const requestedTickers = input
+            .split(/[\s,;/]+/)
+            .map(item => item.trim())
+            .filter(item => item && !["OR", "AND", "ATAU", "DAN"].includes(item))
+            .slice(0, 5);
 
-        const raw = rawTicker(dbSearchTicker);
-        if (raw.length < 3 || raw.length > 7) return;
-        if (!/^[A-Z0-9-]{3,7}$/.test(raw)) return;
+        if (requestedTickers.length === 0) return;
 
-        const stock = await findStockByTicker(dbSearchTicker);
-        if (stock) {
-            generateFullAnalysis(msg.chat.id, dbSearchTicker, interval);
+        for (const tickerInput of requestedTickers) {
+            const dbSearchTicker = normalizeTickerInput(tickerInput);
+            const raw = rawTicker(dbSearchTicker);
+            if (raw.length < 3 || raw.length > 7) continue;
+            if (!/^[A-Z0-9-]{3,7}$/.test(raw)) continue;
+
+            const stock = await findStockByTicker(dbSearchTicker);
+            if (stock) {
+                await generateFullAnalysis(msg.chat.id, dbSearchTicker, interval);
+            }
         }
     });
 
