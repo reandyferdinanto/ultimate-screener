@@ -464,7 +464,7 @@ function SearchContent() {
                       const planRows = [
                         ["Area entry", plan.entryZone],
                         ["Support aktif", plan.supportLabel ? `${plan.supportLabel} ${formatPrice(plan.supportValue)}` : "-"],
-                        ["Risk EMA", plan.riskEmaLabel ? `${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}` : "-"],
+                        ["Risk guard", plan.riskEmaLabel ? `${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}` : "-"],
                         ["Beli ideal", plan.idealBuy ?? "-"],
                         ["Batas waspada", plan.earlyExit ?? "-"],
                         ["Stop batal", plan.hardStop ?? plan.stopLoss ?? "-"],
@@ -507,6 +507,13 @@ function SearchContent() {
                             <strong>Ukuran posisi</strong>
                             <span>{formatReportCopy(plan.positionSizing)}</span>
                           </div>
+
+                          {plan.extraSuggestion && (
+                            <div className="execution-rule">
+                              <strong>Saran tambahan</strong>
+                              <span>{formatReportCopy(plan.extraSuggestion)}</span>
+                            </div>
+                          )}
 
                       </div>
                     );

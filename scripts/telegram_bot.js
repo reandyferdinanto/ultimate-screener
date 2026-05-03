@@ -293,7 +293,7 @@ function buildConvictionReport(raw, interval, price, changePct, techRes) {
         md += `- Maks. rugi     : ${plan.maxLossPct ?? "-"}%\n`;
         md += `- Area entry     : ${plan.entryZone || "-"}\n`;
         if (plan.supportLabel) md += `- Support aktif  : ${plan.supportLabel} ${formatPrice(plan.supportValue)}\n`;
-        if (plan.riskEmaLabel) md += `- Risk EMA       : ${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}\n`;
+        if (plan.riskEmaLabel) md += `- Risk guard     : ${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}\n`;
         md += `- Beli ideal     : ${formatPrice(plan.idealBuy)}\n`;
         md += `- Batas waspada  : ${formatPrice(plan.earlyExit)}\n`;
         md += `- Stop batal     : ${formatPrice(plan.hardStop ?? plan.stopLoss)}\n`;
@@ -301,6 +301,7 @@ function buildConvictionReport(raw, interval, price, changePct, techRes) {
         md += `- Target 2       : ${formatPrice(plan.target2)}\n`;
         if (plan.timeStopRule) md += `- Batas waktu    : ${formatReportCopy(plan.timeStopRule, 240)}\n`;
         if (plan.positionSizing) md += `- Ukuran posisi  : ${formatReportCopy(plan.positionSizing, 240)}\n`;
+        if (plan.extraSuggestion) md += `- Saran tambahan : ${formatReportCopy(plan.extraSuggestion, 260)}\n`;
         md += "\n";
     }
 
@@ -328,7 +329,7 @@ function buildConvictionReport(raw, interval, price, changePct, techRes) {
 
     md += "## FLOW_METRICS\n";
     const details = analysis.details || {};
-    ["mfi", "obv", "vwap", "rsi", "emaFast", "emaSwing", "emaBounce", "emaSupport", "cooldown", "squeeze", "flux", "execution", "rewardRisk", "maxLoss", "atrp"].forEach(key => {
+    ["mfi", "obv", "vwap", "rsi", "emaFast", "emaSwing", "emaBounce", "emaSupport", "bottomReversal", "cooldown", "squeeze", "flux", "execution", "rewardRisk", "maxLoss", "atrp"].forEach(key => {
         if (details[key] !== undefined) md += `- ${key.padEnd(10)}: ${details[key]}\n`;
     });
     md += "```";
@@ -351,7 +352,7 @@ function buildExecutionPlanReport(ticker, interval, techRes) {
     md += "\n";
     md += `ENTRY_ZONE : ${plan.entryZone || "-"}\n`;
     if (plan.supportLabel) md += `SUPPORT    : ${plan.supportLabel} ${formatPrice(plan.supportValue)}\n`;
-    if (plan.riskEmaLabel) md += `RISK_EMA   : ${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}\n`;
+    if (plan.riskEmaLabel) md += `RISK_GUARD : ${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}\n`;
     md += `IDEAL_BUY  : ${formatPrice(plan.idealBuy)}\n`;
     md += `EARLY_EXIT : ${formatPrice(plan.earlyExit)}\n`;
     md += `HARD_STOP  : ${formatPrice(plan.hardStop ?? plan.stopLoss)}\n`;
@@ -360,6 +361,7 @@ function buildExecutionPlanReport(ticker, interval, techRes) {
     md += `RR / RISK  : ${plan.rewardRisk ?? "-"}R / ${plan.maxLossPct ?? "-"}%\n\n`;
     if (plan.timeStopRule) md += `TIME_STOP  : ${cleanMarkdownText(plan.timeStopRule, 240)}\n`;
     if (plan.positionSizing) md += `SIZE_RULE  : ${cleanMarkdownText(plan.positionSizing, 240)}\n`;
+    if (plan.extraSuggestion) md += `EXTRA      : ${cleanMarkdownText(plan.extraSuggestion, 260)}\n`;
     if (plan.reason) md += `REASON     : ${cleanMarkdownText(plan.reason, 300)}\n`;
     if (plan.timing) md += `NEXT       : ${cleanMarkdownText(plan.timing, 300)}\n`;
     md += "```";
@@ -552,6 +554,7 @@ function compactTechnicalContext(ticker, stock, quote, techRes) {
             riskEmaValue: plan.riskEmaValue ?? null,
             reason: plan.reason || null,
             timing: plan.timing || null,
+            extraSuggestion: plan.extraSuggestion || null,
             invalidation: plan.invalidation || null,
             noTradeReasons: plan.noTradeReasons || [],
         },

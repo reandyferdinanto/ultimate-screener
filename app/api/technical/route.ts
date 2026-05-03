@@ -97,6 +97,61 @@ function detectDynamicEmaSupport(quotes: any[]) {
   };
 }
 
+function detectDiscountBottomSetup(quotes: any[]) {
+  const last = quotes[quotes.length - 1];
+  const prev = quotes[quotes.length - 2] || last;
+  const prev2 = quotes[quotes.length - 3] || prev;
+  const currentPrice = Number(last?.close);
+  const swingLow = getSwingLow(quotes, 6);
+  const supportValue = Math.min(Number(last?.low), swingLow);
+  const ema20 = Number(last?.ema20);
+  const rsi = Number(last?.rsi);
+  const prevRsi = Number(prev?.rsi);
+  const mfi = Number(last?.mfi);
+  const prevMfi = Number(prev?.mfi);
+  const sqz = last?.squeezeDeluxe || {};
+  const prevSqz = prev?.squeezeDeluxe || sqz;
+  const range = Number(last?.high) - Number(last?.low);
+  const closePosition = range > 0 ? (currentPrice - Number(last?.low)) / range : 0.5;
+  const avgVolume20 = averageFinite(quotes.slice(-20).map(q => q.volume)) || 0;
+  const volumeNotClimax = avgVolume20 <= 0 || Number(last?.volume) <= avgVolume20 * 2.2;
+  const distancePct = supportValue > 0 ? ((currentPrice - supportValue) / supportValue) * 100 : 99;
+
+  const nearHardStopArea = Number.isFinite(currentPrice) && Number.isFinite(supportValue) && supportValue > 0 &&
+    currentPrice >= supportValue * 0.985 && currentPrice <= supportValue * 1.08;
+  const belowOrNearEma20 = Number.isFinite(ema20) && currentPrice <= ema20 * 1.025;
+  const rsiRecovery = Number.isFinite(rsi) && (rsi <= 38 || (rsi <= 52 && rsi > prevRsi));
+  const mfiRecovery = Number.isFinite(mfi) && (mfi <= 35 || mfi > prevMfi + 0.5);
+  const fluxImproving = Number.isFinite(Number(sqz.flux)) && Number.isFinite(Number(prevSqz.flux)) && Number(sqz.flux) > Number(prevSqz.flux);
+  const momentumImproving = Number.isFinite(Number(sqz.momentum)) && Number.isFinite(Number(prevSqz.momentum)) && Number(sqz.momentum) > Number(prevSqz.momentum);
+  const obvImproving = Number(last?.obv) > Number(prev?.obv);
+  const cmfSupport = Number(last?.cmf) > -0.05;
+  const candleRecovery = currentPrice >= Number(prev?.close) * 0.995 || closePosition >= 0.45 || currentPrice > Number(prev2?.close);
+  const supportStillHeld = currentPrice >= supportValue * 0.995;
+
+  const hints = [rsiRecovery, mfiRecovery, fluxImproving, momentumImproving, obvImproving, cmfSupport, candleRecovery]
+    .filter(Boolean).length;
+  const isActive = nearHardStopArea && belowOrNearEma20 && supportStillHeld && volumeNotClimax && hints >= 3;
+
+  return {
+    isActive,
+    confirmation: hints >= 5 ? "CONFIRMED" : "EARLY",
+    supportLabel: "Swing low / hard-stop area",
+    supportValue,
+    riskLabel: "Swing low",
+    riskValue: supportValue,
+    distancePct,
+    hints,
+    rsiRecovery,
+    mfiRecovery,
+    fluxImproving,
+    momentumImproving,
+    obvImproving,
+    cmfSupport,
+    candleRecovery,
+  };
+}
+
 function averageFinite(values: unknown[]) {
   const finiteValues = values.map(Number).filter(Number.isFinite);
   if (finiteValues.length === 0) return null;
@@ -305,14 +360,15 @@ function buildTradePlan(quotes: any[], pivots: any, timeframe: string, context: 
   const longTrendHealthy = (!Number.isFinite(ema60) || currentPrice > ema60) && (!Number.isFinite(sma200) || currentPrice > sma200);
   const pullbackZone = context.dist20 >= -1.2 && context.dist20 <= 3.5;
   const dynamicSupport = detectDynamicEmaSupport(quotes);
-  const activeSupportLabel = dynamicSupport.supportLabel || "EMA20";
-  const activeSupportValue = Number(dynamicSupport.supportValue) || ema20;
-  const riskEmaLabel = dynamicSupport.riskLabel || "EMA20";
-  const riskEmaValue = Number(dynamicSupport.riskValue) || ema20;
-  const supportDistancePct = Number.isFinite(Number(dynamicSupport.distancePct)) ? Number(dynamicSupport.distancePct) : context.dist20;
+  const discountBottom = detectDiscountBottomSetup(quotes);
+  const activeSupportLabel = discountBottom.isActive ? "Discount bottom" : (dynamicSupport.supportLabel || "EMA20");
+  const activeSupportValue = discountBottom.isActive ? currentPrice : (Number(dynamicSupport.supportValue) || ema20);
+  const riskEmaLabel = discountBottom.isActive ? discountBottom.riskLabel : (dynamicSupport.riskLabel || "EMA20");
+  const riskEmaValue = discountBottom.isActive ? discountBottom.riskValue : (Number(dynamicSupport.riskValue) || ema20);
+  const supportDistancePct = discountBottom.isActive ? discountBottom.distancePct : (Number.isFinite(Number(dynamicSupport.distancePct)) ? Number(dynamicSupport.distancePct) : context.dist20);
   const supportPullbackZone = Boolean(dynamicSupport.isRespected && supportDistancePct >= -0.8 && supportDistancePct <= 4.5);
-  const fastEmaSupportStructure = Boolean(dynamicSupport.isRespected && activeSupportLabel !== "EMA20" && supportPullbackZone);
-  const overextensionAllowed = !context.isOverextended || fastEmaSupportStructure;
+  const fastEmaSupportStructure = Boolean(!discountBottom.isActive && dynamicSupport.isRespected && activeSupportLabel !== "EMA20" && supportPullbackZone);
+  const overextensionAllowed = !context.isOverextended || fastEmaSupportStructure || discountBottom.isActive;
   const squeezeActive = context.squeezeIntensity > 0;
   const previousSqueezeActive = Boolean(prevSqz.squeeze?.high || prevSqz.squeeze?.mid || prevSqz.squeeze?.low);
   const squeezeRelease = !squeezeActive && previousSqueezeActive;
@@ -322,11 +378,11 @@ function buildTradePlan(quotes: any[], pivots: any, timeframe: string, context: 
   const rsiRecovering = Number.isFinite(rsi) && (rsi <= 45 || (rsi <= 55 && rsi > prevRsi));
   const bullishSqueezeTrigger = sqz.buySignal || sqz.isBullDiv || (momentumImproving && context.fluxBullish && (squeezeActive || squeezeRelease || context.fluxImproving));
   const bearishSqueezeTrigger = sqz.sellSignal || sqz.isBearDiv || (bearishMomentum && !context.fluxImproving);
-  const stopAnchor = dynamicSupport.isRespected ? riskEmaValue : Math.min(swingLow, ema20);
+  const stopAnchor = dynamicSupport.isRespected || discountBottom.isActive ? riskEmaValue : Math.min(swingLow, ema20);
   const stopLoss = formatIdxPrice(stopAnchor * 0.985);
-  const idealEntry = pullbackZone || reclaimedEma20 || supportPullbackZone ? currentPrice : activeSupportValue * 1.01;
-  const entryLow = formatIdxPrice(activeSupportValue * 0.995);
-  const entryHigh = formatIdxPrice(Math.min(activeSupportValue * 1.035, Math.max(currentPrice, activeSupportValue * 1.01)));
+  const idealEntry = discountBottom.isActive || pullbackZone || reclaimedEma20 || supportPullbackZone ? currentPrice : activeSupportValue * 1.01;
+  const entryLow = formatIdxPrice(discountBottom.isActive ? currentPrice * 0.985 : activeSupportValue * 0.995);
+  const entryHigh = formatIdxPrice(discountBottom.isActive ? currentPrice * 1.025 : Math.min(activeSupportValue * 1.035, Math.max(currentPrice, activeSupportValue * 1.01)));
   const target = pickTarget(idealEntry, stopLoss, pivots);
   const atr = Number(last.atr14);
   const atrPct = Number(last.atrp14);
@@ -336,7 +392,7 @@ function buildTradePlan(quotes: any[], pivots: any, timeframe: string, context: 
     Number.isFinite(activeSupportValue) ? activeSupportValue * 0.992 : 0
   ));
   const hardStop = formatIdxPrice(Number.isFinite(chandelierLong)
-    ? Math.min(stopLoss, dynamicSupport.isRespected ? stopLoss : chandelierLong)
+    ? Math.min(stopLoss, dynamicSupport.isRespected || discountBottom.isActive ? stopLoss : chandelierLong)
     : stopLoss);
   const idealBuy = formatIdxPrice(idealEntry);
   const riskPerShare = Math.max(idealBuy - hardStop, idealBuy * 0.008);
@@ -347,8 +403,8 @@ function buildTradePlan(quotes: any[], pivots: any, timeframe: string, context: 
   const maxLossPct = riskPct;
   const timeStopBars = getTimeStopBars(timeframe);
   const expiresAt = getNextTimestamp(quotes, timeStopBars);
-  const chaseRisk = supportDistancePct > 5.5 || currentPrice > entryHigh * 1.015 || riskPct > 6 || (Number.isFinite(atrPct) && atrPct > 7);
-  const lowRewardRisk = rewardRisk < 1.5;
+  const chaseRisk = !discountBottom.isActive && (supportDistancePct > 5.5 || currentPrice > entryHigh * 1.015 || riskPct > 6 || (Number.isFinite(atrPct) && atrPct > 7));
+  const lowRewardRisk = rewardRisk < (discountBottom.isActive ? 1.2 : 1.5);
   const momentumStale = context.isMomentumPeaking || (sqz.momentum < sqz.signal && !context.fluxImproving);
   const buildPlan = (plan: any) => {
     let state = "SETUP";
@@ -370,12 +426,12 @@ function buildTradePlan(quotes: any[], pivots: any, timeframe: string, context: 
 
     const noTradeReasons = [...(plan.waitReasons || [])];
     if (chaseRisk) noTradeReasons.unshift(`Jangan kejar: jarak ${activeSupportLabel} ${formatPct(supportDistancePct)}%, risk ${formatPct(riskPct)}%, ATRP ${Number.isFinite(atrPct) ? formatPct(atrPct) : "N/A"}%.`);
-    if (lowRewardRisk) noTradeReasons.unshift(`Reward/risk ${rewardRisk.toFixed(2)}R di bawah minimum 1.5R.`);
+    if (lowRewardRisk) noTradeReasons.unshift(`Reward/risk ${rewardRisk.toFixed(2)}R di bawah minimum ${discountBottom.isActive ? "1.2R untuk starter bottom" : "1.5R"}.`);
 
     return {
       ...plan,
       state,
-      stateLabel: plan.stateLabel || stateMeta[state].label,
+      stateLabel: ["CHASE", "INVALID", "EXPIRED"].includes(state) ? stateMeta[state].label : (plan.stateLabel || stateMeta[state].label),
       stateColor: plan.stateColor || stateMeta[state].color,
       entryLow,
       entryHigh,
@@ -401,12 +457,17 @@ function buildTradePlan(quotes: any[], pivots: any, timeframe: string, context: 
       shouldEnter: state === "TRIGGERED",
       noTradeReasons,
       timeStopRule: `Jika setelah ${timeStopBars} candle belum mencapai +0.5R atau close kembali di bawah early exit ${earlyExit}, keluar/kurangi.`,
-      positionSizing: "Gunakan risiko tetap 0.5%-1% modal; lot = modal_risiko / (entry - hard_stop)."
+      positionSizing: discountBottom.isActive
+        ? "Karena ini area bottom/reversal, mulai kecil dulu. Risiko tetap 0.25%-0.5% modal; tambah hanya kalau candle lanjut menguat."
+        : "Gunakan risiko tetap 0.5%-1% modal; lot = modal_risiko / (entry - hard_stop).",
+      extraSuggestion: plan.extraSuggestion || (discountBottom.isActive
+        ? "Saran tambahan: treat ini sebagai discount entry, bukan all-in. Konfirmasi terbaik muncul kalau harga bertahan di atas support, MFI/RSI lanjut naik, dan close mulai mendekati EMA20."
+        : `Saran tambahan: kalau harga koreksi tertib ke ${activeSupportLabel} dan tidak close di bawah ${riskEmaLabel}, risk/reward bisa dihitung dari support tersebut, bukan otomatis dianggap warning.`)
     };
   };
   const waitReasons: string[] = [];
 
-  if (!priceAboveEma20) waitReasons.push(`Harga masih di bawah EMA20 (${formatPct(context.dist20)}%); strategi 20 EMA menunggu close/reclaim di atas EMA20.`);
+  if (!priceAboveEma20 && !discountBottom.isActive) waitReasons.push(`Harga masih di bawah EMA20 (${formatPct(context.dist20)}%); strategi utama menunggu close/reclaim di atas EMA20 atau validasi bottom reversal di area hard stop.`);
   if (!ema20Rising) waitReasons.push("EMA20 belum menanjak, jadi trend pendek belum memberi tailwind yang bersih.");
   if (!fastEmaBullish) waitReasons.push("EMA9 masih di bawah EMA20; timing cepat belum mengonfirmasi buyer kembali dominan.");
   if (Number.isFinite(ema60) && !swingEmaBullish) waitReasons.push("EMA20 masih di bawah EMA60; trend swing belum bullish menurut setup 20/60 EMA.");
@@ -414,7 +475,7 @@ function buildTradePlan(quotes: any[], pivots: any, timeframe: string, context: 
   if (!context.momRising) waitReasons.push("Momentum Squeeze masih di bawah/menurun terhadap signal.");
   if (context.isOverextended && !fastEmaSupportStructure) waitReasons.push(`Harga terlalu jauh dari EMA20 (${formatPct(context.dist20)}%); entry terbaik menunggu pullback ke EMA9/EMA13/EMA20 yang valid.`);
   if (rsiOverbought) waitReasons.push(`RSI ${formatPct(rsi)} sudah overbought; strategi 20 EMA lebih aman menunggu pullback/retest.`);
-  if (Number.isFinite(rsi) && rsi <= 35 && !priceAboveEma20) waitReasons.push(`RSI ${formatPct(rsi)} oversold, tetapi PDF 20 EMA tetap menunggu close konfirmasi di atas EMA20.`);
+  if (Number.isFinite(rsi) && rsi <= 35 && !priceAboveEma20 && !discountBottom.isActive) waitReasons.push(`RSI ${formatPct(rsi)} oversold; kalau muncul MFI/Flux/Momentum recovery di dekat support, ini bisa berubah jadi peluang bottom reversal.`);
   if (squeezeActive && !bullishSqueezeTrigger) waitReasons.push(`${context.squeezeState.replace('_', ' ')} masih menyimpan energi, tetapi belum ada trigger release bullish.`);
 
   if (bearishSqueezeTrigger || (brokeEma20 && bearishMomentum) || (context.isOverextended && context.isMomentumPeaking && (context.isVolumeClimax || context.isMfiExtreme || rsiOverbought))) {
@@ -430,6 +491,24 @@ function buildTradePlan(quotes: any[], pivots: any, timeframe: string, context: 
       takeProfit: formatIdxPrice(Math.max(currentPrice, pivots?.r1 || currentPrice)),
       invalidation: `Bullish lagi jika close kembali di atas EMA20 (${formatIdxPrice(ema20)}) dengan Momentum > Signal dan Flux membaik.`,
       reason: `Squeeze/EMA memberi sinyal distribusi: ${bearishSqueezeTrigger ? "bearish trigger aktif" : "EMA20 ditembus"} sementara momentum tidak menguat.`,
+      waitReasons: []
+    });
+  }
+
+  if (discountBottom.isActive && !bearishSqueezeTrigger && !context.isVolumeClimax && !context.isMfiExtreme) {
+    return buildPlan({
+      action: "BUY",
+      bias: "DISCOUNT_BOTTOM_REVERSAL",
+      stateLabel: discountBottom.confirmation === "CONFIRMED" ? "DISCOUNT BUY - BOTTOM REVERSAL" : "STARTER BUY - EARLY BOTTOM",
+      stateColor: "oklch(0.78 0.2 165)",
+      timing: `Beli bertahap di area discount ${entryLow} - ${entryHigh}. Jangan tunggu sempurna, tapi wajib disiplin: tambah posisi hanya kalau harga bertahan di atas support dan mulai reclaim EMA20 (${formatIdxPrice(ema20)}).`,
+      entryZone: `${entryLow} - ${entryHigh}`,
+      idealBuy: formatIdxPrice(idealEntry),
+      stopLoss,
+      takeProfit: target,
+      invalidation: `Setup bottom gagal kalau close turun di bawah ${riskEmaLabel} (${formatIdxPrice(riskEmaValue)}) atau rebound ditolak lagi dengan volume besar.`,
+      reason: `Harga dekat area hard stop/swing low (${formatIdxPrice(riskEmaValue)}) sehingga risk relatif terukur. Ada ${discountBottom.hints} isyarat recovery: ${discountBottom.rsiRecovery ? "RSI mulai pulih, " : ""}${discountBottom.mfiRecovery ? "MFI membaik, " : ""}${discountBottom.fluxImproving ? "Flux membaik, " : ""}${discountBottom.momentumImproving ? "Momentum naik, " : ""}${discountBottom.obvImproving ? "OBV mendukung, " : ""}${discountBottom.candleRecovery ? "candle mulai bertahan" : "support masih dijaga"}.`,
+      extraSuggestion: "Saran tambahan: entry discount lebih cocok pakai sizing kecil dan average-up saat konfirmasi muncul, bukan average-down kalau support ditembus.",
       waitReasons: []
     });
   }
@@ -590,6 +669,7 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
   const isSilentAccumulation = priceDown && fluxUp && !fluxBullish && fluxImproving;
 
   const dynamicEmaSupport = detectDynamicEmaSupport(quotes);
+  const discountBottom = detectDiscountBottomSetup(quotes);
   const dynamicSupportDistance = Number(dynamicEmaSupport.distancePct);
   const hasFastEmaSupport = Boolean(
     dynamicEmaSupport.isRespected &&
@@ -598,8 +678,8 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
     dynamicSupportDistance <= 4.5
   );
   const isPriceBullish = last.isUndercutBounce || dist20 > 0;
-  const isOverextended = dist20 > 10 && !hasFastEmaSupport;
-  const isNearSupport = hasFastEmaSupport || (dist20 > -1.5 && dist20 < 4.5);
+  const isOverextended = dist20 > 10 && !hasFastEmaSupport && !discountBottom.isActive;
+  const isNearSupport = discountBottom.isActive || hasFastEmaSupport || (dist20 > -1.5 && dist20 < 4.5);
   const isTight = consolidation < 4.5;
   const isMixedSignal = isPriceBullish && !fluxBullish;
   const isPremiumMixed = isMixedSignal && fluxImproving && consolidation < 8;
@@ -650,6 +730,13 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
       peakAnalysis = "Risiko balik ke rata-rata mulai naik. Momentum sudah mulai jenuh, tapi tren belum patah.";
     }
     suggestion = `Harga sudah berada di atas rata-rata (${dist20.toFixed(1)}% dari EMA20). ${peakAnalysis} Strategi: jika sudah punya, HOLD dengan trailing stop di low bar sebelumnya. Jika belum punya, tunggu pullback sehat ke area EMA9/EMA13/EMA20.`;
+  } else if (discountBottom.isActive && !(isVolumeClimax && isMomentumPeaking)) {
+    verdict = discountBottom.confirmation === "CONFIRMED"
+      ? "DISCOUNT ZONE: BOTTOM REVERSAL"
+      : "EARLY BOTTOM REVERSAL WATCH";
+    color = "oklch(0.78 0.2 165)";
+    riskLevel = discountBottom.confirmation === "CONFIRMED" ? "MEDIUM" : "MEDIUM-HIGH";
+    suggestion = `Harga sedang dekat area hard stop/swing low (${formatIdxPrice(discountBottom.riskValue)}), jadi ini bukan otomatis warning. Kalau support tetap dijaga, area ini bisa jadi peluang discount/bottom reversal. Ada ${discountBottom.hints} isyarat pemulihan; pakai stop ketat di bawah support dan tambah posisi hanya kalau reclaim EMA20/volume mulai mendukung.`;
   } else if (isVolumeClimax || (isMfiExtreme && isMomentumPeaking)) {
     verdict = "BEARISH REVERSAL: CLIMAX RISK";
     color = "oklch(0.6 0.2 20)";
@@ -691,10 +778,10 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
     riskLevel = "LOW";
     suggestion = "Sinyal buy on dip terdeteksi di area support struktural dengan volume dan momentum yang pulih.";
   } else if (dist20 < -5) {
-    verdict = "BEARISH STRUCTURE";
-    color = "oklch(0.6 0.2 20)";
-    riskLevel = "VERY HIGH";
-    suggestion = "Struktur harga rusak di bawah EMA20. Tunggu tren pulih sebelum entry baru.";
+    verdict = "DEEP DISCOUNT: NEED REVERSAL CONFIRMATION";
+    color = "oklch(0.72 0.17 75)";
+    riskLevel = "HIGH";
+    suggestion = "Harga masih jauh di bawah EMA20, tapi jangan langsung dibuang sebagai warning. Ini bisa jadi watchlist discount kalau mulai muncul higher low, RSI/MFI membaik, dan Flux tidak makin distribusi. Entry baru tetap tunggu support jelas dan stop loss ketat.";
   } else {
     verdict = "CONSOLIDATION: BASE BUILDING";
     color = "var(--text-secondary)";
@@ -736,7 +823,8 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
   else mfiStatus = mfiAvg > 50 ? "Healthy" : "Neutral";
 
   let setupScore = 50;
-  if (dist20 < -5) setupScore = 10;
+  if (discountBottom.isActive) setupScore = discountBottom.confirmation === "CONFIRMED" ? 88 : 78;
+  else if (dist20 < -5) setupScore = 35;
   else if (isOverextended) setupScore = 25 + Math.max(0, 15 - dist20);
   else if (isTight && isNearSupport) setupScore = 95 + (fluxBullish ? 5 : 0);
   else if (isNearSupport && fluxImproving) setupScore = 85;
@@ -746,12 +834,15 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
   if (emaBounceConfirmed && squeezeBullish && !isOverextended) setupScore = Math.max(setupScore, 88);
   if (isSilentFlyer) setupScore = Math.max(setupScore, 92);
   if (isCooldownReset) setupScore = Math.max(setupScore, 86);
-  if (squeezeBearish && !emaBounceConfirmed) setupScore = Math.min(setupScore, 25);
+  if (squeezeBearish && !emaBounceConfirmed && !discountBottom.isActive) setupScore = Math.min(setupScore, 25);
 
-  const emaSupportText = dynamicEmaSupport.isRespected
+  const emaSupportText = discountBottom.isActive
+    ? `bottom support valid dekat ${formatIdxPrice(discountBottom.riskValue)} (${discountBottom.hints} recovery hints)`
+    : dynamicEmaSupport.isRespected
     ? `valid/reclaim area ${dynamicEmaSupport.supportLabel} (risk ${dynamicEmaSupport.riskLabel})`
     : `belum valid; jarak harga ke EMA20 ${formatPct(dist20)}%`;
-  const technicalFusionInsight = `Trend: ${emaFastTrend}, ${emaSwingTrend}. Squeeze: ${squeezeState.replace('_', ' ')} (${squeezeDuration} bar) dengan Flux ${fluxStatus} dan momentum ${momRising ? "di atas signal" : "belum di atas signal"}. EMA Bounce: ${emaBounceConfirmed ? emaSupportText : `belum valid; jarak harga ke EMA20 ${formatPct(dist20)}%`}. Volume strength: ${Math.round(volumeStrength)}%.`;
+  const supportConfirmed = emaBounceConfirmed || discountBottom.isActive;
+  const technicalFusionInsight = `Trend: ${emaFastTrend}, ${emaSwingTrend}. Squeeze: ${squeezeState.replace('_', ' ')} (${squeezeDuration} bar) dengan Flux ${fluxStatus} dan momentum ${momRising ? "di atas signal" : "belum di atas signal"}. Support: ${supportConfirmed ? emaSupportText : `belum valid; jarak harga ke EMA20 ${formatPct(dist20)}%`}. Volume strength: ${Math.round(volumeStrength)}%.`;
 
   return {
     verdict,
@@ -778,8 +869,11 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
       rsi: Number.isFinite(last.rsi) ? last.rsi.toFixed(1) : "N/A",
       emaFast: emaFastTrend,
       emaSwing: emaSwingTrend,
-      emaBounce: emaBounceConfirmed ? "VALID" : "WAIT",
-      emaSupport: dynamicEmaSupport.isRespected ? `${dynamicEmaSupport.supportLabel} support / risk ${dynamicEmaSupport.riskLabel}` : "WAIT",
+      emaBounce: discountBottom.isActive ? "BOTTOM" : (emaBounceConfirmed ? "VALID" : "WAIT"),
+      emaSupport: discountBottom.isActive
+        ? `Discount bottom / risk ${discountBottom.riskLabel}`
+        : (dynamicEmaSupport.isRespected ? `${dynamicEmaSupport.supportLabel} support / risk ${dynamicEmaSupport.riskLabel}` : "WAIT"),
+      bottomReversal: discountBottom.isActive ? `${discountBottom.confirmation} / ${discountBottom.hints} recovery hints` : "WAIT",
       cooldown: isCooldownReset ? "ACTIVE" : "WAIT",
       squeeze: squeezeState.replace('_', ' '),
       flux: fluxStatus,
