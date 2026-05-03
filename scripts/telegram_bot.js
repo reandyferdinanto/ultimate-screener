@@ -164,12 +164,18 @@ function getExecutionPlan(analysis) {
 
 function buildInlineKeyboard(ticker, interval = "1d") {
     const raw = rawTicker(ticker);
+    const currentInterval = normalizeIntervalInput(interval) || "1d";
+    const timeframeButtons = ["1d", "15m", "1h", "4h"]
+        .filter(item => item !== currentInterval)
+        .map(item => ({ text: item.toUpperCase(), callback_data: `tf_${raw}_${item}` }));
+
     return {
         inline_keyboard: [
             [
                 { text: '📊 View Interactive Chart', url: analysisUrl(ticker, interval) },
                 { text: '🔄 Refresh', callback_data: `refresh_${raw}_${interval}` }
             ],
+            timeframeButtons,
             [
                 { text: '💸 Execution Plan', callback_data: `buyplan_${raw}_${interval}` }
             ]
@@ -331,6 +337,43 @@ function parseCallback(data, prefix) {
     };
 }
 
+const SUPPORTED_INTERVALS = new Set(["15m", "1h", "4h", "1d"]);
+
+function normalizeIntervalInput(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "scalp") return "15m";
+    if (SUPPORTED_INTERVALS.has(normalized)) return normalized;
+    return null;
+}
+
+function parseTickerRequests(text) {
+    const tokens = String(text || "")
+        .trim()
+        .split(/[\s,;/]+/)
+        .map(item => item.trim())
+        .filter(item => item && !["OR", "AND", "ATAU", "DAN"].includes(item.toUpperCase()));
+
+    const requests = [];
+    for (let index = 0; index < tokens.length; index += 1) {
+        const token = tokens[index];
+        const intervalToken = normalizeIntervalInput(token);
+        if (intervalToken) {
+            if (requests.length > 0) requests[requests.length - 1].interval = intervalToken;
+            continue;
+        }
+
+        const nextInterval = normalizeIntervalInput(tokens[index + 1]);
+        requests.push({
+            ticker: token,
+            interval: nextInterval || "1d"
+        });
+        if (nextInterval) index += 1;
+        if (requests.length >= 5) break;
+    }
+
+    return requests;
+}
+
 async function generateFullAnalysis(chatId, tickerInput, interval = "1d") {
     const ticker = normalizeTickerInput(tickerInput);
     const raw = rawTicker(ticker);
@@ -440,6 +483,12 @@ async function initBot() {
             generateFullAnalysis(chatId, ticker, interval);
         }
 
+        if (data.startsWith('tf_')) {
+            const { ticker, interval } = parseCallback(data, 'tf_');
+            bot.answerCallbackQuery(query.id, { text: `Switching ${ticker} to ${interval.toUpperCase()}...` });
+            generateFullAnalysis(chatId, ticker, interval);
+        }
+
         if (data.startsWith('full_list_')) {
             const category = data.replace('full_list_', '').toUpperCase(); 
             bot.answerCallbackQuery(query.id, { text: `Fetching full list for ${category}...` });
@@ -507,6 +556,9 @@ async function initBot() {
         text += "# HELP: WEB_SYNC COMMANDS\n\n";
         text += "Ticker analysis uses the same /api/technical data as /search.\n\n";
         text += "BUMI          - CONVICTION_REPORT 1D\n";
+        text += "BUMI 1h       - CONVICTION_REPORT 1H\n";
+        text += "FIRE 15m      - CONVICTION_REPORT 15m\n";
+        text += "MPIX 4h       - CONVICTION_REPORT 4H\n";
         text += "FIRE          - CONVICTION_REPORT 1D\n";
         text += "PICO scalp    - CONVICTION_REPORT 15m\n";
         text += "/chart BUMI   - Same as typing BUMI\n";
@@ -743,23 +795,10 @@ async function initBot() {
         const text = msg.text;
         if (!text || text.startsWith('/')) return;
 
-        let input = text.toUpperCase().trim();
-        let interval = "1d";
+        const requests = parseTickerRequests(text);
+        if (requests.length === 0) return;
 
-        if (input.endsWith(" SCALP")) {
-            input = input.replace(" SCALP", "").trim();
-            interval = "15m";
-        }
-
-        const requestedTickers = input
-            .split(/[\s,;/]+/)
-            .map(item => item.trim())
-            .filter(item => item && !["OR", "AND", "ATAU", "DAN"].includes(item))
-            .slice(0, 5);
-
-        if (requestedTickers.length === 0) return;
-
-        for (const tickerInput of requestedTickers) {
+        for (const { ticker: tickerInput, interval } of requests) {
             const dbSearchTicker = normalizeTickerInput(tickerInput);
             const raw = rawTicker(dbSearchTicker);
             if (raw.length < 3 || raw.length > 7) continue;
