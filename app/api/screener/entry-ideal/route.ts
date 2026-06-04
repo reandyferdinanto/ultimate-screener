@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getIdxStocksUniverse } from "@/lib/idx-stock-file";
+import { getPgScreenerSignals } from "@/lib/pg-screener-signals";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -120,6 +121,83 @@ function isInPriceRange(price: number, priceRange: string) {
   if (priceRange === "under500") return price < 500;
   if (priceRange === "above500") return price >= 500;
   return true;
+}
+
+function latestSignalTime(candidate: EntryCandidate) {
+  const time = new Date(candidate.lastScannedAt || candidate.lastQuoteDate || "").getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function startOfJakartaToday() {
+  const now = new Date();
+  const jakartaDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  return new Date(`${jakartaDate}T00:00:00+07:00`).getTime();
+}
+
+function mapStoredEntryCandidate(signal: Awaited<ReturnType<typeof getPgScreenerSignals>>[number]): EntryCandidate | null {
+  const state = String(signal.metadata?.state || "").toUpperCase();
+  const action = String(signal.metadata?.action || "").toUpperCase();
+  const currentPrice = Number(signal.currentPrice);
+  const buyArea = Number(signal.entryPrice);
+  const target1 = Number(signal.targetPrice);
+  const stopLoss = Number(signal.stopLossPrice);
+  const rewardRisk = Number(signal.rewardRisk);
+  const maxLossPct = Number(signal.riskPct);
+  const tradePlan = (signal.metadata?.tradePlan || {}) as TradePlan;
+
+  if (!["TRIGGERED", "ARMED"].includes(state) || action !== "BUY") return null;
+  if (!isFiniteNumber(currentPrice) || !isFiniteNumber(buyArea)) return null;
+  if (!isFiniteNumber(rewardRisk) || !isFiniteNumber(maxLossPct)) return null;
+
+  const entryLow = isFiniteNumber(tradePlan.entryLow) ? tradePlan.entryLow : buyArea;
+  const entryHigh = isFiniteNumber(tradePlan.entryHigh) ? tradePlan.entryHigh : buyArea;
+  const vector = state === "TRIGGERED" ? "VALID_ENTRY_NOW" : "ARMED_IN_ENTRY_ZONE";
+  const lastScannedAt = String(signal.lastScannedAt || signal.updatedAt || signal.entryDate || new Date().toISOString());
+
+  return {
+    ticker: signal.ticker,
+    strategy: `ENTRY_IDEAL: ${state}`,
+    signalSource: `ENTRY_IDEAL: ${state}`,
+    category: "ENTRY_IDEAL",
+    vector,
+    currentPrice,
+    buyArea,
+    entryLow,
+    entryHigh,
+    idealBuy: buyArea,
+    tp: isFiniteNumber(target1) ? target1 : undefined,
+    target1: isFiniteNumber(target1) ? target1 : undefined,
+    target2: isFiniteNumber(tradePlan.target2) ? tradePlan.target2 : undefined,
+    sl: isFiniteNumber(stopLoss) ? stopLoss : undefined,
+    riskPct: maxLossPct.toFixed(1),
+    rewardRisk,
+    maxLossPct,
+    atrPct: isFiniteNumber(tradePlan.atrPct) ? tradePlan.atrPct : null,
+    state,
+    stateLabel: String(tradePlan.stateLabel || state),
+    setupScore: Number(signal.metadata?.setupScore || 0),
+    volumeScore: Number(signal.metadata?.volScore || 0),
+    lastQuoteDate: signal.lastQuoteDate || undefined,
+    lastScannedAt,
+    dataFreshness: {
+      source: "Postgres.signal_events tradePlan",
+      lastScannedAt,
+      isLikelyFreshDaily: true
+    },
+    metadata: {
+      ...signal.metadata,
+      source: "Postgres.signal_events tradePlan",
+      category: "ENTRY_IDEAL",
+      vector,
+      rewardRisk,
+      maxLossPct
+    }
+  };
 }
 
 async function mapWithConcurrency<T, R>(
@@ -264,6 +342,7 @@ function rankState(state: string) {
 
 export async function GET(req: Request) {
   const { origin, searchParams } = new URL(req.url);
+  const live = searchParams.get("live") === "true";
   const interval = searchParams.get("interval") || "1d";
   const priceRange = searchParams.get("priceRange") || "all";
   const minRewardRisk = parseNumberParam(searchParams.get("minRewardRisk"), 1.5, 0, 10);
@@ -276,6 +355,50 @@ export async function GET(req: Request) {
   const startedAt = new Date();
 
   try {
+    if (!live) {
+      const todayStart = startOfJakartaToday();
+      const storedSignals = await getPgScreenerSignals(1_000);
+      const allCandidates = storedSignals
+        .map(mapStoredEntryCandidate)
+        .filter((candidate): candidate is EntryCandidate => Boolean(candidate))
+        .filter(candidate => allowedStates.has(candidate.state))
+        .filter(candidate => isInPriceRange(candidate.currentPrice, priceRange))
+        .filter(candidate => candidate.rewardRisk >= minRewardRisk)
+        .filter(candidate => candidate.maxLossPct <= maxRiskPct)
+        .sort((a, b) => {
+          const timeDiff = latestSignalTime(b) - latestSignalTime(a);
+          if (timeDiff !== 0) return timeDiff;
+          const stateDiff = rankState(a.state) - rankState(b.state);
+          if (stateDiff !== 0) return stateDiff;
+          return b.rewardRisk - a.rewardRisk;
+        });
+      const todayCandidates = allCandidates.filter(candidate => latestSignalTime(candidate) >= todayStart);
+      const data = todayCandidates.length > 0 ? todayCandidates : allCandidates.slice(0, 50);
+      const latestScannedAt = data.map(latestSignalTime).filter(Boolean).sort((a, b) => b - a)[0];
+
+      return NextResponse.json({
+        success: true,
+        data,
+        scanMeta: {
+          source: "Postgres.signal_events stored entry tradePlan. Pakai Scan entry untuk refresh live.",
+          criteria: {
+            states: Array.from(allowedStates),
+            interval,
+            priceRange,
+            minRewardRisk,
+            maxRiskPct
+          },
+          scanned: storedSignals.length,
+          matched: data.length,
+          failures: 0,
+          scanStartedAt: startedAt.toISOString(),
+          latestScannedAt: latestScannedAt ? new Date(latestScannedAt).toISOString() : startedAt.toISOString(),
+          isLatestScanFresh: latestScannedAt ? (Date.now() - latestScannedAt) <= 36 * 60 * 60 * 1000 : false,
+          stored: true
+        }
+      });
+    }
+
     const universe = await getIdxStocksUniverse();
     const stocks: ActiveStock[] = limit ? universe.slice(0, limit) : universe;
     const scanResults = await mapWithConcurrency(stocks, concurrency, stock => scanStock(

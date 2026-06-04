@@ -633,12 +633,49 @@ export default function AdvancedChart({
           });
         }
         if (d.squeezeDeluxe?.isBullDiv) {
+          const lifecycle = d.squeezeDeluxe?.divergenceLifecycle;
+          const markerText = lifecycle?.status === "SPIKE_MATURE"
+            ? "D+ JENUH"
+            : lifecycle?.status === "SPIKE_CONFIRMED"
+              ? "D+ SPIKE"
+              : lifecycle?.status === "INVALID"
+                ? "D+ INV"
+                : lifecycle?.status === "EXPIRED_NO_SPIKE"
+                  ? "D+ EXP"
+                  : "D+ LIVE";
+          const markerColor = lifecycle?.status === "SPIKE_MATURE"
+            ? "#22c55e"
+            : lifecycle?.status === "SPIKE_CONFIRMED"
+              ? "#84cc16"
+              : lifecycle?.status === "INVALID" || lifecycle?.status === "EXPIRED_NO_SPIKE"
+                ? "#f43f5e"
+                : "#ffa600";
           markers.push({
             time: asChartTime(d.time),
             position: "belowBar" as const,
-            color: "#ffa600",
+            color: markerColor,
             shape: "arrowUp" as const,
-            text: "D+",
+            text: markerText,
+          });
+        }
+        const resolution = d.squeezeDeluxe?.divergenceResolution;
+        if (resolution?.type === "bullish") {
+          const resolutionText = resolution.status === "SPIKE_MATURE"
+            ? "SPIKE JENUH"
+            : resolution.status === "SPIKE_CONFIRMED"
+              ? `SPIKE +${Number(resolution.maxRunPct || 0).toFixed(1)}%`
+              : resolution.status === "INVALID"
+                ? "DIV INVALID"
+                : "DIV EXPIRED";
+          const resolutionColor = resolution.status === "INVALID" || resolution.status === "EXPIRED_NO_SPIKE"
+            ? "#f43f5e"
+            : "#22c55e";
+          markers.push({
+            time: asChartTime(d.time),
+            position: resolution.status === "INVALID" || resolution.status === "EXPIRED_NO_SPIKE" ? "aboveBar" as const : "belowBar" as const,
+            color: resolutionColor,
+            shape: resolution.status === "INVALID" || resolution.status === "EXPIRED_NO_SPIKE" ? "arrowDown" as const : "circle" as const,
+            text: resolutionText,
           });
         }
         return markers;

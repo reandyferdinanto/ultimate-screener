@@ -27,7 +27,7 @@ type IdxStockFileRow = {
   listing_board?: unknown;
 };
 
-const DEFAULT_STOCK_FILE = path.join(process.cwd(), "data", "idx_stocks_with_sectors.json");
+const DEFAULT_STOCK_FILE = path.join(/* turbopackIgnore: true */ process.cwd(), "data", "idx_stocks_with_sectors.json");
 const LEGACY_STOCK_FILE = "C:\\Users\\eluon\\Downloads\\idx_stocks_with_sectors_20260501.json";
 
 let cachedStocks: FileBackedIndonesiaStock[] | null = null;
@@ -50,8 +50,8 @@ function stockLookupKeys(value?: string) {
 function resolveStockFilePath() {
   const explicit = String(process.env.IDX_STOCKS_FILE || "").trim();
   if (explicit) return explicit;
-  if (fs.existsSync(DEFAULT_STOCK_FILE)) return DEFAULT_STOCK_FILE;
-  if (fs.existsSync(LEGACY_STOCK_FILE)) return LEGACY_STOCK_FILE;
+  if (fs.existsSync(/* turbopackIgnore: true */ DEFAULT_STOCK_FILE)) return DEFAULT_STOCK_FILE;
+  if (fs.existsSync(/* turbopackIgnore: true */ LEGACY_STOCK_FILE)) return LEGACY_STOCK_FILE;
   return DEFAULT_STOCK_FILE;
 }
 
@@ -78,13 +78,13 @@ export function loadIdxStocks(): FileBackedIndonesiaStock[] {
   if (cachedStocks) return cachedStocks;
 
   const filePath = resolveStockFilePath();
-  if (!fs.existsSync(filePath)) {
+  if (!fs.existsSync(/* turbopackIgnore: true */ filePath)) {
     throw new Error(
       `IDX stock universe file not found at ${filePath}. Set IDX_STOCKS_FILE or use getIdxStocksUniverse().`
     );
   }
 
-  const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const parsed = JSON.parse(fs.readFileSync(/* turbopackIgnore: true */ filePath, "utf8"));
   const sourceDate = parsed?.metadata?.source_date || new Date().toISOString();
   const rows = Array.isArray(parsed?.stocks) ? parsed.stocks : [];
 
@@ -121,7 +121,7 @@ async function loadIdxStocksFromDatabase() {
     .sort((a: FileBackedIndonesiaStock, b: FileBackedIndonesiaStock) => a.ticker.localeCompare(b.ticker));
 
   try {
-    fs.mkdirSync(path.dirname(DEFAULT_STOCK_FILE), { recursive: true });
+    fs.mkdirSync(/* turbopackIgnore: true */ path.dirname(DEFAULT_STOCK_FILE), { recursive: true });
     const payload = {
       metadata: {
         source_date: new Date().toISOString(),
@@ -135,7 +135,7 @@ async function loadIdxStocksFromDatabase() {
         listing_board: stock.exchange,
       })),
     };
-    fs.writeFileSync(DEFAULT_STOCK_FILE, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    fs.writeFileSync(/* turbopackIgnore: true */ DEFAULT_STOCK_FILE, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
   } catch (error) {
     console.warn("[idx-stock-file] failed to persist local IDX universe cache:", error instanceof Error ? error.message : error);
   }
@@ -149,7 +149,7 @@ export async function getIdxStocksUniverse() {
   if (!cachedAsyncStocks) {
     cachedAsyncStocks = (async () => {
       const filePath = resolveStockFilePath();
-      if (fs.existsSync(filePath)) {
+      if (fs.existsSync(/* turbopackIgnore: true */ filePath)) {
         return loadIdxStocks();
       }
 

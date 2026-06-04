@@ -29,7 +29,8 @@ import {
   calculateVWAP,
   calculateVortex,
   calculateKDJ,
-  calculateSqueezeDeluxe
+  calculateSqueezeDeluxe,
+  calculateCVD
 } from "@/lib/indicators";
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
@@ -40,6 +41,302 @@ function formatIdxPrice(value: number) {
 
 function formatPct(value: number) {
   return Number.isFinite(value) ? value.toFixed(1) : "0.0";
+}
+
+function divergenceLifecycleConfig(timeframe: string) {
+  const configs: Record<string, { maxBars: number; spikePct: number; invalidAtr: number }> = {
+    "15m": { maxBars: 28, spikePct: 2.0, invalidAtr: 0.35 },
+    "1h": { maxBars: 24, spikePct: 3.0, invalidAtr: 0.35 },
+    "4h": { maxBars: 18, spikePct: 4.0, invalidAtr: 0.35 },
+    "1d": { maxBars: 8, spikePct: 6.0, invalidAtr: 0.35 },
+  };
+
+  return configs[timeframe] || configs["1d"];
+}
+
+function aggregateWibQuotesByHours(quotes: any[], hours: number) {
+  const bucketSeconds = hours * 60 * 60;
+  const buckets = new Map<number, any>();
+
+  for (const quote of quotes) {
+    const bucketStart = Math.floor(Number(quote.time) / bucketSeconds) * bucketSeconds;
+    const existing = buckets.get(bucketStart);
+
+    if (!existing) {
+      buckets.set(bucketStart, { ...quote, time: bucketStart });
+      continue;
+    }
+
+    existing.high = Math.max(existing.high, quote.high);
+    existing.low = Math.min(existing.low, quote.low);
+    existing.close = quote.close;
+    existing.volume += quote.volume || 0;
+  }
+
+  return Array.from(buckets.values()).sort((a, b) => a.time - b.time);
+}
+
+function classifyBullishDivergence(data: any[], index: number, timeframe: string) {
+  const config = divergenceLifecycleConfig(timeframe);
+  const start = data[index];
+  const entry = Number(start?.close);
+  const signalLow = Number(start?.low);
+  const atr = Number(start?.atr14) > 0 ? Number(start.atr14) : entry * 0.025;
+  if (!Number.isFinite(entry) || entry <= 0 || !Number.isFinite(signalLow)) return null;
+
+  const spikeLevel = entry * (1 + config.spikePct / 100);
+  const invalidLevel = signalLow - (atr * config.invalidAtr);
+  const lastIndex = data.length - 1;
+  const expiryIndex = Math.min(lastIndex, index + config.maxBars);
+  let maxRunPct = 0;
+  let spikeIndex: number | null = null;
+  let matureIndex: number | null = null;
+  let invalidIndex: number | null = null;
+
+  for (let cursor = index + 1; cursor <= expiryIndex; cursor += 1) {
+    const candle = data[cursor];
+    const high = Number(candle?.high);
+    const close = Number(candle?.close);
+    const prev = data[cursor - 1] || candle;
+    const sqz = candle?.squeezeDeluxe || {};
+    const prevSqz = prev?.squeezeDeluxe || {};
+
+    if (Number.isFinite(high)) {
+      maxRunPct = Math.max(maxRunPct, ((high - entry) / entry) * 100);
+      if (spikeIndex === null && high >= spikeLevel) spikeIndex = cursor;
+    }
+
+    if (spikeIndex === null && Number.isFinite(close) && close < invalidLevel) {
+      invalidIndex = cursor;
+      break;
+    }
+
+    if (spikeIndex !== null) {
+      const momentum = Number(sqz.momentum);
+      const signal = Number(sqz.signal);
+      const prevMomentum = Number(prevSqz.momentum);
+      const prevFlux = Number(prevSqz.flux);
+      const flux = Number(sqz.flux);
+      const momentumStalling = Number.isFinite(momentum) && Number.isFinite(signal) && momentum < signal;
+      const flowCooling = Number.isFinite(momentum) && Number.isFinite(prevMomentum) &&
+        Number.isFinite(flux) && Number.isFinite(prevFlux) &&
+        momentum < prevMomentum && flux < prevFlux;
+      const extendedRun = maxRunPct >= config.spikePct * 1.8;
+
+      if (cursor > spikeIndex && (momentumStalling || flowCooling || extendedRun)) {
+        matureIndex = cursor;
+        break;
+      }
+    }
+  }
+
+  if (invalidIndex !== null) {
+    return {
+      type: "bullish",
+      status: "INVALID",
+      label: "D+ invalid",
+      reason: "Harga close menembus low divergence + buffer ATR sebelum spike minimum.",
+      thresholdPct: config.spikePct,
+      invalidLevel,
+      maxRunPct: Number(maxRunPct.toFixed(2)),
+      resolvedAtIndex: invalidIndex,
+      resolvedAtTime: data[invalidIndex]?.time,
+      expiresInBars: 0,
+    };
+  }
+
+  if (matureIndex !== null) {
+    return {
+      type: "bullish",
+      status: "SPIKE_MATURE",
+      label: "D+ jenuh",
+      reason: "Spike minimum sudah terjadi dan momentum/flux mulai cooling atau run sudah melebar.",
+      thresholdPct: config.spikePct,
+      invalidLevel,
+      maxRunPct: Number(maxRunPct.toFixed(2)),
+      resolvedAtIndex: matureIndex,
+      resolvedAtTime: data[matureIndex]?.time,
+      expiresInBars: 0,
+    };
+  }
+
+  if (spikeIndex !== null) {
+    return {
+      type: "bullish",
+      status: "SPIKE_CONFIRMED",
+      label: "D+ spike",
+      reason: "Harga sudah mencapai spike minimum setelah divergence.",
+      thresholdPct: config.spikePct,
+      invalidLevel,
+      maxRunPct: Number(maxRunPct.toFixed(2)),
+      resolvedAtIndex: spikeIndex,
+      resolvedAtTime: data[spikeIndex]?.time,
+      expiresInBars: Math.max(0, expiryIndex - lastIndex),
+    };
+  }
+
+  if (lastIndex >= index + config.maxBars) {
+    return {
+      type: "bullish",
+      status: "EXPIRED_NO_SPIKE",
+      label: "D+ expired",
+      reason: `Belum ada spike minimum ${config.spikePct}% dalam ${config.maxBars} bar.`,
+      thresholdPct: config.spikePct,
+      invalidLevel,
+      maxRunPct: Number(maxRunPct.toFixed(2)),
+      resolvedAtIndex: expiryIndex,
+      resolvedAtTime: data[expiryIndex]?.time,
+      expiresInBars: 0,
+    };
+  }
+
+  return {
+    type: "bullish",
+    status: "ACTIVE",
+    label: "D+ aktif",
+    reason: `Menunggu spike minimum ${config.spikePct}% sebelum ${config.maxBars} bar.`,
+    thresholdPct: config.spikePct,
+    invalidLevel,
+    maxRunPct: Number(maxRunPct.toFixed(2)),
+    resolvedAtIndex: null,
+    resolvedAtTime: null,
+    expiresInBars: Math.max(0, (index + config.maxBars) - lastIndex),
+  };
+}
+
+function annotateSqueezeDivergenceLifecycle(data: any[], timeframe: string) {
+  data.forEach((item, index) => {
+    if (!item?.squeezeDeluxe?.isBullDiv) return;
+    const lifecycle = classifyBullishDivergence(data, index, timeframe);
+    if (!lifecycle) return;
+
+    item.squeezeDeluxe.divergenceLifecycle = lifecycle;
+    if (typeof lifecycle.resolvedAtIndex === "number" && data[lifecycle.resolvedAtIndex]?.squeezeDeluxe) {
+      data[lifecycle.resolvedAtIndex].squeezeDeluxe.divergenceResolution = {
+        type: lifecycle.type,
+        status: lifecycle.status,
+        sourceIndex: index,
+        label: lifecycle.label,
+        maxRunPct: lifecycle.maxRunPct,
+      };
+    }
+  });
+}
+
+function strictTimeframeConfig(timeframe: string) {
+  const configs: Record<string, {
+    lookback: number;
+    maxRunPct: number;
+    maxRiskPct: number;
+    minRewardRisk: number;
+    requireTrendFloor: boolean;
+    vector: string;
+  }> = {
+    "15m": { lookback: 10, maxRunPct: 2.5, maxRiskPct: 4.5, minRewardRisk: 1.8, requireTrendFloor: true, vector: "SQZ_BULL_DIV_15M_STRICT" },
+    "1h": { lookback: 8, maxRunPct: 3.5, maxRiskPct: 5.5, minRewardRisk: 1.7, requireTrendFloor: true, vector: "SQZ_BULL_DIV_1H_STRICT" },
+    "4h": { lookback: 6, maxRunPct: 5.5, maxRiskPct: 7.0, minRewardRisk: 1.6, requireTrendFloor: false, vector: "SQZ_BULL_DIV_4H_STRICT" },
+    "1d": { lookback: 5, maxRunPct: 8.0, maxRiskPct: 8.0, minRewardRisk: 1.6, requireTrendFloor: false, vector: "SQZ_BULL_DIV_1D_STRICT" },
+  };
+
+  return configs[timeframe] || configs["1d"];
+}
+
+function detectStrictSqueezeDivergence(data: any[], timeframe: string, plan: any) {
+  const config = strictTimeframeConfig(timeframe);
+  const lastIndex = data.length - 1;
+  const last = data[lastIndex];
+  const prev = data[lastIndex - 1] || last;
+  if (!last?.squeezeDeluxe || !plan) return null;
+
+  for (let offset = 0; offset <= config.lookback; offset += 1) {
+    const index = lastIndex - offset;
+    const item = data[index];
+    const sqz = item?.squeezeDeluxe;
+    if (!sqz?.isBullDiv) continue;
+
+    const lifecycle = sqz.divergenceLifecycle;
+    if (lifecycle?.status === "INVALIDATED" || lifecycle?.status === "MATURED_SPIKE") continue;
+
+    const entry = Number(item.close);
+    const current = Number(last.close);
+    const runPct = entry > 0 ? ((current - entry) / entry) * 100 : Number.NaN;
+    const momentumConstructive = Number(last.squeezeDeluxe.momentum) > Number(last.squeezeDeluxe.signal) ||
+      Number(last.squeezeDeluxe.momentum) > Number(prev.squeezeDeluxe?.momentum);
+    const fluxConstructive = Number(last.squeezeDeluxe.flux) > -10 &&
+      Number(last.squeezeDeluxe.flux) >= Number(prev.squeezeDeluxe?.flux) - 8;
+    const compressionNearby = data.slice(Math.max(0, index - 4), lastIndex + 1)
+      .some(row => row.squeezeDeluxe?.squeeze?.high || row.squeezeDeluxe?.squeeze?.mid || row.squeezeDeluxe?.squeeze?.low);
+    const riskOk = Number(plan.maxLossPct) <= config.maxRiskPct;
+    const rewardOk = Number(plan.rewardRisk) >= config.minRewardRisk;
+    const trendFloorOk = !config.requireTrendFloor ||
+      Number(last.close) >= Number(last.ema20) * 0.985 ||
+      (Number(last.ema9) >= Number(last.ema20) * 0.99 && Number(last.close) >= Number(last.ema9) * 0.99);
+
+    if (
+      Number.isFinite(runPct) &&
+      runPct <= config.maxRunPct &&
+      momentumConstructive &&
+      fluxConstructive &&
+      compressionNearby &&
+      riskOk &&
+      rewardOk &&
+      trendFloorOk
+    ) {
+      return {
+        category: "SQUEEZE_DIVERGENCE",
+        vector: config.vector,
+        signalIndex: index,
+        barsAgo: offset,
+        runPct: Number(runPct.toFixed(2)),
+        lifecycleStatus: lifecycle?.status || "ACTIVE",
+      };
+    }
+  }
+
+  return null;
+}
+
+function detectCvdBullishDivergence(quotes: any[], timeframe: string, plan: any) {
+  const config = strictTimeframeConfig(timeframe);
+  const cvd = calculateCVD(quotes);
+  const lastIndex = quotes.length - 1;
+  const lookback = Math.min(config.lookback + 8, 24);
+  if (lastIndex < lookback || !plan) return null;
+
+  const recentStart = Math.max(2, lastIndex - lookback);
+  let previousLowIndex = recentStart;
+  for (let i = recentStart; i < lastIndex - 2; i += 1) {
+    if (Number(quotes[i].low) < Number(quotes[previousLowIndex].low)) previousLowIndex = i;
+  }
+
+  const lastLowWindowStart = Math.max(previousLowIndex + 2, lastIndex - Math.ceil(lookback / 2));
+  let currentLowIndex = lastLowWindowStart;
+  for (let i = lastLowWindowStart; i <= lastIndex; i += 1) {
+    if (Number(quotes[i].low) < Number(quotes[currentLowIndex].low)) currentLowIndex = i;
+  }
+
+  const previousLow = Number(quotes[previousLowIndex].low);
+  const currentLow = Number(quotes[currentLowIndex].low);
+  const priceLowerLow = currentLow <= previousLow * 1.01;
+  const cvdHigherLow = Number(cvd[currentLowIndex]) > Number(cvd[previousLowIndex]);
+  const cvdRecoveryPct = Math.abs(Number(cvd[previousLowIndex])) > 0
+    ? ((Number(cvd[currentLowIndex]) - Number(cvd[previousLowIndex])) / Math.abs(Number(cvd[previousLowIndex]))) * 100
+    : 0;
+  const closeRecovery = Number(quotes[lastIndex].close) >= currentLow * 1.01;
+  const riskOk = Number(plan.maxLossPct) <= Math.max(config.maxRiskPct, 6);
+  const rewardOk = Number(plan.rewardRisk) >= config.minRewardRisk;
+
+  if (priceLowerLow && cvdHigherLow && cvdRecoveryPct >= 8 && closeRecovery && riskOk && rewardOk) {
+    return {
+      category: "CVD_DIVERGENCE",
+      vector: `CVD_BULL_DIV_${timeframe.toUpperCase()}_STRICT`,
+      previousLowIndex,
+      currentLowIndex,
+      cvdRecoveryPct: Number(cvdRecoveryPct.toFixed(2)),
+    };
+  }
+
+  return null;
 }
 
 function getSwingLow(quotes: any[], lookback = 5) {
@@ -843,12 +1140,24 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
     : `belum valid; jarak harga ke EMA20 ${formatPct(dist20)}%`;
   const supportConfirmed = emaBounceConfirmed || discountBottom.isActive;
   const technicalFusionInsight = `Trend: ${emaFastTrend}, ${emaSwingTrend}. Squeeze: ${squeezeState.replace('_', ' ')} (${squeezeDuration} bar) dengan Flux ${fluxStatus} dan momentum ${momRising ? "di atas signal" : "belum di atas signal"}. Support: ${supportConfirmed ? emaSupportText : `belum valid; jarak harga ke EMA20 ${formatPct(dist20)}%`}. Volume strength: ${Math.round(volumeStrength)}%.`;
+  const strictSqzDivergence = detectStrictSqueezeDivergence(quotes, timeframe, tradePlan);
+  const cvdDivergence = strictSqzDivergence ? null : detectCvdBullishDivergence(quotes, timeframe, tradePlan);
+  const strictScreener = strictSqzDivergence || cvdDivergence;
+  const strictScreenerLabel = strictScreener
+    ? `${strictScreener.category}/${strictScreener.vector}`
+    : undefined;
 
   return {
-    verdict,
+    verdict: strictSqzDivergence
+      ? "STRICT SQUEEZE DIVERGENCE"
+      : (cvdDivergence ? "STRICT CVD DIVERGENCE" : verdict),
     color,
     riskLevel,
-    suggestion,
+    suggestion: strictSqzDivergence
+      ? `${suggestion} Strict squeeze divergence aktif: momentum masih konstruktif, belum terlalu jauh dari titik divergence, dan risk/reward lolos filter timeframe.`
+      : (cvdDivergence
+        ? `${suggestion} CVD proxy menunjukkan tekanan jual melemah: harga mengetes low, tetapi cumulative volume delta membentuk higher low.`
+        : suggestion),
     tradePlan,
     squeezeInsight,
     technicalFusionInsight,
@@ -856,8 +1165,9 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
     cooldownSetup,
     volDetails,
     isSilentFlyer,
+    strictDivergence: strictScreener || null,
     score: {
-      setup: Math.round(setupScore),
+      setup: Math.round(strictScreener ? Math.max(setupScore, strictSqzDivergence ? 90 : 84) : setupScore),
       volume: Math.round(volumeStrength)
     },
     details: {
@@ -885,7 +1195,8 @@ function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") 
       atrp: tradePlan.atrPct === null ? "N/A" : `${tradePlan.atrPct}%`,
       volClimax: isVolumeClimax,
       mfiExtreme: isMfiExtreme,
-      peakStatus: isVolumeClimax || (isMfiExtreme && isMomentumPeaking) ? "PEAK_POTENTIAL" : (hasTrendStrength && !isMomentumPeaking ? "STRONG_INERTIA" : "MEAN_REVERSION")
+      peakStatus: isVolumeClimax || (isMfiExtreme && isMomentumPeaking) ? "PEAK_POTENTIAL" : (hasTrendStrength && !isMomentumPeaking ? "STRONG_INERTIA" : "MEAN_REVERSION"),
+      ...(strictScreenerLabel ? { screener: strictScreenerLabel, strictScreener: true } : {})
     }
   };
 }
@@ -957,6 +1268,15 @@ function buildScreenerTradePlan(basePlan: any, screenerContext: ScreenerSignalCo
 
 function applyScreenerSync(analysis: any, activeScreenerSignals: ScreenerSignalContext[]) {
   const screenerContext = activeScreenerSignals[0] || null;
+  if (analysis.details?.strictScreener) {
+    return {
+      ...analysis,
+      screenerContext: screenerContext || null,
+      activeScreenerSignals: activeScreenerSignals || [],
+      screenerTradePlan: null,
+    };
+  }
+
   if (!screenerContext) {
     return {
       ...analysis,
@@ -1052,21 +1372,7 @@ export async function GET(req: Request) {
 
     // Aggregate to 4h if requested
     if (originalInterval === "4h") {
-      const aggregated = [];
-      for (let i = 0; i < quotes.length; i += 4) {
-        const chunk = quotes.slice(i, i + 4);
-        if (chunk.length > 0) {
-          aggregated.push({
-            time: chunk[0].time,
-            open: chunk[0].open,
-            high: Math.max(...chunk.map((c: any) => c.high)),
-            low: Math.min(...chunk.map((c: any) => c.low)),
-            close: chunk[chunk.length - 1].close,
-            volume: chunk.reduce((sum: number, c: any) => sum + (c.volume || 0), 0),
-          });
-        }
-      }
-      quotes = aggregated;
+      quotes = aggregateWibQuotesByHours(quotes, 4);
     }
 
     const closes = quotes.map((q: any) => q.close);
@@ -1242,6 +1548,7 @@ export async function GET(req: Request) {
         squeezeDeluxe: squeezeDeluxe[i]
       };
     });
+    annotateSqueezeDivergenceLifecycle(data, originalInterval);
 
     const activeScreenerSignals = await getActiveScreenerSignals(symbol, 5);
     const unifiedAnalysis = applyScreenerSync(

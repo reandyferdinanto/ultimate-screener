@@ -111,37 +111,129 @@ function hasFreshBullishDivergence(results, signalIndex, currentIndex, maxBarsAp
     return momentumStillConstructive && notOverheated && fluxNotDeteriorating;
 }
 
+function timeframeConfig(interval) {
+    const configs = {
+        "15m": {
+            lookbackDays: 30,
+            fetchInterval: "15m",
+            lookbackBars: 28,
+            minUpsidePct: 2.0,
+            maxPostSignalRunPct: 5.0,
+            resistanceLookback: 80,
+            swingLowLookback: 28,
+            heldHoursPerBar: 0.25,
+            vector: "SQZ_BULL_DIV_15M_ROOM",
+            dataSource: "YahooFinance.chart(15m)",
+            ageSuffix: "B",
+        },
+        "1h": {
+            lookbackDays: 90,
+            fetchInterval: "1h",
+            lookbackBars: 24,
+            minUpsidePct: 3.0,
+            maxPostSignalRunPct: 7.0,
+            resistanceLookback: 64,
+            swingLowLookback: 24,
+            heldHoursPerBar: 1,
+            vector: "SQZ_BULL_DIV_1H_ROOM",
+            dataSource: "YahooFinance.chart(1h)",
+            ageSuffix: "B",
+        },
+        "4h": {
+            lookbackDays: 120,
+            fetchInterval: "1h",
+            aggregateHours: 4,
+            lookbackBars: 18,
+            minUpsidePct: 4.0,
+            maxPostSignalRunPct: 9.0,
+            resistanceLookback: 42,
+            swingLowLookback: 18,
+            heldHoursPerBar: 4,
+            vector: "SQZ_BULL_DIV_4H_ROOM",
+            dataSource: "YahooFinance.chart(1h aggregated 4h)",
+            ageSuffix: "B",
+        },
+        "1d": {
+            lookbackDays: 220,
+            fetchInterval: "1d",
+            lookbackBars: 8,
+            minUpsidePct: 6.0,
+            maxPostSignalRunPct: 12.0,
+            resistanceLookback: 55,
+            swingLowLookback: 12,
+            heldHoursPerBar: 24,
+            vector: "SQZ_BULL_DIV_1D_ROOM",
+            dataSource: "YahooFinance.chart(1d)",
+            ageSuffix: "D",
+        },
+    };
+
+    return configs[interval] || configs["1d"];
+}
+
+function jakartaDateParts(value) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    }).formatToParts(new Date(value));
+    const get = type => parts.find(part => part.type === type)?.value || "00";
+
+    return {
+        day: `${get("year")}-${get("month")}-${get("day")}`,
+        minutes: (Number(get("hour")) * 60) + Number(get("minute")),
+    };
+}
+
+function aggregateQuotesByHours(quotes, hours) {
+    const bucketMinutes = hours * 60;
+    const buckets = new Map();
+
+    for (const quote of quotes) {
+        const { day, minutes } = jakartaDateParts(quote.date);
+        const bucketStart = Math.floor(minutes / bucketMinutes) * bucketMinutes;
+        const key = `${day}:${bucketStart}`;
+        const existing = buckets.get(key);
+
+        if (!existing) {
+            buckets.set(key, {
+                date: quote.date,
+                open: quote.open,
+                high: quote.high,
+                low: quote.low,
+                close: quote.close,
+                volume: quote.volume || 0,
+            });
+            continue;
+        }
+
+        existing.high = Math.max(existing.high, quote.high);
+        existing.low = Math.min(existing.low, quote.low);
+        existing.close = quote.close;
+        existing.volume += quote.volume || 0;
+    }
+
+    return Array.from(buckets.values());
+}
+
 async function analyzeSqueeze(stock, interval = "1d") {
   try {
     const scanRunAt = new Date();
+    const config = timeframeConfig(interval);
     const period1 = new Date();
-    period1.setDate(period1.getDate() - (interval === "4h" ? 120 : 220));
-    
-    // Support for 4h via 1h aggregation
-    let fetchInterval = interval;
-    if (interval === "4h") fetchInterval = "1h";
+    period1.setDate(period1.getDate() - config.lookbackDays);
 
-    const result = await yahooFinance.chart(stock.ticker, { period1, interval: fetchInterval });
+    const result = await yahooFinance.chart(stock.ticker, { period1, interval: config.fetchInterval });
     
     if (!result || !result.quotes || result.quotes.length < 60) return null;
     let quotes = result.quotes.filter(q => q.close !== null);
     
-    if (interval === "4h") {
-        const aggregated = [];
-        for (let i = 0; i < quotes.length; i += 4) {
-            const chunk = quotes.slice(i, i + 4);
-            if (chunk.length > 0) {
-                aggregated.push({
-                    date: chunk[0].date,
-                    open: chunk[0].open,
-                    high: Math.max(...chunk.map(c => c.high)),
-                    low: Math.min(...chunk.map(c => c.low)),
-                    close: chunk[chunk.length - 1].close,
-                    volume: chunk.reduce((s, c) => s + (c.volume || 0), 0)
-                });
-            }
-        }
-        quotes = aggregated;
+    if (config.aggregateHours) {
+        quotes = aggregateQuotesByHours(quotes, config.aggregateHours);
     }
 
     if (quotes.length < 60) return null;
@@ -163,9 +255,9 @@ async function analyzeSqueeze(stock, interval = "1d") {
     const currentAtr = atr[currentIndex] || Math.max(currentPrice * 0.025, 1);
 
     let foundSignal = null;
-    const lookbackBars = interval === "4h" ? 18 : 8;
-    const minUpsidePct = interval === "4h" ? 4.0 : 6.0;
-    const maxPostSignalRunPct = interval === "4h" ? 9.0 : 12.0;
+    const lookbackBars = config.lookbackBars;
+    const minUpsidePct = config.minUpsidePct;
+    const maxPostSignalRunPct = config.maxPostSignalRunPct;
 
     for (let j = 0; j < lookbackBars; j++) {
         const idx = results.length - 1 - j;
@@ -189,9 +281,8 @@ async function analyzeSqueeze(stock, interval = "1d") {
             const priceRunFromSignal = ((currentPrice - quoteAtSignal.close) / quoteAtSignal.close) * 100;
             if (priceRunFromSignal > maxPostSignalRunPct) continue;
 
-            const resistanceLookback = interval === "4h" ? 42 : 55;
-            const recentHigh = getRecentHigh(quotes, currentIndex, resistanceLookback);
-            const swingLow = Math.min(getRecentLow(quotes, currentIndex, interval === "4h" ? 18 : 12), quoteAtSignal.low);
+            const recentHigh = getRecentHigh(quotes, currentIndex, config.resistanceLookback);
+            const swingLow = Math.min(getRecentLow(quotes, currentIndex, config.swingLowLookback), quoteAtSignal.low);
             const stopLoss = Math.min(swingLow * 0.985, currentPrice - currentAtr * 1.2);
             const risk = Math.max(currentPrice - stopLoss, currentPrice * 0.025);
             const rrTarget = currentPrice + risk * 1.5;
@@ -214,14 +305,15 @@ async function analyzeSqueeze(stock, interval = "1d") {
                     targetPrice: Math.round(targetPrice),
                     stopLossPrice: Math.round(stopLoss),
                     status: 'pending',
-                    daysHeld: j * (interval === "4h" ? 4 : 24),
+                    daysHeld: j * config.heldHoursPerBar,
                     priceHistory: [{ date: quoteAtSignal.date, price: quoteAtSignal.close }],
                     metadata: {
                         category: "SQUEEZE_DIVERGENCE",
-                        vector: interval === "4h" ? "SQZ_BULL_DIV_4H_ROOM" : "SQZ_BULL_DIV_1D_ROOM",
+                        vector: config.vector,
+                        timeframe: interval,
                         appearedAt: scanRunAt.toISOString(),
                         scanRunAt: scanRunAt.toISOString(),
-                        dataSource: `YahooFinance.chart(${interval === "4h" ? "1h aggregated 4h" : "1d"})`,
+                        dataSource: config.dataSource,
                         lastQuoteDate: currentQuote.date ? new Date(currentQuote.date).toISOString() : scanRunAt.toISOString(),
                         signalDate: quoteAtSignal.date ? new Date(quoteAtSignal.date).toISOString() : scanRunAt.toISOString(),
                         strategyRank: isHighConviction ? 850 : 650,
@@ -234,7 +326,7 @@ async function analyzeSqueeze(stock, interval = "1d") {
                         isHighConviction: isHighConviction,
                         divergence: "Bullish Momentum",
                         status: isHighConviction ? "SQUEEZE_RELEASE_DIV_WITH_ROOM" : "SQUEEZE_PREP_DIV_WITH_ROOM",
-                        age: j === 0 ? "TODAY" : `${j}${interval === "4h" ? 'B' : 'D'}_AGO`,
+                        age: j === 0 ? "TODAY" : `${j}${config.ageSuffix}_AGO`,
                         divergenceBarsAgo: j,
                         priceRunFromSignal: priceRunFromSignal.toFixed(2),
                         upsideRoomPct: upsidePct.toFixed(2),
@@ -264,7 +356,7 @@ async function run() {
     await mongoose.connect(MONGODB_URI);
     console.log(`Starting Squeeze Divergence Scan for \${stocks.length} stocks...`);
     
-    const timeframes = ["1d", "4h"];
+    const timeframes = ["15m", "1h", "4h", "1d"];
     const results = [];
     
     for (const tf of timeframes) {
@@ -326,7 +418,12 @@ async function run() {
           status: 'pending',
           $or: [
             { signalSource: `Squeeze Divergence (${tf})` },
-            { signalSource: 'Squeeze Divergence (${interval})', 'metadata.vector': tf === '4h' ? /4H/i : { $not: /4H/i } }
+            {
+              signalSource: 'Squeeze Divergence (${interval})',
+              ...(tf === '4h'
+                ? { 'metadata.vector': /4H/i }
+                : (tf === '1d' ? { 'metadata.vector': { $not: /(15M|1H|4H)/i } } : { 'metadata.vector': new RegExp(tf.toUpperCase(), 'i') }))
+            }
           ],
           ticker: { $nin: activeTickers }
         },

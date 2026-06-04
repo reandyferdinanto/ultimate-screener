@@ -124,6 +124,9 @@ interface ScanMeta {
   isLatestSignalFresh?: boolean;
   latestScannedAt?: string | null;
   isLatestScanFresh?: boolean;
+  cacheHit?: boolean;
+  cacheGeneratedAt?: string;
+  cacheExpiresAt?: string;
   scanned?: number;
   matched?: number;
   failures?: number;
@@ -165,7 +168,7 @@ const viewCopy: Record<string, { label: string; plain: string; helper: string; r
   sqz_div: {
     label: 'Squeeze Divergence',
     plain: 'Kompresi volatilitas',
-    helper: 'Saham yang masuk karena squeeze dan bullish divergence, dengan pilihan timeframe 1D atau 4H.',
+    helper: 'Saham yang masuk karena squeeze dan bullish divergence, dengan pilihan timeframe 15M, 1H, 4H, atau 1D.',
     risk: 'Valid jika kompresi mulai release ke atas, bukan breakdown.',
   },
 };
@@ -482,7 +485,7 @@ export default function ScreenerPage() {
   const [priceRange, setPriceRange] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [sortMode, setSortMode] = useState<SortMode>('latest');
-  const [sqzTimeframe, setSqzTimeframe] = useState<'1d' | '4h'>('1d');
+  const [sqzTimeframe, setSqzTimeframe] = useState<'15m' | '1h' | '4h' | '1d'>('1d');
   const [vectorFilter, setVectorFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -511,12 +514,18 @@ export default function ScreenerPage() {
     riskCheck?: RiskCheckResult;
   })[]>([]);
 
+  const refreshScreenerCache = async () => {
+    const res = await fetch("/api/screener?priceRange=all&dateFilter=all&cache=false");
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || "CACHE_REFRESH_FAILED");
+  };
+
   const fetchData = async () => {
     if (view === 'entry') {
       setScanning(true);
       setMsg("Memindai zona entry live...");
       try {
-        await loadCurrentData();
+        await loadCurrentData({ liveEntry: true });
         setMsg("Scan entry selesai. Cek delta, stop, dan target sebelum masuk.");
       } catch {
         setMsg("Scan entry gagal. Coba ulang beberapa saat lagi.");
@@ -534,6 +543,7 @@ export default function ScreenerPage() {
       const scanJson = await scanRes.json();
       if (scanJson.success) {
         setMsg(`Scan selesai. Data terbaru tersimpan di DB pada ${formatDateTime(scanJson.scanCompletedAt)}.`);
+        await refreshScreenerCache();
         await loadCurrentData();
       } else {
         setMsg("Scan gagal: " + scanJson.error);
@@ -546,11 +556,11 @@ export default function ScreenerPage() {
     }
   };
 
-  const loadCurrentData = useCallback(async () => {
+  const loadCurrentData = useCallback(async (options?: { liveEntry?: boolean }) => {
     setLoading(true);
     try {
       const endpoint = view === 'entry'
-        ? `/api/screener/entry-ideal?priceRange=${priceRange}&interval=1d`
+        ? `/api/screener/entry-ideal?priceRange=${priceRange}&interval=1d${options?.liveEntry ? '&live=true' : ''}`
         : `/api/screener?priceRange=${priceRange}&dateFilter=${dateFilter}`;
       const res = await fetch(endpoint);
       const json = await res.json();
@@ -624,12 +634,13 @@ export default function ScreenerPage() {
       if (view === 'entry') return category === 'ENTRY_IDEAL' || source.includes('ENTRY_IDEAL');
       if (view === 'cooldown') return category === 'COOLDOWN' || /COOLDOWN|EXTENDED_EMA20_COOLDOWN|PULLBACK|SIDEWAYS/.test(`${source} ${vector}`.toUpperCase());
       if (view === 'breakout') return category === 'TECHNICAL_BREAKOUT' || /TECHNICAL_BREAKOUT|TIGHT_FLAT|POWER_IGNITION|WINNER_SIMILARITY|TECHNICAL BREAKOUT/.test(`${source} ${vector}`.toUpperCase());
-      if (view === 'divergence') return source.includes('CVD');
+      if (view === 'divergence') return category === 'CVD_DIVERGENCE' || /CVD|BULLISH_DIVERGENCE|BULLISH DIVERGENCE/.test(`${source} ${vector}`.toUpperCase());
       if (view === 'sqz_div') {
           const sourceLower = source.toLowerCase();
           const vector = String(s.vector || s.metadata?.vector || "").toLowerCase();
           const isSqz = category === 'SQUEEZE_DIVERGENCE' || sourceLower.includes('squeeze divergence') || vector.includes('sqz_bull_div');
-          const hasExplicitTf = sourceLower.includes('1d') || sourceLower.includes('4h') || vector.includes('1d') || vector.includes('4h');
+          const hasExplicitTf = sourceLower.includes('15m') || sourceLower.includes('1h') || sourceLower.includes('4h') || sourceLower.includes('1d') ||
+            vector.includes('15m') || vector.includes('1h') || vector.includes('4h') || vector.includes('1d');
           const isRightTF = sourceLower.includes(sqzTimeframe.toLowerCase()) || vector.includes(sqzTimeframe.toLowerCase()) || (!hasExplicitTf && sqzTimeframe === '1d');
           return isSqz && isRightTF;
       }
@@ -761,8 +772,10 @@ export default function ScreenerPage() {
                 <div className="select-wrapper">
                   <label>Timeframe</label>
                   <select value={sqzTimeframe} onChange={e => setSqzTimeframe(e.target.value as any)}>
-                    <option value="1d">1D</option>
+                    <option value="15m">15M</option>
+                    <option value="1h">1H</option>
                     <option value="4h">4H</option>
+                    <option value="1d">1D</option>
                   </select>
                   <ChevronDown size={14} className="select-icon" />
                 </div>

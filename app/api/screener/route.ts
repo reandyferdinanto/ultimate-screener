@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { connectToDatabase } from "@/lib/db";
 import YahooFinance from "yahoo-finance2";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { SignalPerformanceModel } from "@/lib/models/SignalPerformance";
-import { StockSignalModel } from "@/lib/models/StockSignal";
-import { findIdxStocksByLookupKeysAsync, getIdxStocksUniverse } from "@/lib/idx-stock-file";
+import { getIdxStocksUniverse } from "@/lib/idx-stock-file";
+import { getLatestScreenerSnapshot, saveScreenerSnapshot } from "@/lib/screener-cache";
+import { getPgScreenerSignals } from "@/lib/pg-screener-signals";
 
 const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
@@ -43,10 +42,21 @@ function deriveSignalVector(source = "", metadata?: any) {
   if (normalized.includes("EMA BOUNCE")) return "EMA20_RECLAIM";
   if (normalized.includes("TURNAROUND")) return "TURNAROUND_FLUX_IMPROVING";
   if (normalized.includes("ARAHUNTER")) return "ARAHUNTER";
+  if (normalized.includes("SQUEEZE DIVERGENCE") && normalized.includes("15M")) return "SQZ_BULL_DIV_15M_ROOM";
+  if (normalized.includes("SQUEEZE DIVERGENCE") && normalized.includes("1H")) return "SQZ_BULL_DIV_1H_ROOM";
   if (normalized.includes("SQUEEZE DIVERGENCE") && normalized.includes("4H")) return "SQZ_BULL_DIV_4H_ROOM";
   if (normalized.includes("SQUEEZE DIVERGENCE")) return "SQZ_BULL_DIV_1D_ROOM";
   if (normalized.includes("EXPLOSION")) return "SQUEEZE_RELEASE";
   return normalized.replace(/^CONVICTION:\s*/, "").replace(/^SIGNAL:\s*/, "") || "GENERAL";
+}
+
+function deriveSqueezeDivergenceTimeframe(vector = "", metadata?: any) {
+  const normalizedVector = String(vector || "").toUpperCase();
+  const metadataTimeframe = String(metadata?.timeframe || "").toLowerCase();
+  if (metadataTimeframe === "15m" || normalizedVector.includes("15M")) return "15m";
+  if (metadataTimeframe === "1h" || normalizedVector.includes("1H")) return "1h";
+  if (metadataTimeframe === "4h" || normalizedVector.includes("4H")) return "4h";
+  return "1d";
 }
 
 function hoursSince(value?: Date | string) {
@@ -211,6 +221,129 @@ function sortLatestSignalScanFirst(a: any, b: any) {
   return (Number(b.relevanceScore) || 0) - (Number(a.relevanceScore) || 0);
 }
 
+function passesCachedPriceRange(item: any, priceRange: string) {
+  if (priceRange === "all") return true;
+  const entryPrice = Number(item.buyArea ?? item.entryPrice);
+  if (!Number.isFinite(entryPrice)) return false;
+  if (priceRange === "under300") return entryPrice < 300;
+  if (priceRange === "under500") return entryPrice < 500;
+  if (priceRange === "above500") return entryPrice >= 500;
+  return true;
+}
+
+function passesCachedDateFilter(item: any, dateFilter: string) {
+  if (dateFilter === "all") return true;
+
+  const updatedAt = dateTime(item.updatedAt) ||
+    dateTime(item.lastScannedAt) ||
+    dateTime(item.metadata?.lastScannedAt) ||
+    dateTime(item.metadata?.scanRunAt);
+  if (!updatedAt) return false;
+
+  const start = new Date();
+  if (dateFilter === "today") {
+    start.setHours(0, 0, 0, 0);
+  } else if (dateFilter === "3d") {
+    start.setDate(start.getDate() - 3);
+  } else if (dateFilter === "7d") {
+    start.setDate(start.getDate() - 7);
+  } else {
+    return true;
+  }
+
+  return updatedAt >= start.getTime();
+}
+
+function passesCachedCategoryFilter(item: any, categoryFilter?: string | null) {
+  if (!categoryFilter) return true;
+  const target = categoryFilter.toUpperCase();
+  return String(item.category || "").toUpperCase() === target ||
+    String(item.vector || "").toUpperCase() === target ||
+    String(item.strategy || "").toUpperCase().includes(target);
+}
+
+function screenerResultKey(item: any) {
+  const ticker = String(item.ticker || "").toUpperCase();
+  const source = String(item.signalSource || item.strategy || "").toUpperCase();
+  const category = String(item.category || item.metadata?.category || "").toUpperCase();
+  const vector = String(item.vector || item.metadata?.vector || "").toUpperCase();
+  if (category === "SQUEEZE_DIVERGENCE" || source.includes("SQUEEZE DIVERGENCE") || vector.includes("SQZ_BULL_DIV")) {
+    return `${ticker}:${source || vector}`;
+  }
+  return ticker;
+}
+
+function diversifyResults(sortedResults: any[]) {
+  const categories = [
+    "ARAHunter",
+    "SCALP",
+    "ELITE BOUNCE",
+    "VOLATILITY EXPLOSION",
+    "BUY ON DIP",
+    "COOLDOWN",
+    "TURNAROUND",
+    "EMA BOUNCE",
+    "CVD DIVERGENCE",
+    "Technical Breakout",
+    "Squeeze Divergence",
+    "Squeeze Explosion",
+    "The Perfect Retest"
+  ];
+  const diversified: any[] = [];
+  const seen = new Set();
+
+  ["15M", "1H", "4H", "1D"].forEach(tf => {
+    const timeframeResults = sortedResults
+      .filter(r => {
+        const source = String(r.strategy || r.signalSource || "").toUpperCase();
+        const vector = String(r.vector || r.metadata?.vector || "").toUpperCase();
+        const category = String(r.category || r.metadata?.category || "").toUpperCase();
+        return category === "SQUEEZE_DIVERGENCE" &&
+          (source.includes(tf) || vector.includes(tf));
+      })
+      .slice(0, 20);
+
+    timeframeResults.forEach(r => {
+      const key = screenerResultKey(r);
+      if (!seen.has(key)) {
+        diversified.push(r);
+        seen.add(key);
+      }
+    });
+  });
+
+  categories.forEach(cat => {
+    const catResults = sortedResults.filter(r => String(r.strategy || "").toUpperCase().includes(cat.toUpperCase())).slice(0, 20);
+    catResults.forEach(r => {
+      const key = screenerResultKey(r);
+      if (!seen.has(key)) {
+        diversified.push(r);
+        seen.add(key);
+      }
+    });
+  });
+
+  sortedResults.forEach(r => {
+    const key = screenerResultKey(r);
+    if (!seen.has(key) && diversified.length < 150) {
+      diversified.push(r);
+      seen.add(key);
+    }
+  });
+
+  return diversified.sort(sortLatestSignalScanFirst);
+}
+
+function applyCachedRequestFilters(items: any[], priceRange: string, dateFilter: string, categoryFilter?: string | null) {
+  return diversifyResults(
+    items
+      .filter(item => passesCachedPriceRange(item, priceRange))
+      .filter(item => passesCachedDateFilter(item, dateFilter))
+      .filter(item => passesCachedCategoryFilter(item, categoryFilter))
+      .sort(sortLatestSignalScanFirst)
+  );
+}
+
 function normalizeYahooSymbol(value?: string) {
   const ticker = String(value || "").trim().toUpperCase();
   if (!ticker) return "";
@@ -330,6 +463,8 @@ export async function GET(req: Request) {
   const categoryFilter = searchParams.get("category");
   const livePrices = searchParams.get("livePrices") !== "false";
   const quoteConcurrency = parseIntegerParam(searchParams.get("quoteConcurrency"), 8, 1, 16);
+  const useCache = searchParams.get("cache") !== "false";
+  const shouldWriteFullCache = priceRange === "all" && dateFilter === "all" && !categoryFilter;
 
   try {
     if (getAll) {
@@ -337,168 +472,105 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, data: stocks });
     }
 
-    await connectToDatabase();
+    if (useCache) {
+      let cached = null;
+      try {
+        cached = await getLatestScreenerSnapshot();
+      } catch (cacheError) {
+        console.error("Failed to read Postgres screener cache; falling back to signal_events:", cacheError);
+      }
 
-    // Build Price Filter
-    let priceFilter = {};
-    if (priceRange === "under300") priceFilter = { entryPrice: { $lt: 300 } };
-    else if (priceRange === "under500") priceFilter = { entryPrice: { $lt: 500 } };
-    else if (priceRange === "above500") priceFilter = { entryPrice: { $gte: 500 } };
+      if (cached) {
+        const cachedData = applyCachedRequestFilters(cached.data as any[], priceRange, dateFilter, categoryFilter);
+        const latestScannedAt = cachedData
+          .map(item => item.lastScannedAt ? new Date(item.lastScannedAt).getTime() : 0)
+          .filter(Number.isFinite)
+          .sort((a, b) => b - a)[0];
+        const latestDataAt = cachedData
+          .map(latestDataDateTime)
+          .filter(Number.isFinite)
+          .sort((a, b) => b - a)[0];
+        const latestSignalAt = cachedData
+          .map(latestSignalScanDateTime)
+          .filter(Number.isFinite)
+          .sort((a, b) => b - a)[0];
 
-    // Build Date Filter — use updatedAt (last scan time) instead of createdAt
-    // so re-confirmed signals from latest scans are always visible
-    let dateFilterQuery = {};
-    if (dateFilter === "today") {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      dateFilterQuery = { updatedAt: { $gte: startOfDay } };
-    } else if (dateFilter === "3d") {
-      const threeDaysAgo = new Date();
-      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-      dateFilterQuery = { updatedAt: { $gte: threeDaysAgo } };
-    } else if (dateFilter === "7d") {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      dateFilterQuery = { updatedAt: { $gte: sevenDaysAgo } };
+        return NextResponse.json({
+          success: true,
+          data: cachedData,
+          scanMeta: {
+            ...(cached.scanMeta || {}),
+            source: "Postgres screener cache. Klik Scan terbaru untuk mengambil data pasar terbaru.",
+            priceSource: "Cached DB snapshot",
+            sortBy: "latest_signal_scan_date",
+            livePriceRefreshed: 0,
+            livePriceFailed: 0,
+            cacheHit: true,
+            cacheGeneratedAt: cached.generatedAt,
+            cacheExpiresAt: cached.expiresAt,
+            latestDataAt: latestDataAt ? new Date(latestDataAt).toISOString() : null,
+            isLatestDataFresh: latestDataAt ? (Date.now() - latestDataAt) <= 36 * 60 * 60 * 1000 : false,
+            latestSignalAt: latestSignalAt ? new Date(latestSignalAt).toISOString() : null,
+            isLatestSignalFresh: latestSignalAt ? (Date.now() - latestSignalAt) <= 36 * 60 * 60 * 1000 : false,
+            latestScannedAt: latestScannedAt ? new Date(latestScannedAt).toISOString() : null,
+            isLatestScanFresh: latestScannedAt ? (Date.now() - latestScannedAt) <= 36 * 60 * 60 * 1000 : false
+          }
+        });
+      }
     }
 
-    // Get all pending signals with price + date filter
-    const activeSignals = await StockSignalModel.find({ 
-        status: "pending",
-        ...priceFilter,
-        ...dateFilterQuery
-    }).lean();
+    const pgSignals = await getPgScreenerSignals(1_000);
+    const results = pgSignals
+      .filter(signal => passesCachedPriceRange({ buyArea: signal.entryPrice }, priceRange))
+      .filter(signal => passesCachedDateFilter(signal, dateFilter))
+      .map(signal => {
+        const entryPrice = Number(signal.entryPrice);
+        const currentPrice = Number(signal.currentPrice);
+        const evaluation = buildEvaluationState(
+          signal.appearedAt,
+          entryPrice,
+          currentPrice,
+          signal.lastQuoteDate || signal.lastScannedAt
+        );
+        const quoteAgeHours = hoursSince(signal.lastQuoteDate || signal.lastScannedAt || undefined);
 
-    const stockLookupKeys = Array.from(new Set(
-      activeSignals.flatMap((signal: any) => tickerLookupKeys(signal.ticker))
-    ));
-    const latestStocks = await findIdxStocksByLookupKeysAsync(stockLookupKeys);
-    const latestStockByTicker = new Map<string, any>();
-    latestStocks.forEach((stock: any) => {
-      tickerLookupKeys(stock.ticker).forEach(key => latestStockByTicker.set(key, stock));
-      tickerLookupKeys(stock.symbol).forEach(key => latestStockByTicker.set(key, stock));
-    });
-
-    const results = await Promise.all(activeSignals.map(async (signal: any) => {
-      // Get historical performance for this ticker
-      const stats = await SignalPerformanceModel.aggregate([
-        { $match: { ticker: signal.ticker } },
-        {
-          $group: {
-            _id: "$ticker",
-            totalSignals: { $sum: 1 },
-            successfulSignals: { $sum: { $cond: [{ $eq: ["$status", "success"] }, 1, 0] } }
-          }
-        }
-      ]);
-
-      const stat = stats[0] || { totalSignals: 0, successfulSignals: 0 };
-      const winRate = stat.totalSignals > 0 
-        ? ((stat.successfulSignals / stat.totalSignals) * 100).toFixed(2)
-        : "0.00";
-
-      const metadata = signal.metadata as any;
-      const category = deriveSignalCategory(signal.signalSource, metadata);
-      const vector = deriveSignalVector(signal.signalSource, metadata);
-      const metadataEntryPrice = Number(metadata?.firstEntryPrice);
-      const entryPrice = isFinitePrice(metadataEntryPrice) ? metadataEntryPrice : Number(signal.entryPrice);
-      const signalSource = signal.signalSource === 'Squeeze Divergence (${interval})'
-        ? (vector.includes('4H') ? 'Squeeze Divergence (4h)' : 'Squeeze Divergence (1d)')
-        : signal.signalSource;
-      const appearedAt = metadata?.firstAppearedAt || metadata?.appearedAt || signal.createdAt || signal.entryDate;
-      const stockSnapshot = tickerLookupKeys(signal.ticker)
-        .map(key => latestStockByTicker.get(key))
-        .find(Boolean);
-      const lastScannedAt = metadata?.lastScannedAt || metadata?.scanRunAt || signal.updatedAt;
-      const lastQuoteDate = metadata?.lastQuoteDate || stockSnapshot?.updatedAt;
-      const quoteAgeHours = hoursSince(lastQuoteDate);
-      const mappedPriceHistory = (signal.priceHistory || [])
-        .map((h: any) => ({ date: h.date, price: Number(h.price) }))
-        .filter((h: any) => isFinitePrice(h.price));
-      const masterLastPrice = Number(stockSnapshot?.lastPrice);
-      const signalCurrentPrice = Number(signal.currentPrice);
-      const latestHistory = latestHistoryPrice(signal.priceHistory || []);
-      const currentPrice = isFinitePrice(masterLastPrice)
-        ? masterLastPrice
-        : (isFinitePrice(signalCurrentPrice)
-          ? signalCurrentPrice
-          : (latestHistory || entryPrice));
-      const deltaPct = isFinitePrice(currentPrice) && isFinitePrice(entryPrice)
-        ? Number((((currentPrice - entryPrice) / entryPrice) * 100).toFixed(2))
-        : null;
-      const evaluation = buildEvaluationState(appearedAt, entryPrice, currentPrice, lastQuoteDate || lastScannedAt);
-
-      // Calculate Score: Priority 1: Metadata Scores (Setup + Vol)
-      let finalRelevanceScore = 0;
-      if (category === "TECHNICAL_BREAKOUT" && metadata?.similarityScore !== undefined) {
-          finalRelevanceScore = Number(metadata.similarityScore) || signal.relevanceScore || 0;
-      } else if (metadata?.setupScore !== undefined && metadata?.volScore !== undefined) {
-          finalRelevanceScore = Number(metadata.setupScore) + Number(metadata.volScore);
-          // Add Turnaround bonus if applicable
-          if (signal.signalSource.includes("TURNAROUND")) finalRelevanceScore += 50;
-      } else {
-          // Priority 2: Pre-calculated relevanceScore from DB
-          finalRelevanceScore = signal.relevanceScore || 0;
-      }
-
-      // Priority 3: Fallback calculation for old signal types
-      if (!finalRelevanceScore) {
-        let strategyScore = 50;
-        if (signal.signalSource.includes("CONVICTION:")) strategyScore = 150; 
-        else if (signal.signalSource === "Swing Volatilitas Tinggi") strategyScore = 100;
-
-        finalRelevanceScore = strategyScore + (Number(metadata?.breakoutReadiness) || 0) + (Number(metadata?.accumulationBias) || 0);
-      }
-
-      const stopLossPrice = Number(signal.stopLossPrice);
-      const riskPct = isFinitePrice(entryPrice) && isFinitePrice(stopLossPrice)
-        ? (((entryPrice - stopLossPrice) / entryPrice) * 100).toFixed(1)
-        : null;
-      return {
-        ticker: signal.ticker,
-        strategy: signalSource,
-        signalSource,
-        winRate: winRate,
-        totalSignals: stat.totalSignals,
-        successfulSignals: stat.successfulSignals,
-        buyArea: entryPrice,
-        tp: signal.targetPrice,
-        sl: isFinitePrice(stopLossPrice) ? stopLossPrice : null,
-        riskPct: riskPct,
-        volRatio: metadata?.volRatio,
-        currentPrice,
-        currentPriceSource: isFinitePrice(masterLastPrice)
-          ? "IndonesiaStock.lastPrice"
-          : (isFinitePrice(signalCurrentPrice) ? "StockSignal.currentPrice" : (latestHistory ? "StockSignal.priceHistory" : "StockSignal.entryPrice")),
-        deltaPct,
-        evaluation,
-        priceHistory: mappedPriceHistory,
-        daysHeld: signal.daysHeld,
-        relevanceScore: finalRelevanceScore,
-        category,
-        vector,
-        appearedAt,
-        createdAt: signal.createdAt,
-        entryDate: signal.entryDate,
-        updatedAt: signal.updatedAt,
-        lastScannedAt,
-        lastQuoteDate,
-        dataFreshness: {
-            source: metadata?.dataSource || "Stored screener signal",
-            lastQuoteDate,
-            lastScannedAt,
+        return {
+          ticker: signal.ticker,
+          strategy: signal.strategy,
+          signalSource: signal.signalSource,
+          winRate: "0.00",
+          totalSignals: 0,
+          successfulSignals: 0,
+          buyArea: signal.entryPrice,
+          tp: signal.targetPrice,
+          sl: signal.stopLossPrice,
+          riskPct: signal.riskPct === null ? null : signal.riskPct.toFixed(1),
+          volRatio: (signal.metadata as any)?.volRatio,
+          currentPrice: signal.currentPrice,
+          currentPriceSource: signal.currentPriceSource,
+          deltaPct: signal.deltaPct,
+          evaluation,
+          priceHistory: signal.priceHistory,
+          daysHeld: signal.daysHeld,
+          relevanceScore: signal.relevanceScore,
+          category: signal.category,
+          vector: signal.vector,
+          appearedAt: signal.appearedAt,
+          createdAt: signal.createdAt,
+          entryDate: signal.entryDate,
+          updatedAt: signal.updatedAt,
+          lastScannedAt: signal.lastScannedAt,
+          lastQuoteDate: signal.lastQuoteDate,
+          dataFreshness: {
+            source: "Postgres.signal_events + market_candles",
+            lastQuoteDate: signal.lastQuoteDate,
+            lastScannedAt: signal.lastScannedAt,
             quoteAgeHours,
             isLikelyFreshDaily: quoteAgeHours === null ? false : quoteAgeHours <= 36
-        },
-        metadata: {
-            ...metadata,
-            category,
-            vector,
-            setupScore: metadata?.setupScore || 0,
-            volScore: metadata?.volScore || 0
-        }
-      };
-    }));
+          },
+          metadata: signal.metadata
+        };
+      });
 
     // Latest qualifying signal scan first; relevance is only a tie-breaker.
     const categoryFilteredResults = categoryFilter
@@ -512,46 +584,8 @@ export async function GET(req: Request) {
 
     const sortedResults = categoryFilteredResults.sort(sortLatestSignalScanFirst);
 
-    // DIVERSIFY RESULTS: Ensure we see a mix of categories
-    const categories = [
-        "ARAHunter", 
-        "SCALP", 
-        "ELITE BOUNCE", 
-        "VOLATILITY EXPLOSION", 
-        "BUY ON DIP", 
-        "COOLDOWN",
-        "TURNAROUND", 
-        "EMA BOUNCE", 
-        "CVD DIVERGENCE",
-        "Technical Breakout",
-        "Squeeze Divergence",
-        "Squeeze Explosion",
-        "The Perfect Retest"
-    ];
-    const diversified: any[] = [];
-    const seen = new Set();
-
-    // Pick top 20 from each category to ensure visibility
-    categories.forEach(cat => {
-        const catResults = sortedResults.filter(r => r.strategy.toUpperCase().includes(cat.toUpperCase())).slice(0, 20);
-        catResults.forEach(r => {
-            if (!seen.has(r.ticker)) {
-                diversified.push(r);
-                seen.add(r.ticker);
-            }
-        });
-    });
-
-    // Add remaining results up to 150 total
-    sortedResults.forEach(r => {
-        if (!seen.has(r.ticker) && diversified.length < 150) {
-            diversified.push(r);
-            seen.add(r.ticker);
-        }
-    });
-
     // Final sort keeps the table ordered by latest qualifying signal scan.
-    let finalResults = diversified.sort(sortLatestSignalScanFirst);
+    let finalResults = diversifyResults(sortedResults);
     const livePriceMeta = livePrices
       ? await enrichWithLivePrices(finalResults, quoteConcurrency)
       : { data: finalResults, refreshed: 0, failed: 0 };
@@ -570,22 +604,35 @@ export async function GET(req: Request) {
       .filter(Number.isFinite)
       .sort((a, b) => b - a)[0];
 
+    const scanMeta: Record<string, any> = {
+      source: "Postgres signal_events. Klik Scan terbaru untuk refresh YahooFinance.chart ke PostgreSQL lokal.",
+      priceSource: livePrices ? "YahooFinance.quote" : "Stored DB fallback",
+      sortBy: "latest_signal_scan_date",
+      livePriceRefreshed: livePriceMeta.refreshed,
+      livePriceFailed: livePriceMeta.failed,
+      cacheHit: false,
+      latestDataAt: latestDataAt ? new Date(latestDataAt).toISOString() : null,
+      isLatestDataFresh: latestDataAt ? (Date.now() - latestDataAt) <= 36 * 60 * 60 * 1000 : false,
+      latestSignalAt: latestSignalAt ? new Date(latestSignalAt).toISOString() : null,
+      isLatestSignalFresh: latestSignalAt ? (Date.now() - latestSignalAt) <= 36 * 60 * 60 * 1000 : false,
+      latestScannedAt: latestScannedAt ? new Date(latestScannedAt).toISOString() : null,
+      isLatestScanFresh: latestScannedAt ? (Date.now() - latestScannedAt) <= 36 * 60 * 60 * 1000 : false
+    };
+
+    if (shouldWriteFullCache) {
+      try {
+        const cacheWrite = await saveScreenerSnapshot({ data: finalResults, scanMeta });
+        scanMeta.cacheGeneratedAt = cacheWrite.generatedAt;
+        scanMeta.cacheExpiresAt = cacheWrite.expiresAt;
+      } catch (cacheError) {
+        console.error("Failed to write screener cache:", cacheError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: finalResults,
-      scanMeta: {
-        source: "Stored StockSignal collection. Press RUN_SCAN to fetch latest YahooFinance.chart(1d) data and update signals.",
-        priceSource: livePrices ? "YahooFinance.quote" : "Stored DB fallback",
-        sortBy: "latest_signal_scan_date",
-        livePriceRefreshed: livePriceMeta.refreshed,
-        livePriceFailed: livePriceMeta.failed,
-        latestDataAt: latestDataAt ? new Date(latestDataAt).toISOString() : null,
-        isLatestDataFresh: latestDataAt ? (Date.now() - latestDataAt) <= 36 * 60 * 60 * 1000 : false,
-        latestSignalAt: latestSignalAt ? new Date(latestSignalAt).toISOString() : null,
-        isLatestSignalFresh: latestSignalAt ? (Date.now() - latestSignalAt) <= 36 * 60 * 60 * 1000 : false,
-        latestScannedAt: latestScannedAt ? new Date(latestScannedAt).toISOString() : null,
-        isLatestScanFresh: latestScannedAt ? (Date.now() - latestScannedAt) <= 36 * 60 * 60 * 1000 : false
-      }
+      scanMeta
     });
   } catch (error) {
     console.error("Screener Error:", error);
