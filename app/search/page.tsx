@@ -1,4 +1,4 @@
-o"use client";
+"use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";

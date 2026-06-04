@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // Use technicalindicators for standard indicators (TA-Lib algorithms)
-import { RSI, MACD, EMA } from 'technicalindicators';
+import { RSI, MACD, EMA, BollingerBands, ATR, Stochastic, ADX, PSAR } from 'technicalindicators';
 
 // Keep custom implementations for proprietary indicators
 import {
@@ -381,22 +381,28 @@ export async function GET(req: Request) {
   let interval = searchParams.get("interval") || "1d";
   const originalInterval = interval;
 
-  // Yahoo Finance doesn't support 4h and 2h natively
+  // Yahoo Finance doesn't support 4h, 2h, 30m natively
+  // Map unsupported intervals to supported ones
   if (interval === "4h" || interval === "2h") interval = "1h";
+  if (interval === "30m") interval = "15m";
 
   try {
     const period2 = new Date();
     const period1 = new Date();
     
     // Adjust lookback based on timeframe
-    if (originalInterval === "5m") {
-      period1.setDate(period1.getDate() - 7); 
-    } else if (originalInterval === "15m") {
+    if (originalInterval === "1m") {
+      period1.setDate(period1.getDate() - 2); // 2 days for 1-minute
+    } else if (originalInterval === "5m") {
+      period1.setDate(period1.getDate() - 7);
+    } else if (originalInterval === "15m" || originalInterval === "30m") {
       period1.setDate(period1.getDate() - 30);
     } else if (originalInterval === "1h") {
       period1.setDate(period1.getDate() - 90);
     } else if (originalInterval === "2h" || originalInterval === "4h") {
       period1.setDate(period1.getDate() - 180);
+    } else if (originalInterval === "1wk") {
+      period1.setFullYear(period1.getFullYear() - 10); // 10 years for weekly
     } else {
       period1.setFullYear(period1.getFullYear() - 5);
     }
@@ -425,8 +431,10 @@ export async function GET(req: Request) {
       };
     });
 
-    // Aggregate to 2h or 4h if requested
-    if (originalInterval === "2h") {
+    // Aggregate to 30m, 2h or 4h if requested
+    if (originalInterval === "30m") {
+      quotes = aggregateWibQuotesByHours(quotes, 0.5); // 30 minutes = 0.5 hours
+    } else if (originalInterval === "2h") {
       quotes = aggregateWibQuotesByHours(quotes, 2);
     } else if (originalInterval === "4h") {
       quotes = aggregateWibQuotesByHours(quotes, 4);
@@ -467,6 +475,78 @@ export async function GET(req: Request) {
     });
     const macdPadded = new Array(33).fill(null).concat(macdValues);
     
+    // Bollinger Bands calculation with error handling
+    let bbPadded: any[] = new Array(quotes.length).fill(null);
+    try {
+      const bbValues = BollingerBands.calculate({
+        values: closes,
+        period: 20,
+        stdDev: 2
+      });
+      bbPadded = new Array(19).fill(null).concat(bbValues);
+    } catch (error) {
+      console.error('Bollinger Bands calculation error:', error);
+    }
+    
+    // ATR calculation with error handling
+    let atrPadded: any[] = new Array(quotes.length).fill(null);
+    try {
+      const atrValues = ATR.calculate({
+        high: quotes.map((q: any) => q.high),
+        low: quotes.map((q: any) => q.low),
+        close: quotes.map((q: any) => q.close),
+        period: 14
+      });
+      atrPadded = new Array(14).fill(null).concat(atrValues);
+    } catch (error) {
+      console.error('ATR calculation error:', error);
+    }
+    
+    // Stochastic Oscillator calculation with error handling
+    let stochPadded: any[] = new Array(quotes.length).fill(null);
+    try {
+      const stochValues = Stochastic.calculate({
+        high: quotes.map((q: any) => q.high),
+        low: quotes.map((q: any) => q.low),
+        close: quotes.map((q: any) => q.close),
+        period: 14,
+        signalPeriod: 3
+      });
+      stochPadded = new Array(16).fill(null).concat(stochValues);
+    } catch (error) {
+      console.error('Stochastic calculation error:', error);
+    }
+    
+    // ADX calculation with error handling
+    let adxPadded: any[] = new Array(quotes.length).fill(null);
+    try {
+      const adxValues = ADX.calculate({
+        high: quotes.map((q: any) => q.high),
+        low: quotes.map((q: any) => q.low),
+        close: quotes.map((q: any) => q.close),
+        period: 14
+      });
+      adxPadded = new Array(27).fill(null).concat(adxValues);
+    } catch (error) {
+      console.error('ADX calculation error:', error);
+    }
+    
+    // Parabolic SAR calculation with error handling
+    let psarPadded: any[] = new Array(quotes.length).fill(null);
+    try {
+      const psarValues = PSAR.calculate({
+        high: quotes.map((q: any) => q.high),
+        low: quotes.map((q: any) => q.low),
+        step: 0.02,
+        max: 0.2
+      });
+      psarPadded = psarValues.length < quotes.length
+        ? new Array(quotes.length - psarValues.length).fill(null).concat(psarValues)
+        : psarValues;
+    } catch (error) {
+      console.error('PSAR calculation error:', error);
+    }
+    
     // Keep custom implementations for proprietary indicators
     const mfi = calculateMFI(quotes, 14);
     const squeezeDeluxe = calculateSqueezeDeluxe(quotes);
@@ -476,6 +556,10 @@ export async function GET(req: Request) {
 
     const data = quotes.map((q: any, i: number) => {
       const macdData = macdPadded[i];
+      const bbData = bbPadded[i];
+      const stochData = stochPadded[i];
+      const adxData = adxPadded[i];
+      
       return {
         ...q,
         ema9: ema9Padded[i],
@@ -489,6 +573,23 @@ export async function GET(req: Request) {
           signal: macdData.signal,
           histogram: macdData.histogram
         } : null,
+        bollingerBands: bbData ? {
+          upper: bbData.upper,
+          middle: bbData.middle,
+          lower: bbData.lower,
+          pb: bbData.pb // %B indicator (price position within bands)
+        } : null,
+        atr: atrPadded[i],
+        stochastic: stochData ? {
+          k: stochData.k,
+          d: stochData.d
+        } : null,
+        adx: adxData ? {
+          adx: adxData.adx,
+          pdi: adxData.pdi, // +DI
+          mdi: adxData.mdi  // -DI
+        } : null,
+        psar: psarPadded[i],
         squeezeDeluxe: squeezeDeluxe[i],
         ao: ao[i],
         aoDivergence: {

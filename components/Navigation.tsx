@@ -60,6 +60,10 @@ function GuideIcon(props: IconProps) {
   return <IconBase {...props}><path d="M12 6v12" /><path d="M8 8h8" /><path d="M8 12h8" /><path d="M8 16h5" /><rect x="4" y="3" width="16" height="18" rx="2" /></IconBase>;
 }
 
+function GoldIcon(props: IconProps) {
+  return <IconBase {...props}><circle cx="12" cy="12" r="8" /><path d="M12 2v4" /><path d="M12 18v4" /><path d="m4.93 4.93 2.83 2.83" /><path d="m16.24 16.24 2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="m4.93 19.07 2.83-2.83" /><path d="m16.24 7.76 2.83-2.83" /></IconBase>;
+}
+
 function InfoIcon(props: IconProps) {
   return <IconBase {...props}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></IconBase>;
 }
@@ -77,6 +81,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "SCREENER", shortLabel: "Screener", href: "/screener", icon: ZapIcon, mobilePrimary: true },
   { label: "BREAKOUT", shortLabel: "Breakout", href: "/silent-flyer", icon: BreakoutIcon, mobilePrimary: true },
   { label: "ANALYSIS", shortLabel: "Analyze", href: "/search", icon: SearchIcon, mobilePrimary: true },
+  { label: "GOLD", shortLabel: "Gold", href: "/gold", icon: GoldIcon },
   { label: "RESEARCH", shortLabel: "Research", href: "/research", icon: ResearchIcon },
   { label: "GUIDE", shortLabel: "Guide", href: "/guide", icon: GuideIcon },
 ];
