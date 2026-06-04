@@ -1,4 +1,4 @@
-"use client";
+o"use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -156,6 +156,8 @@ function SearchContent() {
   const [showEMA60, setShowEMA60] = useState(true);
   const [showEMA200, setShowEMA200] = useState(false);
   const [showSqueezeDeluxe, setShowSqueezeDeluxe] = useState(true);
+  const [showAO, setShowAO] = useState(true);
+  const [showRSI, setShowRSI] = useState(true);
   const screenerContext = data?.screenerContext || data?.unifiedAnalysis?.screenerContext;
   const activeScreenerSignals = Array.isArray(data?.activeScreenerSignals)
     ? data.activeScreenerSignals
@@ -235,15 +237,16 @@ function SearchContent() {
           </div>
 
           <div className="command-row main">
-            <form onSubmit={handleSearch} className="search-box-premium">
+            <form onSubmit={handleSearch} className="search-box-premium" suppressHydrationWarning>
               <Search className="search-icon" size={16} />
               <input
                 className="input-premium"
                 placeholder="Cari kode saham, contoh: BBCA"
                 value={input}
                 onChange={e => setInput(e.target.value)}
+                suppressHydrationWarning
               />
-              <button className="analyze-btn" type="submit" disabled={loading}>
+              <button className="analyze-btn" type="submit" disabled={loading} suppressHydrationWarning>
                 {loading ? "Memuat" : "Analisis"}
               </button>
             </form>
@@ -251,11 +254,12 @@ function SearchContent() {
             <div className="timeframe-block">
               <span>Timeframe chart</span>
               <div className="timeframe-selector">
-                  {['15m', '1h', '4h', '1d'].map(tf => (
+                  {['5m', '15m', '1h', '2h', '4h', '1d'].map(tf => (
                       <button
                           key={tf}
                           className={`tf-pill ${interval === tf ? 'active' : ''}`}
                           onClick={() => setInterval(tf)}
+                          suppressHydrationWarning
                       >
                           {tf.toUpperCase()}
                       </button>
@@ -271,10 +275,10 @@ function SearchContent() {
             <div className="search-grid">
                 <div className="charts-column">
                     <div className="chart-wrapper main-viz panel" style={{ padding: 0, height: "auto", overflow: "visible" }}>
-                        <AdvancedChart 
-                            key={`main-${symbol}-${interval}-${showEMA9}-${showEMA10}-${showEMA20}-${showEMA50}-${showEMA60}-${showEMA200}-${showSqueezeDeluxe}-${showBB}-${showMFI}-${showVWAP}-${showOBV}-${showCMF}`}
-                            data={data.data} 
-                            pivots={data.pivots} 
+                        <AdvancedChart
+                            key={`main-${symbol}-${interval}-${showEMA9}-${showEMA10}-${showEMA20}-${showEMA50}-${showEMA60}-${showEMA200}-${showSqueezeDeluxe}-${showAO}-${showRSI}-${showBB}-${showMFI}-${showVWAP}-${showOBV}-${showCMF}`}
+                            data={data.data}
+                            pivots={data.pivots}
                             riskPlan={executionPlan}
                             ticker={displayTicker}
                             showSuperTrend={showSuperTrend}
@@ -291,6 +295,8 @@ function SearchContent() {
                             showEMA200={showEMA200}
                             showEMA10={showEMA10}
                             showSqueezeDeluxe={showSqueezeDeluxe}
+                            showAO={showAO}
+                            showRSI={showRSI}
                         />
                     </div>
 
@@ -357,8 +363,9 @@ function SearchContent() {
                         <div className="control-label">Momentum & volume</div>
                         <div className="indicator-matrix">
                             <button className={`matrix-btn vol ${showSqueezeDeluxe ? 'active' : ''}`} onClick={() => setShowSqueezeDeluxe(!showSqueezeDeluxe)}><span className="indicator-color" style={{ backgroundColor: '#fbbf24' }}></span>Squeeze</button>
+                            <button className={`matrix-btn vol ${showAO ? 'active' : ''}`} onClick={() => setShowAO(!showAO)}><span className="indicator-color" style={{ backgroundColor: '#22c55e' }}></span>AO</button>
                             <button className={`matrix-btn vol ${showBB ? 'active' : ''}`} onClick={() => setShowBB(!showBB)}><span className="indicator-color" style={{ backgroundColor: '#94a3b8' }}></span>Bollinger</button>
-                            <button className={`matrix-btn vol ${showMFI ? 'active' : ''}`} onClick={() => setShowMFI(!showMFI)}><span className="indicator-color" style={{ backgroundColor: '#22c55e' }}></span>MFI</button>
+                            <button className={`matrix-btn vol ${showMFI ? 'active' : ''}`} onClick={() => setShowMFI(!showMFI)}><span className="indicator-color" style={{ backgroundColor: '#10b981' }}></span>MFI</button>
                             <button className={`matrix-btn vol ${showVWAP ? 'active' : ''}`} onClick={() => setShowVWAP(!showVWAP)}><span className="indicator-color" style={{ backgroundColor: '#38bdf8' }}></span>VWAP</button>
                             <button className={`matrix-btn vol ${showOBV ? 'active' : ''}`} onClick={() => setShowOBV(!showOBV)}><span className="indicator-color" style={{ backgroundColor: '#a78bfa' }}></span>OBV</button>
                             <button className={`matrix-btn vol ${showCMF ? 'active' : ''}`} onClick={() => setShowCMF(!showCMF)}><span className="indicator-color" style={{ backgroundColor: '#fb7185' }}></span>CMF</button>
@@ -385,38 +392,107 @@ function SearchContent() {
 
                   {/* RIGHT COLUMN: ANALYSIS */}
             <div className="analysis-column">
-              {data.unifiedAnalysis && (
-                <div className="conviction-panel panel" style={{ '--accent-color': data.unifiedAnalysis.color } as any}>
+              {data.divergenceReport && (
+                <div className="conviction-panel panel" style={{ '--accent-color': data.divergenceReport.color } as any}>
                   <div className="panel-header report-header">
                     <div>
-                      <span>Conviction Report</span>
-                      <small>Verdict, execution plan, screener context, and validation in one flow.</small>
+                      <span>Divergence Report</span>
+                      <small>Divergence-focused analysis with market structure, EMA bounces, and accumulation detection.</small>
                     </div>
-                    <div className={`report-sync-pill ${isScreenerBlocked ? "warn" : "ok"}`}>
-                      {isScreenerBlocked ? "Wait for recovery" : (screenerContext ? "Synced" : "Chart only")}
+                    <div className={`report-sync-pill ${data.divergenceReport.conviction >= 70 ? "ok" : data.divergenceReport.conviction >= 50 ? "warn" : "neutral"}`}>
+                      Conviction: {data.divergenceReport.conviction}%
                     </div>
                   </div>
                   
                   <div className="verdict-hero">
                     <div className="v-header">
-  <div className="v-label">Current verdict</div>
-  <div className="verdict-icon">
-    {data.unifiedAnalysis.verdict.includes('BUY') || data.unifiedAnalysis.verdict.includes('BULLISH') ? (
-      <TrendingUp size={20} />
-    ) : data.unifiedAnalysis.verdict.includes('SELL') || data.unifiedAnalysis.verdict.includes('BEARISH') ? (
-      <TrendingDown size={20} />
-    ) : (
-      <AlertTriangle size={20} />
-    )}
-  </div>
-</div>
-                    <div className="v-value" style={{ color: data.unifiedAnalysis.color }}>
-                      {formatVerdictText(data.unifiedAnalysis.verdict)}
+                      <div className="v-label">Current verdict</div>
+                      <div className="verdict-icon">
+                        {data.divergenceReport.verdict.includes('BULLISH') ? (
+                          <TrendingUp size={20} />
+                        ) : data.divergenceReport.verdict.includes('BEARISH') ? (
+                          <TrendingDown size={20} />
+                        ) : (
+                          <AlertTriangle size={20} />
+                        )}
+                      </div>
+                    </div>
+                    <div className="v-value" style={{ color: data.divergenceReport.color }}>
+                      {data.divergenceReport.verdict}
                     </div>
                     <div className="v-meta">
-                        <span>Risk: <strong>{formatRiskText(data.unifiedAnalysis.riskLevel)}</strong></span>
+                      <span>Conviction: <strong>{data.divergenceReport.conviction}%</strong></span>
                     </div>
                   </div>
+
+                  {data.divergenceReport.shouldReport && (
+                    <div className="divergence-signals-panel">
+                      <div className="mini-section-title">🎯 Detected Signals</div>
+                      <div className="signals-list">
+                        {data.divergenceReport.signals?.map((signal: string, idx: number) => (
+                          <div key={idx} className="signal-item">{signal}</div>
+                        ))}
+                      </div>
+                      
+                      {data.divergenceReport.details && (
+                        <div className="divergence-details">
+                          <div className="mini-section-title">📊 Analysis Details</div>
+                          <p>{data.divergenceReport.details}</p>
+                        </div>
+                      )}
+
+                      {data.divergenceReport.context && (
+                        <div className="divergence-context">
+                          <div className="mini-section-title">📈 Context</div>
+                          <p>{data.divergenceReport.context}</p>
+                        </div>
+                      )}
+
+                      {data.divergenceReport.marketStructure && (
+                        <div className="market-structure-panel">
+                          <div className="mini-section-title">🏗️ Market Structure</div>
+                          <div className="structure-grid">
+                            <div><span>Quality</span><strong>{data.divergenceReport.marketStructure.quality}</strong></div>
+                            <div><span>Score</span><strong>{data.divergenceReport.marketStructure.score}/100</strong></div>
+                            <div><span>Details</span><strong>{data.divergenceReport.marketStructure.details}</strong></div>
+                          </div>
+                        </div>
+                      )}
+
+                      {data.divergenceReport.emaBounce?.isBouncing && (
+                        <div className="ema-bounce-panel">
+                          <div className="mini-section-title">🎯 EMA Bounce</div>
+                          <p>{data.divergenceReport.emaBounce.details}</p>
+                        </div>
+                      )}
+
+                      {data.divergenceReport.accumulation?.isAccumulating && (
+                        <div className="accumulation-panel">
+                          <div className="mini-section-title">💰 Accumulation</div>
+                          <p>{data.divergenceReport.accumulation.details}</p>
+                          <div className="accumulation-strength">
+                            <span>Strength</span>
+                            <div className="strength-bar">
+                              <div className="strength-fill" style={{ width: `${data.divergenceReport.accumulation.strength}%` }}></div>
+                            </div>
+                            <strong>{data.divergenceReport.accumulation.strength}%</strong>
+                          </div>
+                        </div>
+                      )}
+
+                      {data.divergenceReport.indicators && (
+                        <div className="indicators-panel">
+                          <div className="mini-section-title">📊 Key Indicators</div>
+                          <div className="indicators-grid">
+                            <div><span>RSI</span><strong>{data.divergenceReport.indicators.rsi?.toFixed(1) || 'N/A'}</strong></div>
+                            <div><span>MFI</span><strong>{data.divergenceReport.indicators.mfi?.toFixed(1) || 'N/A'}</strong></div>
+                            <div><span>AO</span><strong>{data.divergenceReport.indicators.ao?.toFixed(2) || 'N/A'}</strong></div>
+                            <div><span>Squeeze</span><strong>{data.divergenceReport.indicators.squeezeIntensity > 0 ? `Active (${data.divergenceReport.indicators.squeezeIntensity})` : 'None'}</strong></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {screenerContext && (
                     <div className={`screener-sync-panel ${isScreenerBlocked ? "blocked" : "synced"}`}>
@@ -534,97 +610,11 @@ function SearchContent() {
                     </div>
                   )}
 
-                  <div className="analysis-section">
-                    <div className="section-title">Ringkasan keputusan</div>
-                    <p className="suggestion-text">{formatReportCopy(data.unifiedAnalysis.suggestion)}</p>
-
-                    {executionPlan?.reason && (
-                        <div className="insight-box decision">
-                            <div className="box-label">Kenapa verdict ini muncul</div>
-                            <p>{formatReportCopy(executionPlan.reason)}</p>
-                        </div>
-                    )}
-
-                    {executionPlan?.timing && (
-                        <div className="insight-box action">
-                            <div className="box-label">Aksi berikutnya</div>
-                            <p>{formatReportCopy(executionPlan.timing)}</p>
-                        </div>
-                    )}
-                    
-                    {showSqueezeDeluxe && data.unifiedAnalysis.squeezeInsight && (
-                        <div className="insight-box squeeze">
-                            <div className="box-label">Insight kompresi</div>
-                            <p>{formatReportCopy(data.unifiedAnalysis.squeezeInsight)}</p>
-                        </div>
-                    )}
-
-                  </div>
-
-                  <div className="analysis-section metrics">
-                    <div className="metrics-header">
-                      <div className="metrics-title">Quality metrics</div>
-                      <div className="metrics-subtitle">Setup and volume validation</div>
+                  {data.divergenceReport?.context && (
+                    <div className="analysis-section">
+                      <div className="section-title">Analysis Context</div>
+                      <p className="suggestion-text">{data.divergenceReport.context}</p>
                     </div>
-                    <div className="metric-row">
-                      <div className="m-info">
-                        <span>Setup quality</span>
-                        <div className="m-value-wrapper">
-                          <span className="m-val">{data.unifiedAnalysis.score.setup}%</span>
-                          <div className="m-grade">
-                            {data.unifiedAnalysis.score.setup >= 80 ? 'A' :
-                             data.unifiedAnalysis.score.setup >= 60 ? 'B' :
-                             data.unifiedAnalysis.score.setup >= 40 ? 'C' : 'D'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="m-bar">
-                        <div className="m-fill" style={{
-                          width: `${data.unifiedAnalysis.score.setup}%`,
-                          background: data.unifiedAnalysis.score.setup >= 80 ?
-                            'linear-gradient(90deg, #22c55e, #16a34a)' :
-                            data.unifiedAnalysis.score.setup >= 60 ?
-                            'linear-gradient(90deg, #f59e0b, #d97706)' :
-                            'linear-gradient(90deg, #ef4444, #dc2626)'
-                        }}></div>
-                      </div>
-                    </div>
-                    <div className="metric-row">
-                      <div className="m-info">
-                        <span>Volume conviction</span>
-                        <div className="m-value-wrapper">
-                          <span className="m-val">{data.unifiedAnalysis.score.volume.toFixed(0)}%</span>
-                          <div className="m-grade">
-                            {data.unifiedAnalysis.score.volume >= 80 ? 'HIGH' :
-                             data.unifiedAnalysis.score.volume >= 60 ? 'MED' : 'LOW'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="m-bar">
-                        <div className="m-fill" style={{
-                          width: `${data.unifiedAnalysis.score.volume}%`,
-                          background: data.unifiedAnalysis.score.volume >= 80 ?
-                            'linear-gradient(90deg, #3b82f6, #2563eb)' :
-                            data.unifiedAnalysis.score.volume >= 60 ?
-                            'linear-gradient(90deg, #8b5cf6, #7c3aed)' :
-                            'linear-gradient(90deg, #64748b, #475569)'
-                        }}></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {reportDetailRows.length > 0 && (
-                  <div className="analysis-section flow">
-                    <div className="section-title">Quick validation</div>
-                    <div className="flow-grid">
-                      {reportDetailRows.map(([label, value]) => (
-                        <div key={String(label)} className="flow-item">
-                          <span className="f-label">{String(label)}</span>
-                          <span className="f-value">{formatReportCopy(value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                   )}
                 </div>
               )}

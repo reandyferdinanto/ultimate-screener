@@ -48,13 +48,15 @@ interface AdvancedChartProps {
   showEMA200?: boolean;
   showUndercutBounce?: boolean;
   showSqueezeDeluxe?: boolean;
+  showAO?: boolean;
+  showRSI?: boolean;
 }
 
-export default function AdvancedChart({ 
-  data, 
-  pivots, 
+export default function AdvancedChart({
+  data,
+  pivots,
   riskPlan,
-  ticker, 
+  ticker,
   onLogicalRangeChange,
   syncLogicalRange,
   showSuperTrend = false,
@@ -71,7 +73,9 @@ export default function AdvancedChart({
   showEMA60 = false,
   showEMA200 = true,
   showUndercutBounce = false,
-  showSqueezeDeluxe = false
+  showSqueezeDeluxe = false,
+  showAO = true,
+  showRSI = true
 }: AdvancedChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -104,19 +108,64 @@ export default function AdvancedChart({
       };
       return labels[title] ?? title;
     };
+    const hasRSIPane = showRSI;
+    const hasAOPane = showAO;
     const hasSqueezePane = showSqueezeDeluxe;
-    const macdPaneRatio = hasSqueezePane ? 0.2 : 0.26;
-    const squeezePaneRatio = hasSqueezePane ? 0.22 : 0;
-    const lowerGap = hasSqueezePane ? 0.03 : 0.02;
-    const lowerReserved = macdPaneRatio + squeezePaneRatio + lowerGap;
-    const priceBottomMargin = Math.min(0.52, lowerReserved);
-    const volumeTopMargin = Math.max(0.48, 1 - priceBottomMargin - 0.08);
-    const macdTopMargin = hasSqueezePane ? 1 - squeezePaneRatio - lowerGap - macdPaneRatio : 1 - macdPaneRatio;
-    const macdBottomMargin = hasSqueezePane ? squeezePaneRatio + lowerGap : 0;
-    const squeezeTopMargin = 1 - squeezePaneRatio;
-    const chartHeight = isMobile
-      ? (hasSqueezePane ? 560 : 460)
-      : (hasSqueezePane ? 760 : 660);
+    
+    // TradingView-style layout with proper vertical separation
+    // New layout: Price | RSI+Volume | AO | MACD+Squeeze
+    
+    const gap = 0.02; // 2% gap between each pane
+    
+    // Define each indicator's height
+    const macdSqueezeHeight = 0.15;  // MACD + Squeeze combined: 15%
+    const aoHeight = hasAOPane ? 0.12 : 0;  // AO: 12%
+    const rsiVolumeHeight = hasRSIPane ? 0.13 : 0;  // RSI + Volume combined: 13%
+    
+    // Calculate positions from bottom to top
+    let currentBottom = 0;
+    
+    // MACD + Squeeze at bottom (combined pane)
+    const macdSqueezeBottom = currentBottom;
+    const macdSqueezeTop = currentBottom + macdSqueezeHeight;
+    currentBottom = macdSqueezeTop + gap;
+    
+    // AO above MACD+Squeeze (if enabled)
+    const aoBottom = currentBottom;
+    const aoTop = currentBottom + aoHeight;
+    if (hasAOPane) currentBottom = aoTop + gap;
+    
+    // RSI + Volume above AO (if enabled)
+    const rsiVolumeBottom = currentBottom;
+    const rsiVolumeTop = currentBottom + rsiVolumeHeight;
+    if (hasRSIPane) currentBottom = rsiVolumeTop + gap;
+    
+    // Price chart gets all remaining space at top
+    const priceBottom = currentBottom;
+    const priceTop = 0.98; // Leave 2% at very top
+    
+    // Assign margins for each indicator (convert to scaleMargins format)
+    // MACD and Squeeze share the same pane
+    const macdTopMargin = 1 - macdSqueezeTop;
+    const macdBottomMargin = macdSqueezeBottom;
+    const squeezeTopMargin = 1 - macdSqueezeTop;
+    const squeezeBottomMargin = macdSqueezeBottom;
+    
+    // AO separate pane
+    const aoTopMargin = 1 - aoTop;
+    const aoBottomMargin = aoBottom;
+    
+    // RSI and Volume share the same pane
+    const rsiTopMargin = 1 - rsiVolumeTop;
+    const rsiBottomMargin = rsiVolumeBottom;
+    const volumeTopMargin = 1 - rsiVolumeTop;
+    const volumeBottomMargin = rsiVolumeBottom;
+    
+    // Price chart
+    const priceBottomMargin = priceBottom;
+    const priceTopMargin = 1 - priceTop;
+    
+    const chartHeight = isMobile ? 720 : 920;
     const rightOffsetBars = isMobile ? 30 : 50;
 
     // Clear container
@@ -169,12 +218,12 @@ export default function AdvancedChart({
 
     chartRef.current = chart;
     chart.priceScale("right").applyOptions({
-      scaleMargins: { top: 0.02, bottom: priceBottomMargin },
+      scaleMargins: { top: priceTopMargin, bottom: priceBottomMargin },
       borderColor: "rgba(148, 163, 184, 0.12)",
     });
 
     chart.priceScale("left").applyOptions({
-      scaleMargins: { top: 0.02, bottom: priceBottomMargin },
+      scaleMargins: { top: priceTopMargin, bottom: priceBottomMargin },
       borderColor: "rgba(148, 163, 184, 0.12)",
     });
 
@@ -186,7 +235,7 @@ export default function AdvancedChart({
     const volumeSeries = chart.addSeries(HistogramSeries, { 
       color: "rgba(45, 212, 191, 0.22)", priceFormat: { type: "volume" }, priceScaleId: "volume" 
     });
-    chart.priceScale("volume").applyOptions({ scaleMargins: { top: volumeTopMargin, bottom: priceBottomMargin } });
+    chart.priceScale("volume").applyOptions({ scaleMargins: { top: volumeTopMargin, bottom: volumeBottomMargin } });
     volumeSeries.setData(data.map(d => ({
       time: d.time as UTCTimestamp,
       value: d.volume,
@@ -437,10 +486,14 @@ export default function AdvancedChart({
       priceLineVisible: false,
       crosshairMarkerVisible: false,
     };
-    const macdHistSeries = chart.addSeries(HistogramSeries, { ...macdScaleOptions });
+    const macdHistSeries = chart.addSeries(HistogramSeries, {
+      title: "MACD (12,26,9)",
+      ...macdScaleOptions
+    });
     chart.priceScale("macd").applyOptions({
       scaleMargins: { top: macdTopMargin, bottom: macdBottomMargin },
       borderColor: "rgba(197, 203, 206, 0.12)",
+      visible: true,
     });
     macdHistSeries.setData(
       compactChartData<HistogramData<Time>>(
@@ -541,11 +594,13 @@ export default function AdvancedChart({
         bottomFillColor2: "rgba(151, 5, 41, 0.30)",
         bottomLineColor: "rgba(151, 5, 41, 0.55)",
         lineWidth: 1,
+        title: "Squeeze Deluxe",
         ...squeezeScaleOptions,
       });
       chart.priceScale("squeeze").applyOptions({
-        scaleMargins: { top: squeezeTopMargin, bottom: 0 },
+        scaleMargins: { top: squeezeTopMargin, bottom: squeezeBottomMargin },
         borderColor: "rgba(197, 203, 206, 0.12)",
+        visible: true,
       });
       fluxSeries.setData(
         compactChartData<BaselineData<Time>>(
@@ -604,6 +659,7 @@ export default function AdvancedChart({
       const momentumSeries = chart.addSeries(LineSeries, {
         color: "#ffcfa6",
         lineWidth: 2 as LineWidth,
+        title: "Momentum",
         ...squeezeScaleOptions,
       });
       momentumSeries.setData(
@@ -682,6 +738,164 @@ export default function AdvancedChart({
       });
       if (squeezeMarkers.length > 0) {
         createSeriesMarkers(momentumSeries, squeezeMarkers);
+      }
+    }
+
+    // --- 6.3 RSI LOWER PANE ---
+    if (showRSI) {
+      const rsiScaleOptions = {
+        priceScaleId: "rsi",
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      };
+
+      // RSI Line - Create series first with title
+      const rsiSeries = chart.addSeries(LineSeries, {
+        color: "rgba(139, 92, 246, 0.85)",
+        lineWidth: 2 as LineWidth,
+        title: "RSI (14)",
+        ...rsiScaleOptions,
+      });
+
+      rsiSeries.setData(
+        compactChartData<LineData<Time>>(
+          data.map((d) => {
+            const value = Number(d.rsi);
+            return Number.isFinite(value) ? { time: asChartTime(d.time), value } : null;
+          })
+        )
+      );
+
+      // Now apply scale options after series is created
+      chart.priceScale("rsi").applyOptions({
+        scaleMargins: { top: rsiTopMargin, bottom: rsiBottomMargin },
+        borderColor: "rgba(197, 203, 206, 0.12)",
+        visible: true,
+      });
+
+      // Overbought line (70)
+      chart.addSeries(LineSeries, {
+        color: "rgba(239, 68, 68, 0.4)",
+        lineWidth: 1 as LineWidth,
+        lineStyle: 2,
+        ...rsiScaleOptions,
+      }).setData(
+        compactChartData<LineData<Time>>(
+          data.map((d) => ({
+            time: asChartTime(d.time),
+            value: 70,
+          }))
+        )
+      );
+
+      // Oversold line (30)
+      chart.addSeries(LineSeries, {
+        color: "rgba(34, 197, 94, 0.4)",
+        lineWidth: 1 as LineWidth,
+        lineStyle: 2,
+        ...rsiScaleOptions,
+      }).setData(
+        compactChartData<LineData<Time>>(
+          data.map((d) => ({
+            time: asChartTime(d.time),
+            value: 30,
+          }))
+        )
+      );
+
+      // Middle line (50)
+      chart.addSeries(LineSeries, {
+        color: "rgba(148, 163, 184, 0.25)",
+        lineWidth: 1 as LineWidth,
+        lineStyle: 2,
+        ...rsiScaleOptions,
+      }).setData(
+        compactChartData<LineData<Time>>(
+          data.map((d) => ({
+            time: asChartTime(d.time),
+            value: 50,
+          }))
+        )
+      );
+    }
+
+    // --- 6.4 AWESOME OSCILLATOR (AO) LOWER PANE ---
+    if (showAO) {
+      const aoScaleOptions = {
+        priceScaleId: "ao",
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      };
+
+      // Create AO histogram series first with title
+      const aoHistSeries = chart.addSeries(HistogramSeries, {
+        title: "AO (Awesome Oscillator)",
+        ...aoScaleOptions
+      });
+      
+      aoHistSeries.setData(
+        compactChartData<HistogramData<Time>>(
+          data.map((d) => {
+            const value = Number(d.ao);
+            if (!Number.isFinite(value)) return null;
+            return {
+              time: asChartTime(d.time),
+              value,
+              color: value >= 0 ? "rgba(34, 197, 94, 0.65)" : "rgba(239, 68, 68, 0.65)",
+            };
+          })
+        )
+      );
+
+      // Now apply scale options after series is created
+      chart.priceScale("ao").applyOptions({
+        scaleMargins: { top: aoTopMargin, bottom: aoBottomMargin },
+        borderColor: "rgba(197, 203, 206, 0.12)",
+        visible: true,
+      });
+
+      // Add zero line for AO
+      chart.addSeries(LineSeries, {
+        color: "rgba(148, 163, 184, 0.3)",
+        lineWidth: 1 as LineWidth,
+        lineStyle: 2,
+        ...aoScaleOptions,
+      }).setData(
+        compactChartData<LineData<Time>>(
+          data.map((d) => ({
+            time: asChartTime(d.time),
+            value: 0,
+          }))
+        )
+      );
+
+      // Add AO divergence markers
+      const aoMarkers: SeriesMarker<Time>[] = data.flatMap((d): SeriesMarker<Time>[] => {
+        const markers: SeriesMarker<Time>[] = [];
+        if (d.aoDivergence?.bullish) {
+          markers.push({
+            time: asChartTime(d.time),
+            position: "belowBar" as const,
+            color: "#22c55e",
+            shape: "arrowUp" as const,
+            text: "AO+",
+          });
+        }
+        if (d.aoDivergence?.bearish) {
+          markers.push({
+            time: asChartTime(d.time),
+            position: "aboveBar" as const,
+            color: "#ef4444",
+            shape: "arrowDown" as const,
+            text: "AO-",
+          });
+        }
+        return markers;
+      });
+      if (aoMarkers.length > 0) {
+        createSeriesMarkers(aoHistSeries, aoMarkers);
       }
     }
 

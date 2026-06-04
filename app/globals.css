@@ -365,3 +365,275 @@ tr:hover td {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* Divergence Report Styles - Improved */
+.conviction-panel {
+  background: linear-gradient(135deg, oklch(0.16 0 0) 0%, oklch(0.14 0 0) 100%);
+  border: 1px solid oklch(0.28 0 0);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.verdict-hero {
+  background: linear-gradient(135deg, oklch(0.18 0 0) 0%, oklch(0.15 0 0) 100%);
+  border: 1px solid oklch(0.25 0 0);
+  padding: 20px;
+  border-radius: 12px;
+  margin: 16px 0;
+}
+
+.v-value {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 12px 0;
+  text-shadow: 0 2px 8px currentColor;
+}
+
+.v-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid oklch(0.22 0 0);
+}
+
+.v-meta span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.v-meta strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.divergence-signals-panel {
+  margin-top: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, oklch(0.17 0 0) 0%, oklch(0.14 0 0) 100%);
+  border-radius: 12px;
+  border: 1px solid oklch(0.26 0 0);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.signals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.signal-item {
+  padding: 14px 16px;
+  background: linear-gradient(135deg, oklch(0.19 0 0) 0%, oklch(0.17 0 0) 100%);
+  border-radius: 8px;
+  border-left: 4px solid var(--accent-green);
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.signal-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.divergence-details,
+.divergence-context {
+  margin-top: 18px;
+  padding: 16px;
+  background: linear-gradient(135deg, oklch(0.15 0 0) 0%, oklch(0.13 0 0) 100%);
+  border-radius: 8px;
+  border: 1px solid oklch(0.22 0 0);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.market-structure-panel,
+.ema-bounce-panel,
+.accumulation-panel,
+.indicators-panel {
+  margin-top: 18px;
+  padding: 16px;
+  background: linear-gradient(135deg, oklch(0.16 0 0) 0%, oklch(0.14 0 0) 100%);
+  border-radius: 10px;
+  border: 1px solid oklch(0.24 0 0);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.structure-grid,
+.indicators-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.structure-grid > div,
+.indicators-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: oklch(0.18 0 0);
+  border-radius: 6px;
+  border: 1px solid oklch(0.22 0 0);
+  transition: all 0.2s ease;
+}
+
+.structure-grid > div:hover,
+.indicators-grid > div:hover {
+  background: oklch(0.20 0 0);
+  border-color: oklch(0.28 0 0);
+}
+
+.structure-grid span,
+.indicators-grid span {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+}
+
+.structure-grid strong,
+.indicators-grid strong {
+  font-size: 15px;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.accumulation-strength {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 12px;
+  background: oklch(0.17 0 0);
+  border-radius: 6px;
+}
+
+.accumulation-strength span {
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 70px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.strength-bar {
+  flex: 1;
+  height: 10px;
+  background: oklch(0.22 0 0);
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.strength-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-green), var(--accent-amber));
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 10px currentColor;
+}
+
+.accumulation-strength strong {
+  font-size: 14px;
+  color: var(--text-primary);
+  min-width: 45px;
+  text-align: right;
+  font-weight: 700;
+}
+
+.mini-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-amber);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.report-sync-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.report-sync-pill.ok {
+  background: linear-gradient(135deg, var(--accent-green), oklch(0.75 0.15 145));
+  color: oklch(0.15 0 0);
+}
+
+.report-sync-pill.warn {
+  background: linear-gradient(135deg, var(--accent-amber), oklch(0.80 0.12 80));
+  color: oklch(0.15 0 0);
+}
+
+.report-sync-pill.neutral {
+  background: linear-gradient(135deg, oklch(0.30 0 0), oklch(0.25 0 0));
+  color: var(--text-secondary);
+  border: 1px solid oklch(0.35 0 0);
+}
+
+/* Chart Overview Improvements */
+.chart-overview {
+  background: linear-gradient(135deg, oklch(0.17 0 0) 0%, oklch(0.14 0 0) 100%);
+  border: 1px solid oklch(0.28 0 0);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.chart-stat-card {
+  background: linear-gradient(135deg, oklch(0.19 0 0) 0%, oklch(0.16 0 0) 100%);
+  border: 1px solid oklch(0.26 0 0);
+  padding: 16px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.chart-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  border-color: oklch(0.32 0 0);
+}
+
+.chart-stat-card strong {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: block;
+  margin: 8px 0;
+}
+
+/* Panel Headers */
+.panel-header {
+  padding-bottom: 16px;
+  border-bottom: 2px solid oklch(0.25 0 0);
+  margin-bottom: 16px;
+}
+
+.panel-header span {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.panel-header small {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}

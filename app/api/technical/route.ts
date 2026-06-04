@@ -1,36 +1,21 @@
 import { NextResponse } from "next/server";
 import YahooFinance from 'yahoo-finance2';
-import { getRecentSignalEvents, persistTechnicalAnalysis } from "@/lib/market-data-store";
-import { getActiveScreenerSignals, type ScreenerSignalContext } from "@/lib/screener-context";
+import { persistTechnicalAnalysis } from "@/lib/market-data-store";
+import { getActiveScreenerSignals } from "@/lib/screener-context";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-import { 
-  calculateEMA, 
-  calculateSMA,
-  calculateRSI,
-  calculateMACD, 
-  calculatePivotPoints, 
-  calculateBollingerBands, 
-  calculateATR,
-  calculateATRP,
-  calculateChandelierExit,
-  calculateKeltnerChannels,
-  calculateSuperTrend,
+// Use technicalindicators for standard indicators (TA-Lib algorithms)
+import { RSI, MACD, EMA } from 'technicalindicators';
+
+// Keep custom implementations for proprietary indicators
+import {
   calculateMFI,
-  calculateAD,
-  calculateCMF,
-  calculateEMV,
-  calculateForceIndex,
-  calculateNVI,
-  calculateOBV,
-  calculateVPT,
-  calculateVWAP,
-  calculateVortex,
-  calculateKDJ,
   calculateSqueezeDeluxe,
-  calculateCVD
+  calculateAO,
+  detectAODivergence,
+  detectAOMomentumShift
 } from "@/lib/indicators";
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
@@ -41,17 +26,6 @@ function formatIdxPrice(value: number) {
 
 function formatPct(value: number) {
   return Number.isFinite(value) ? value.toFixed(1) : "0.0";
-}
-
-function divergenceLifecycleConfig(timeframe: string) {
-  const configs: Record<string, { maxBars: number; spikePct: number; invalidAtr: number }> = {
-    "15m": { maxBars: 28, spikePct: 2.0, invalidAtr: 0.35 },
-    "1h": { maxBars: 24, spikePct: 3.0, invalidAtr: 0.35 },
-    "4h": { maxBars: 18, spikePct: 4.0, invalidAtr: 0.35 },
-    "1d": { maxBars: 8, spikePct: 6.0, invalidAtr: 0.35 },
-  };
-
-  return configs[timeframe] || configs["1d"];
 }
 
 function aggregateWibQuotesByHours(quotes: any[], hours: number) {
@@ -76,1248 +50,328 @@ function aggregateWibQuotesByHours(quotes: any[], hours: number) {
   return Array.from(buckets.values()).sort((a, b) => a.time - b.time);
 }
 
-function classifyBullishDivergence(data: any[], index: number, timeframe: string) {
-  const config = divergenceLifecycleConfig(timeframe);
-  const start = data[index];
-  const entry = Number(start?.close);
-  const signalLow = Number(start?.low);
-  const atr = Number(start?.atr14) > 0 ? Number(start.atr14) : entry * 0.025;
-  if (!Number.isFinite(entry) || entry <= 0 || !Number.isFinite(signalLow)) return null;
-
-  const spikeLevel = entry * (1 + config.spikePct / 100);
-  const invalidLevel = signalLow - (atr * config.invalidAtr);
-  const lastIndex = data.length - 1;
-  const expiryIndex = Math.min(lastIndex, index + config.maxBars);
-  let maxRunPct = 0;
-  let spikeIndex: number | null = null;
-  let matureIndex: number | null = null;
-  let invalidIndex: number | null = null;
-
-  for (let cursor = index + 1; cursor <= expiryIndex; cursor += 1) {
-    const candle = data[cursor];
-    const high = Number(candle?.high);
-    const close = Number(candle?.close);
-    const prev = data[cursor - 1] || candle;
-    const sqz = candle?.squeezeDeluxe || {};
-    const prevSqz = prev?.squeezeDeluxe || {};
-
-    if (Number.isFinite(high)) {
-      maxRunPct = Math.max(maxRunPct, ((high - entry) / entry) * 100);
-      if (spikeIndex === null && high >= spikeLevel) spikeIndex = cursor;
-    }
-
-    if (spikeIndex === null && Number.isFinite(close) && close < invalidLevel) {
-      invalidIndex = cursor;
-      break;
-    }
-
-    if (spikeIndex !== null) {
-      const momentum = Number(sqz.momentum);
-      const signal = Number(sqz.signal);
-      const prevMomentum = Number(prevSqz.momentum);
-      const prevFlux = Number(prevSqz.flux);
-      const flux = Number(sqz.flux);
-      const momentumStalling = Number.isFinite(momentum) && Number.isFinite(signal) && momentum < signal;
-      const flowCooling = Number.isFinite(momentum) && Number.isFinite(prevMomentum) &&
-        Number.isFinite(flux) && Number.isFinite(prevFlux) &&
-        momentum < prevMomentum && flux < prevFlux;
-      const extendedRun = maxRunPct >= config.spikePct * 1.8;
-
-      if (cursor > spikeIndex && (momentumStalling || flowCooling || extendedRun)) {
-        matureIndex = cursor;
-        break;
-      }
-    }
+/**
+ * Detect accumulation patterns
+ * Price consolidates or drifts lower while volume indicators show buying pressure
+ */
+function detectAccumulation(quotes: any[], lookback = 20) {
+  if (quotes.length < lookback) return { isAccumulating: false, strength: 0, details: "" };
+  
+  const recent = quotes.slice(-lookback);
+  const last = quotes[quotes.length - 1];
+  const first = recent[0];
+  
+  // Price action: sideways or slightly down
+  const priceChange = ((last.close - first.close) / first.close) * 100;
+  const isPriceFlat = priceChange > -5 && priceChange < 3;
+  
+  // MFI improving (money flowing in)
+  let mfiImproving = 0;
+  for (let i = 1; i < recent.length; i++) {
+    if (recent[i].mfi > recent[i-1].mfi) mfiImproving++;
   }
-
-  if (invalidIndex !== null) {
-    return {
-      type: "bullish",
-      status: "INVALID",
-      label: "D+ invalid",
-      reason: "Harga close menembus low divergence + buffer ATR sebelum spike minimum.",
-      thresholdPct: config.spikePct,
-      invalidLevel,
-      maxRunPct: Number(maxRunPct.toFixed(2)),
-      resolvedAtIndex: invalidIndex,
-      resolvedAtTime: data[invalidIndex]?.time,
-      expiresInBars: 0,
-    };
+  const mfiStrength = (mfiImproving / (recent.length - 1)) * 100;
+  
+  // Volume patterns
+  const avgVolume = recent.reduce((sum, q) => sum + q.volume, 0) / recent.length;
+  const recentVolume = recent.slice(-5).reduce((sum, q) => sum + q.volume, 0) / 5;
+  const volumeIncreasing = recentVolume > avgVolume * 1.1;
+  
+  // Squeeze building (volatility compression)
+  const inSqueeze = last.squeezeDeluxe?.squeeze?.low || 
+                    last.squeezeDeluxe?.squeeze?.mid || 
+                    last.squeezeDeluxe?.squeeze?.high;
+  
+  const isAccumulating = isPriceFlat && mfiStrength > 50 && (volumeIncreasing || inSqueeze);
+  const strength = Math.min(100, Math.round((mfiStrength * 0.6) + (volumeIncreasing ? 20 : 0) + (inSqueeze ? 20 : 0)));
+  
+  let details = "";
+  if (isAccumulating) {
+    details = `Accumulation detected: Price ${priceChange > 0 ? '+' : ''}${priceChange.toFixed(1)}% over ${lookback} bars, `;
+    details += `MFI improving ${mfiStrength.toFixed(0)}% of the time`;
+    if (volumeIncreasing) details += ", volume increasing";
+    if (inSqueeze) details += ", volatility compressing";
   }
-
-  if (matureIndex !== null) {
-    return {
-      type: "bullish",
-      status: "SPIKE_MATURE",
-      label: "D+ jenuh",
-      reason: "Spike minimum sudah terjadi dan momentum/flux mulai cooling atau run sudah melebar.",
-      thresholdPct: config.spikePct,
-      invalidLevel,
-      maxRunPct: Number(maxRunPct.toFixed(2)),
-      resolvedAtIndex: matureIndex,
-      resolvedAtTime: data[matureIndex]?.time,
-      expiresInBars: 0,
-    };
-  }
-
-  if (spikeIndex !== null) {
-    return {
-      type: "bullish",
-      status: "SPIKE_CONFIRMED",
-      label: "D+ spike",
-      reason: "Harga sudah mencapai spike minimum setelah divergence.",
-      thresholdPct: config.spikePct,
-      invalidLevel,
-      maxRunPct: Number(maxRunPct.toFixed(2)),
-      resolvedAtIndex: spikeIndex,
-      resolvedAtTime: data[spikeIndex]?.time,
-      expiresInBars: Math.max(0, expiryIndex - lastIndex),
-    };
-  }
-
-  if (lastIndex >= index + config.maxBars) {
-    return {
-      type: "bullish",
-      status: "EXPIRED_NO_SPIKE",
-      label: "D+ expired",
-      reason: `Belum ada spike minimum ${config.spikePct}% dalam ${config.maxBars} bar.`,
-      thresholdPct: config.spikePct,
-      invalidLevel,
-      maxRunPct: Number(maxRunPct.toFixed(2)),
-      resolvedAtIndex: expiryIndex,
-      resolvedAtTime: data[expiryIndex]?.time,
-      expiresInBars: 0,
-    };
-  }
-
-  return {
-    type: "bullish",
-    status: "ACTIVE",
-    label: "D+ aktif",
-    reason: `Menunggu spike minimum ${config.spikePct}% sebelum ${config.maxBars} bar.`,
-    thresholdPct: config.spikePct,
-    invalidLevel,
-    maxRunPct: Number(maxRunPct.toFixed(2)),
-    resolvedAtIndex: null,
-    resolvedAtTime: null,
-    expiresInBars: Math.max(0, (index + config.maxBars) - lastIndex),
-  };
+  
+  return { isAccumulating, strength, details };
 }
 
-function annotateSqueezeDivergenceLifecycle(data: any[], timeframe: string) {
-  data.forEach((item, index) => {
-    if (!item?.squeezeDeluxe?.isBullDiv) return;
-    const lifecycle = classifyBullishDivergence(data, index, timeframe);
-    if (!lifecycle) return;
-
-    item.squeezeDeluxe.divergenceLifecycle = lifecycle;
-    if (typeof lifecycle.resolvedAtIndex === "number" && data[lifecycle.resolvedAtIndex]?.squeezeDeluxe) {
-      data[lifecycle.resolvedAtIndex].squeezeDeluxe.divergenceResolution = {
-        type: lifecycle.type,
-        status: lifecycle.status,
-        sourceIndex: index,
-        label: lifecycle.label,
-        maxRunPct: lifecycle.maxRunPct,
-      };
-    }
-  });
-}
-
-function strictTimeframeConfig(timeframe: string) {
-  const configs: Record<string, {
-    lookback: number;
-    maxRunPct: number;
-    maxRiskPct: number;
-    minRewardRisk: number;
-    requireTrendFloor: boolean;
-    vector: string;
-  }> = {
-    "15m": { lookback: 10, maxRunPct: 2.5, maxRiskPct: 4.5, minRewardRisk: 1.8, requireTrendFloor: true, vector: "SQZ_BULL_DIV_15M_STRICT" },
-    "1h": { lookback: 8, maxRunPct: 3.5, maxRiskPct: 5.5, minRewardRisk: 1.7, requireTrendFloor: true, vector: "SQZ_BULL_DIV_1H_STRICT" },
-    "4h": { lookback: 6, maxRunPct: 5.5, maxRiskPct: 7.0, minRewardRisk: 1.6, requireTrendFloor: false, vector: "SQZ_BULL_DIV_4H_STRICT" },
-    "1d": { lookback: 5, maxRunPct: 8.0, maxRiskPct: 8.0, minRewardRisk: 1.6, requireTrendFloor: false, vector: "SQZ_BULL_DIV_1D_STRICT" },
-  };
-
-  return configs[timeframe] || configs["1d"];
-}
-
-function detectStrictSqueezeDivergence(data: any[], timeframe: string, plan: any) {
-  const config = strictTimeframeConfig(timeframe);
-  const lastIndex = data.length - 1;
-  const last = data[lastIndex];
-  const prev = data[lastIndex - 1] || last;
-  if (!last?.squeezeDeluxe || !plan) return null;
-
-  for (let offset = 0; offset <= config.lookback; offset += 1) {
-    const index = lastIndex - offset;
-    const item = data[index];
-    const sqz = item?.squeezeDeluxe;
-    if (!sqz?.isBullDiv) continue;
-
-    const lifecycle = sqz.divergenceLifecycle;
-    if (lifecycle?.status === "INVALIDATED" || lifecycle?.status === "MATURED_SPIKE") continue;
-
-    const entry = Number(item.close);
-    const current = Number(last.close);
-    const runPct = entry > 0 ? ((current - entry) / entry) * 100 : Number.NaN;
-    const momentumConstructive = Number(last.squeezeDeluxe.momentum) > Number(last.squeezeDeluxe.signal) ||
-      Number(last.squeezeDeluxe.momentum) > Number(prev.squeezeDeluxe?.momentum);
-    const fluxConstructive = Number(last.squeezeDeluxe.flux) > -10 &&
-      Number(last.squeezeDeluxe.flux) >= Number(prev.squeezeDeluxe?.flux) - 8;
-    const compressionNearby = data.slice(Math.max(0, index - 4), lastIndex + 1)
-      .some(row => row.squeezeDeluxe?.squeeze?.high || row.squeezeDeluxe?.squeeze?.mid || row.squeezeDeluxe?.squeeze?.low);
-    const riskOk = Number(plan.maxLossPct) <= config.maxRiskPct;
-    const rewardOk = Number(plan.rewardRisk) >= config.minRewardRisk;
-    const trendFloorOk = !config.requireTrendFloor ||
-      Number(last.close) >= Number(last.ema20) * 0.985 ||
-      (Number(last.ema9) >= Number(last.ema20) * 0.99 && Number(last.close) >= Number(last.ema9) * 0.99);
-
-    if (
-      Number.isFinite(runPct) &&
-      runPct <= config.maxRunPct &&
-      momentumConstructive &&
-      fluxConstructive &&
-      compressionNearby &&
-      riskOk &&
-      rewardOk &&
-      trendFloorOk
-    ) {
+/**
+ * Check if price is bouncing off any EMA line
+ */
+function detectEmaBounce(quotes: any[]) {
+  const last = quotes[quotes.length - 1];
+  const prev = quotes[quotes.length - 2] || last;
+  
+  const emaLines = [
+    { name: "EMA9", value: last.ema9, prev: prev.ema9 },
+    { name: "EMA20", value: last.ema20, prev: prev.ema20 },
+    { name: "EMA60", value: last.ema60, prev: prev.ema60 },
+    { name: "EMA200", value: last.ema200, prev: prev.ema200 }
+  ];
+  
+  for (const ema of emaLines) {
+    if (!Number.isFinite(ema.value)) continue;
+    
+    // Check if price touched or went below EMA and is now above
+    const touchedEma = last.low <= ema.value * 1.01; // Within 1%
+    const nowAbove = last.close > ema.value;
+    const emaRising = ema.value > ema.prev;
+    
+    if (touchedEma && nowAbove && emaRising) {
+      const distancePct = ((last.close - ema.value) / ema.value) * 100;
       return {
-        category: "SQUEEZE_DIVERGENCE",
-        vector: config.vector,
-        signalIndex: index,
-        barsAgo: offset,
-        runPct: Number(runPct.toFixed(2)),
-        lifecycleStatus: lifecycle?.status || "ACTIVE",
+        isBouncing: true,
+        emaLine: ema.name,
+        emaValue: ema.value,
+        distancePct,
+        details: `Price bounced off ${ema.name} (${formatIdxPrice(ema.value)}), now ${distancePct.toFixed(2)}% above`
       };
     }
   }
-
-  return null;
+  
+  return { isBouncing: false, emaLine: null, emaValue: null, distancePct: 0, details: "" };
 }
 
-function detectCvdBullishDivergence(quotes: any[], timeframe: string, plan: any) {
-  const config = strictTimeframeConfig(timeframe);
-  const cvd = calculateCVD(quotes);
-  const lastIndex = quotes.length - 1;
-  const lookback = Math.min(config.lookback + 8, 24);
-  if (lastIndex < lookback || !plan) return null;
-
-  const recentStart = Math.max(2, lastIndex - lookback);
-  let previousLowIndex = recentStart;
-  for (let i = recentStart; i < lastIndex - 2; i += 1) {
-    if (Number(quotes[i].low) < Number(quotes[previousLowIndex].low)) previousLowIndex = i;
-  }
-
-  const lastLowWindowStart = Math.max(previousLowIndex + 2, lastIndex - Math.ceil(lookback / 2));
-  let currentLowIndex = lastLowWindowStart;
-  for (let i = lastLowWindowStart; i <= lastIndex; i += 1) {
-    if (Number(quotes[i].low) < Number(quotes[currentLowIndex].low)) currentLowIndex = i;
-  }
-
-  const previousLow = Number(quotes[previousLowIndex].low);
-  const currentLow = Number(quotes[currentLowIndex].low);
-  const priceLowerLow = currentLow <= previousLow * 1.01;
-  const cvdHigherLow = Number(cvd[currentLowIndex]) > Number(cvd[previousLowIndex]);
-  const cvdRecoveryPct = Math.abs(Number(cvd[previousLowIndex])) > 0
-    ? ((Number(cvd[currentLowIndex]) - Number(cvd[previousLowIndex])) / Math.abs(Number(cvd[previousLowIndex]))) * 100
-    : 0;
-  const closeRecovery = Number(quotes[lastIndex].close) >= currentLow * 1.01;
-  const riskOk = Number(plan.maxLossPct) <= Math.max(config.maxRiskPct, 6);
-  const rewardOk = Number(plan.rewardRisk) >= config.minRewardRisk;
-
-  if (priceLowerLow && cvdHigherLow && cvdRecoveryPct >= 8 && closeRecovery && riskOk && rewardOk) {
-    return {
-      category: "CVD_DIVERGENCE",
-      vector: `CVD_BULL_DIV_${timeframe.toUpperCase()}_STRICT`,
-      previousLowIndex,
-      currentLowIndex,
-      cvdRecoveryPct: Number(cvdRecoveryPct.toFixed(2)),
-    };
-  }
-
-  return null;
-}
-
-function getSwingLow(quotes: any[], lookback = 5) {
-  return Math.min(...quotes.slice(-lookback).map(q => q.low).filter(Number.isFinite));
-}
-
-function getSwingHigh(quotes: any[], lookback = 5) {
-  return Math.max(...quotes.slice(-lookback).map(q => q.high).filter(Number.isFinite));
-}
-
-function detectDynamicEmaSupport(quotes: any[]) {
+/**
+ * Assess market structure quality
+ */
+function assessMarketStructure(quotes: any[]) {
   const last = quotes[quotes.length - 1];
-  const recent = quotes.slice(-4);
-  const currentPrice = Number(last?.close);
-  const emaCandidates = [
-    { period: 9, key: "ema9", label: "EMA9", value: Number(last?.ema9) },
-    { period: 13, key: "ema13", label: "EMA13", value: Number(last?.ema13) },
-    { period: 20, key: "ema20", label: "EMA20", value: Number(last?.ema20) },
-  ].filter(item => Number.isFinite(item.value) && item.value > 0 && Number.isFinite(currentPrice) && currentPrice >= item.value * 0.995);
-
-  const respected = emaCandidates.find(item => recent.some(candle => {
-    const ema = Number(candle?.[item.key]);
-    const low = Number(candle?.low);
-    const close = Number(candle?.close);
-    return Number.isFinite(ema) && Number.isFinite(low) && Number.isFinite(close) &&
-      low <= ema * 1.018 && close >= ema * 0.995;
-  }));
-
-  if (!respected) {
-    return {
-      isRespected: false,
-      supportLabel: null,
-      supportValue: null,
-      riskLabel: null,
-      riskValue: null,
-      distancePct: null,
-    };
-  }
-
-  const lowerEma = [
-    { label: "EMA13", value: Number(last?.ema13) },
-    { label: "EMA20", value: Number(last?.ema20) },
-    { label: "EMA60", value: Number(last?.ema60) },
-  ]
-    .filter(item => Number.isFinite(item.value) && item.value > 0 && item.value < respected.value * 0.998)
-    .sort((a, b) => b.value - a.value)[0] || { label: respected.label, value: respected.value };
-
+  
+  // EMA alignment (bullish structure)
+  const emaAligned = last.ema9 > last.ema20 && last.ema20 > last.ema60;
+  
+  // Price above key EMAs
+  const aboveEma20 = last.close > last.ema20;
+  const aboveEma60 = last.close > last.ema60;
+  
+  // EMAs trending up
+  const ema20Rising = quotes.length >= 5 && 
+    last.ema20 > quotes[quotes.length - 5].ema20;
+  
+  let score = 0;
+  let details = [];
+  
+  if (emaAligned) { score += 30; details.push("EMA alignment bullish"); }
+  if (aboveEma20) { score += 25; details.push("Price above EMA20"); }
+  if (aboveEma60) { score += 20; details.push("Price above EMA60"); }
+  if (ema20Rising) { score += 25; details.push("EMA20 trending up"); }
+  
+  const quality = score >= 70 ? "GOOD" : score >= 50 ? "FAIR" : "POOR";
+  
   return {
-    isRespected: true,
-    supportLabel: respected.label,
-    supportValue: respected.value,
-    riskLabel: lowerEma.label,
-    riskValue: lowerEma.value,
-    distancePct: ((currentPrice - respected.value) / respected.value) * 100,
+    quality,
+    score,
+    details: details.join(", "),
+    emaAligned,
+    aboveEma20,
+    ema20Rising
   };
 }
 
-function detectDiscountBottomSetup(quotes: any[]) {
+/**
+ * Generate divergence-focused conviction report
+ */
+function generateDivergenceReport(quotes: any[], timeframe: string) {
   const last = quotes[quotes.length - 1];
   const prev = quotes[quotes.length - 2] || last;
-  const prev2 = quotes[quotes.length - 3] || prev;
-  const currentPrice = Number(last?.close);
-  const swingLow = getSwingLow(quotes, 6);
-  const supportValue = Math.min(Number(last?.low), swingLow);
-  const ema20 = Number(last?.ema20);
-  const rsi = Number(last?.rsi);
-  const prevRsi = Number(prev?.rsi);
-  const mfi = Number(last?.mfi);
-  const prevMfi = Number(prev?.mfi);
-  const sqz = last?.squeezeDeluxe || {};
-  const prevSqz = prev?.squeezeDeluxe || sqz;
-  const range = Number(last?.high) - Number(last?.low);
-  const closePosition = range > 0 ? (currentPrice - Number(last?.low)) / range : 0.5;
-  const avgVolume20 = averageFinite(quotes.slice(-20).map(q => q.volume)) || 0;
-  const volumeNotClimax = avgVolume20 <= 0 || Number(last?.volume) <= avgVolume20 * 2.2;
-  const distancePct = supportValue > 0 ? ((currentPrice - supportValue) / supportValue) * 100 : 99;
-
-  const nearHardStopArea = Number.isFinite(currentPrice) && Number.isFinite(supportValue) && supportValue > 0 &&
-    currentPrice >= supportValue * 0.985 && currentPrice <= supportValue * 1.08;
-  const belowOrNearEma20 = Number.isFinite(ema20) && currentPrice <= ema20 * 1.025;
-  const rsiRecovery = Number.isFinite(rsi) && (rsi <= 38 || (rsi <= 52 && rsi > prevRsi));
-  const mfiRecovery = Number.isFinite(mfi) && (mfi <= 35 || mfi > prevMfi + 0.5);
-  const fluxImproving = Number.isFinite(Number(sqz.flux)) && Number.isFinite(Number(prevSqz.flux)) && Number(sqz.flux) > Number(prevSqz.flux);
-  const momentumImproving = Number.isFinite(Number(sqz.momentum)) && Number.isFinite(Number(prevSqz.momentum)) && Number(sqz.momentum) > Number(prevSqz.momentum);
-  const obvImproving = Number(last?.obv) > Number(prev?.obv);
-  const cmfSupport = Number(last?.cmf) > -0.05;
-  const candleRecovery = currentPrice >= Number(prev?.close) * 0.995 || closePosition >= 0.45 || currentPrice > Number(prev2?.close);
-  const supportStillHeld = currentPrice >= supportValue * 0.995;
-
-  const hints = [rsiRecovery, mfiRecovery, fluxImproving, momentumImproving, obvImproving, cmfSupport, candleRecovery]
-    .filter(Boolean).length;
-  const isActive = nearHardStopArea && belowOrNearEma20 && supportStillHeld && volumeNotClimax && hints >= 3;
-
-  return {
-    isActive,
-    confirmation: hints >= 5 ? "CONFIRMED" : "EARLY",
-    supportLabel: "Swing low / hard-stop area",
-    supportValue,
-    riskLabel: "Swing low",
-    riskValue: supportValue,
-    distancePct,
-    hints,
-    rsiRecovery,
-    mfiRecovery,
-    fluxImproving,
-    momentumImproving,
-    obvImproving,
-    cmfSupport,
-    candleRecovery,
+  
+  // Get divergence signals
+  const squeezeDivergence = {
+    bullish: last.squeezeDeluxe?.isBullDiv || false,
+    bearish: last.squeezeDeluxe?.isBearDiv || false
   };
-}
-
-function averageFinite(values: unknown[]) {
-  const finiteValues = values.map(Number).filter(Number.isFinite);
-  if (finiteValues.length === 0) return null;
-  return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
-}
-
-function hasHigherLows(lows: number[], count = 3) {
-  const recent = lows.slice(-count);
-  if (recent.length < count) return false;
-  for (let i = 1; i < recent.length; i += 1) {
-    if (recent[i] < recent[i - 1] * 0.995) return false;
-  }
-  return true;
-}
-
-function inactiveCooldownSetup() {
-  return {
-    isActive: false,
-    peakHigh: null,
-    peakDist20: null,
-    barsSincePeak: null,
-    pullbackPct: null,
-    cooldownRangePct: null,
-    closeRangePct: null,
-    atrPct: null,
-    atrCompressionRatio: null,
-    avgVol5Ratio: null,
-    volumeCooling: false,
-    volatilityCooling: false,
-    trendStillIntact: false,
-    reaccumulationHint: false,
-    cooldownScore: 0,
+  
+  const aoDivergence = {
+    bullish: last.aoDivergence?.bullish || false,
+    bearish: last.aoDivergence?.bearish || false
   };
-}
-
-function detectCooldownSetup(quotes: any[], timeframe: string) {
-  if (timeframe !== "1d" || quotes.length < 60) return inactiveCooldownSetup();
-
-  const lastIdx = quotes.length - 1;
-  const last = quotes[lastIdx];
-  const prev = quotes[lastIdx - 1] || last;
-  const price = Number(last.close);
-  const lastEma20 = Number(last.ema20);
-  const prevEma20 = Number(prev.ema20);
-  const lastSma50 = Number(last.sma50);
-  const lastRsi = Number(last.rsi);
-  const lastMfi = Number(last.mfi);
-  if (![price, lastEma20].every(Number.isFinite) || price <= 0 || lastEma20 <= 0) return inactiveCooldownSetup();
-
-  const highs = quotes.map(q => Number(q.high));
-  const lows = quotes.map(q => Number(q.low));
-  const closes = quotes.map(q => Number(q.close));
-  const volumes = quotes.map(q => Number(q.volume));
-  if ([highs, lows, closes, volumes].some(values => values.some(value => !Number.isFinite(value)))) {
-    return inactiveCooldownSetup();
-  }
-
-  const cooldownLookback = 18;
-  const cooldownStartIdx = Math.max(0, lastIdx - cooldownLookback);
-  let peakIdx = cooldownStartIdx;
-  for (let i = cooldownStartIdx; i <= lastIdx - 2; i += 1) {
-    if (highs[i] > highs[peakIdx]) peakIdx = i;
-  }
-
-  const peakHigh = highs[peakIdx];
-  const peakEma20 = Number(quotes[peakIdx]?.ema20);
-  const peakDist20 = Number.isFinite(peakEma20) && peakEma20 > 0
-    ? ((peakHigh - peakEma20) / peakEma20) * 100
-    : 0;
-  const barsSincePeak = lastIdx - peakIdx;
-  const pullbackPct = peakHigh > 0 ? ((peakHigh - price) / peakHigh) * 100 : 0;
-  const cooldownWindow = quotes.slice(-7);
-  const cooldownHigh = Math.max(...cooldownWindow.map(q => Number(q.high)));
-  const cooldownLow = Math.min(...cooldownWindow.map(q => Number(q.low)));
-  const cooldownRangePct = price > 0 ? ((cooldownHigh - cooldownLow) / price) * 100 : 99;
-  const recentCloses = closes.slice(-5);
-  const closeRangePct = price > 0
-    ? ((Math.max(...recentCloses) - Math.min(...recentCloses)) / price) * 100
-    : 99;
-  const ma20Vol = averageFinite(volumes.slice(-20)) || 0;
-  const avgVol5 = averageFinite(volumes.slice(-5)) || 0;
-  const volRatio = ma20Vol > 0 ? Number(last.volume) / ma20Vol : 0;
-  const atr5 = averageFinite(quotes.slice(-5).map(q => q.atr14)) || 0;
-  const atr20 = averageFinite(quotes.slice(-20).map(q => q.atr14)) || 0;
-  const atrCompressionRatio = atr20 > 0 ? atr5 / atr20 : 1;
-  const atrNow = Number(last.atr14) || 0;
-  const atrPctNow = price > 0 ? (atrNow / price) * 100 : 99;
-  const dist20 = ((price - lastEma20) / lastEma20) * 100;
-  const ema20Rising = lastEma20 >= prevEma20;
-  const isAboveSma50 = Number.isFinite(lastSma50) ? price > lastSma50 : true;
-  const hasHL = hasHigherLows(lows.slice(-5), 3);
-  const lastSqz = last.squeezeDeluxe || {};
-  const prevSqz = prev.squeezeDeluxe || {};
-  const sqzMomentumImproving = Number.isFinite(lastSqz.momentum) && Number.isFinite(prevSqz.momentum) && lastSqz.momentum > prevSqz.momentum;
-  const sqzFluxImproving = Number.isFinite(lastSqz.flux) && Number.isFinite(prevSqz.flux) && lastSqz.flux > prevSqz.flux;
-
-  const priorExtension = peakDist20 >= 7.5;
-  const controlledPullback = pullbackPct >= 2.5 && pullbackPct <= Math.min(14, Math.max(8, peakDist20 * 0.8));
-  const sidewaysReset = barsSincePeak >= 3 && barsSincePeak <= 15 &&
-    cooldownRangePct <= 12 &&
-    cooldownRangePct <= Math.max(6.5, atrPctNow * 2.8) &&
-    closeRangePct <= Math.max(3.8, atrPctNow * 1.6);
-  const volatilityCooling = atrCompressionRatio <= 0.95 || cooldownRangePct <= 8;
-  const volumeCooling = avgVol5 <= ma20Vol * 1.05 && volRatio <= 1.25;
-  const trendStillIntact = isAboveSma50 && ema20Rising && price >= lastEma20 * 0.985 && cooldownLow >= lastEma20 * 0.94;
-  const currentPositionOk = dist20 >= -2.2 && dist20 <= 6.5;
-  const notDistribution = atrPctNow <= 8 &&
-    (!Number.isFinite(lastRsi) || lastRsi <= 70) &&
-    (!Number.isFinite(lastMfi) || lastMfi < 85) &&
-    Number(last.close) >= Number(prev.close) * 0.985;
-  const reaccumulationHint = hasHL || sqzMomentumImproving || sqzFluxImproving || price >= cooldownLow + ((cooldownHigh - cooldownLow) * 0.45);
-  const isActive = priorExtension && controlledPullback && sidewaysReset && volatilityCooling && volumeCooling && trendStillIntact && currentPositionOk && notDistribution && reaccumulationHint;
-  const cooldownScore = 165 +
-    Math.min(35, peakDist20 * 2) +
-    (volumeCooling ? 15 : 0) +
-    (volatilityCooling ? 15 : 0) +
-    (hasHL ? 12 : 0) +
-    (sqzMomentumImproving || sqzFluxImproving ? 10 : 0) -
-    Math.max(0, pullbackPct - 8) * 3;
-
-  return {
-    isActive,
-    peakHigh,
-    peakDist20,
-    barsSincePeak,
-    pullbackPct,
-    cooldownRangePct,
-    closeRangePct,
-    atrPct: atrPctNow,
-    atrCompressionRatio,
-    avgVol5Ratio: ma20Vol > 0 ? avgVol5 / ma20Vol : null,
-    volumeCooling,
-    volatilityCooling,
-    trendStillIntact,
-    reaccumulationHint,
-    cooldownScore: Math.round(cooldownScore),
-  };
-}
-
-function pickTarget(entry: number, stopLoss: number, pivots?: any) {
-  const risk = Math.max(entry - stopLoss, entry * 0.015);
-  const rrTarget = entry + risk * 1.5;
-  const pivotTargets = [pivots?.r1, pivots?.r2, pivots?.r3]
-    .filter((value): value is number => Number.isFinite(value) && value > entry)
-    .sort((a, b) => a - b);
-  const pivotTarget = pivotTargets.find(value => value >= rrTarget * 0.98) || pivotTargets[pivotTargets.length - 1];
-  return formatIdxPrice(Math.max(rrTarget, pivotTarget || rrTarget));
-}
-
-function getTimeStopBars(timeframe: string) {
-  if (timeframe === "15m") return 8;
-  if (timeframe === "1h") return 6;
-  if (timeframe === "4h") return 4;
-  return 4;
-}
-
-function getNextTimestamp(quotes: any[], barsForward: number) {
-  const lastTime = Number(quotes[quotes.length - 1]?.time);
-  const prevTime = Number(quotes[quotes.length - 2]?.time);
-  const step = Number.isFinite(lastTime - prevTime) && lastTime > prevTime ? lastTime - prevTime : 86400;
-  return lastTime + step * barsForward;
-}
-
-function buildTradePlan(quotes: any[], pivots: any, timeframe: string, context: {
-  dist20: number;
-  squeezeIntensity: number;
-  squeezeDuration: number;
-  squeezeState: string;
-  fluxStatus: string;
-  fluxBullish: boolean;
-  fluxImproving: boolean;
-  momRising: boolean;
-  isOverextended: boolean;
-  isMomentumPeaking: boolean;
-  isVolumeClimax: boolean;
-  isMfiExtreme: boolean;
-  isCooldownReset: boolean;
-  cooldownSetup?: any;
-}) {
-  const last = quotes[quotes.length - 1];
-  const prev = quotes[quotes.length - 2] || last;
+  
+  // Check for any divergence
+  const hasBullishDivergence = squeezeDivergence.bullish || aoDivergence.bullish;
+  const hasBearishDivergence = squeezeDivergence.bearish || aoDivergence.bearish;
+  
+  // Market structure
+  const marketStructure = assessMarketStructure(quotes);
+  
+  // EMA bounce
+  const emaBounce = detectEmaBounce(quotes);
+  
+  // Accumulation
+  const accumulation = detectAccumulation(quotes);
+  
+  // RSI and MFI levels
+  const rsi = last.rsi || 50;
+  const mfi = last.mfi || 50;
+  const rsiOversold = rsi < 35;
+  const rsiOverbought = rsi > 70;
+  const mfiOversold = mfi < 25;
+  
+  // Squeeze state
   const sqz = last.squeezeDeluxe;
-  const prevSqz = prev.squeezeDeluxe || sqz;
-  const currentPrice = Number(last.close);
-  const ema9 = Number(last.ema9);
-  const ema20 = Number(last.ema20);
-  const ema10 = Number(last.ema10);
-  const ema60 = Number(last.ema60);
-  const sma50 = Number(last.sma50);
-  const sma200 = Number(last.sma200);
-  const rsi = Number(last.rsi);
-  const prevRsi = Number(prev.rsi);
-  const swingLow = getSwingLow(quotes, 6);
-  const swingHigh = getSwingHigh(quotes, 6);
-  const priceAboveEma20 = currentPrice > ema20;
-  const reclaimedEma20 = prev.close <= prev.ema20 && priceAboveEma20;
-  const brokeEma20 = prev.close >= prev.ema20 && currentPrice < ema20;
-  const ema20Rising = ema20 >= Number(prev.ema20);
-  const fastEmaBullish = ema9 > ema20;
-  const fastEmaCrossover = Number(prev.ema9) <= Number(prev.ema20) && fastEmaBullish;
-  const swingEmaBullish = ema20 > ema60;
-  const emaStackBullish = fastEmaBullish &&
-    (swingEmaBullish || !Number.isFinite(ema60)) &&
-    (!Number.isFinite(sma50) || currentPrice > sma50) &&
-    (!Number.isFinite(ema60) || currentPrice > ema60);
-  const longTrendHealthy = (!Number.isFinite(ema60) || currentPrice > ema60) && (!Number.isFinite(sma200) || currentPrice > sma200);
-  const pullbackZone = context.dist20 >= -1.2 && context.dist20 <= 3.5;
-  const dynamicSupport = detectDynamicEmaSupport(quotes);
-  const discountBottom = detectDiscountBottomSetup(quotes);
-  const activeSupportLabel = discountBottom.isActive ? "Discount bottom" : (dynamicSupport.supportLabel || "EMA20");
-  const activeSupportValue = discountBottom.isActive ? currentPrice : (Number(dynamicSupport.supportValue) || ema20);
-  const riskEmaLabel = discountBottom.isActive ? discountBottom.riskLabel : (dynamicSupport.riskLabel || "EMA20");
-  const riskEmaValue = discountBottom.isActive ? discountBottom.riskValue : (Number(dynamicSupport.riskValue) || ema20);
-  const supportDistancePct = discountBottom.isActive ? discountBottom.distancePct : (Number.isFinite(Number(dynamicSupport.distancePct)) ? Number(dynamicSupport.distancePct) : context.dist20);
-  const supportPullbackZone = Boolean(dynamicSupport.isRespected && supportDistancePct >= -0.8 && supportDistancePct <= 4.5);
-  const fastEmaSupportStructure = Boolean(!discountBottom.isActive && dynamicSupport.isRespected && activeSupportLabel !== "EMA20" && supportPullbackZone);
-  const overextensionAllowed = !context.isOverextended || fastEmaSupportStructure || discountBottom.isActive;
-  const squeezeActive = context.squeezeIntensity > 0;
-  const previousSqueezeActive = Boolean(prevSqz.squeeze?.high || prevSqz.squeeze?.mid || prevSqz.squeeze?.low);
-  const squeezeRelease = !squeezeActive && previousSqueezeActive;
-  const momentumImproving = context.momRising && sqz.momentum > prevSqz.momentum;
-  const bearishMomentum = sqz.momentum < sqz.signal || sqz.momentum < prevSqz.momentum;
-  const rsiOverbought = Number.isFinite(rsi) && rsi >= 70;
-  const rsiRecovering = Number.isFinite(rsi) && (rsi <= 45 || (rsi <= 55 && rsi > prevRsi));
-  const bullishSqueezeTrigger = sqz.buySignal || sqz.isBullDiv || (momentumImproving && context.fluxBullish && (squeezeActive || squeezeRelease || context.fluxImproving));
-  const bearishSqueezeTrigger = sqz.sellSignal || sqz.isBearDiv || (bearishMomentum && !context.fluxImproving);
-  const stopAnchor = dynamicSupport.isRespected || discountBottom.isActive ? riskEmaValue : Math.min(swingLow, ema20);
-  const stopLoss = formatIdxPrice(stopAnchor * 0.985);
-  const idealEntry = discountBottom.isActive || pullbackZone || reclaimedEma20 || supportPullbackZone ? currentPrice : activeSupportValue * 1.01;
-  const entryLow = formatIdxPrice(discountBottom.isActive ? currentPrice * 0.985 : activeSupportValue * 0.995);
-  const entryHigh = formatIdxPrice(discountBottom.isActive ? currentPrice * 1.025 : Math.min(activeSupportValue * 1.035, Math.max(currentPrice, activeSupportValue * 1.01)));
-  const target = pickTarget(idealEntry, stopLoss, pivots);
-  const atr = Number(last.atr14);
-  const atrPct = Number(last.atrp14);
-  const chandelierLong = Number(last.chandelier?.long);
-  const earlyExit = formatIdxPrice(Math.max(
-    Number.isFinite(last.vwap) ? Number(last.vwap) * 0.995 : 0,
-    Number.isFinite(activeSupportValue) ? activeSupportValue * 0.992 : 0
-  ));
-  const hardStop = formatIdxPrice(Number.isFinite(chandelierLong)
-    ? Math.min(stopLoss, dynamicSupport.isRespected || discountBottom.isActive ? stopLoss : chandelierLong)
-    : stopLoss);
-  const idealBuy = formatIdxPrice(idealEntry);
-  const riskPerShare = Math.max(idealBuy - hardStop, idealBuy * 0.008);
-  const target1 = target;
-  const target2 = formatIdxPrice(Math.max(target1, idealBuy + riskPerShare * 2.5, pivots?.r2 || 0, pivots?.r3 || 0));
-  const rewardRisk = riskPerShare > 0 ? (target1 - idealBuy) / riskPerShare : 0;
-  const riskPct = idealBuy > 0 ? (riskPerShare / idealBuy) * 100 : 0;
-  const maxLossPct = riskPct;
-  const timeStopBars = getTimeStopBars(timeframe);
-  const expiresAt = getNextTimestamp(quotes, timeStopBars);
-  const chaseRisk = !discountBottom.isActive && (supportDistancePct > 5.5 || currentPrice > entryHigh * 1.015 || riskPct > 6 || (Number.isFinite(atrPct) && atrPct > 7));
-  const lowRewardRisk = rewardRisk < (discountBottom.isActive ? 1.2 : 1.5);
-  const momentumStale = context.isMomentumPeaking || (sqz.momentum < sqz.signal && !context.fluxImproving);
-  const buildPlan = (plan: any) => {
-    let state = "SETUP";
-    if (plan.action.includes("SELL") || plan.action.includes("REDUCE")) state = "INVALID";
-    else if (momentumStale && !bullishSqueezeTrigger) state = "EXPIRED";
-    else if (chaseRisk || lowRewardRisk) state = "CHASE";
-    else if (plan.action === "BUY") state = "TRIGGERED";
-    else if (context.isCooldownReset) state = "ARMED";
-    else if (priceAboveEma20 && ema20Rising && context.fluxImproving) state = "ARMED";
-
-    const stateMeta: Record<string, { label: string; color: string }> = {
-      SETUP: { label: "SETUP BUILDING", color: "oklch(0.75 0.2 200)" },
-      ARMED: { label: "ARMED - WAIT TRIGGER", color: "oklch(0.85 0.2 150)" },
-      TRIGGERED: { label: "TRIGGERED - VALID ENTRY", color: "oklch(0.75 0.25 150)" },
-      CHASE: { label: "DO NOT CHASE", color: "oklch(0.75 0.2 40)" },
-      INVALID: { label: "INVALID / RISK OFF", color: "oklch(0.65 0.22 25)" },
-      EXPIRED: { label: "MOMENTUM EXPIRED", color: "oklch(0.62 0.08 260)" }
-    };
-
-    const noTradeReasons = [...(plan.waitReasons || [])];
-    if (chaseRisk) noTradeReasons.unshift(`Jangan kejar: jarak ${activeSupportLabel} ${formatPct(supportDistancePct)}%, risk ${formatPct(riskPct)}%, ATRP ${Number.isFinite(atrPct) ? formatPct(atrPct) : "N/A"}%.`);
-    if (lowRewardRisk) noTradeReasons.unshift(`Reward/risk ${rewardRisk.toFixed(2)}R di bawah minimum ${discountBottom.isActive ? "1.2R untuk starter bottom" : "1.5R"}.`);
-
-    return {
-      ...plan,
-      state,
-      stateLabel: ["CHASE", "INVALID", "EXPIRED"].includes(state) ? stateMeta[state].label : (plan.stateLabel || stateMeta[state].label),
-      stateColor: plan.stateColor || stateMeta[state].color,
-      entryLow,
-      entryHigh,
-      idealBuy,
-      earlyExit,
-      hardStop,
-      stopLoss: hardStop,
-      target1,
-      target2,
-      takeProfit: target1,
-      supportLabel: activeSupportLabel,
-      supportValue: formatIdxPrice(activeSupportValue),
-      riskEmaLabel,
-      riskEmaValue: formatIdxPrice(riskEmaValue),
-      rewardRisk: Number(rewardRisk.toFixed(2)),
-      riskPct: Number(riskPct.toFixed(2)),
-      maxLossPct: Number(maxLossPct.toFixed(2)),
-      atr: Number.isFinite(atr) ? Number(atr.toFixed(2)) : null,
-      atrPct: Number.isFinite(atrPct) ? Number(atrPct.toFixed(2)) : null,
-      timeStopBars,
-      expiresAt,
-      chaseRisk,
-      shouldEnter: state === "TRIGGERED",
-      noTradeReasons,
-      timeStopRule: `Jika setelah ${timeStopBars} candle belum mencapai +0.5R atau close kembali di bawah early exit ${earlyExit}, keluar/kurangi.`,
-      positionSizing: discountBottom.isActive
-        ? "Karena ini area bottom/reversal, mulai kecil dulu. Risiko tetap 0.25%-0.5% modal; tambah hanya kalau candle lanjut menguat."
-        : "Gunakan risiko tetap 0.5%-1% modal; lot = modal_risiko / (entry - hard_stop).",
-      extraSuggestion: plan.extraSuggestion || (discountBottom.isActive
-        ? "Saran tambahan: treat ini sebagai discount entry, bukan all-in. Konfirmasi terbaik muncul kalau harga bertahan di atas support, MFI/RSI lanjut naik, dan close mulai mendekati EMA20."
-        : `Saran tambahan: kalau harga koreksi tertib ke ${activeSupportLabel} dan tidak close di bawah ${riskEmaLabel}, risk/reward bisa dihitung dari support tersebut, bukan otomatis dianggap warning.`)
-    };
-  };
-  const waitReasons: string[] = [];
-
-  if (!priceAboveEma20 && !discountBottom.isActive) waitReasons.push(`Harga masih di bawah EMA20 (${formatPct(context.dist20)}%); strategi utama menunggu close/reclaim di atas EMA20 atau validasi bottom reversal di area hard stop.`);
-  if (!ema20Rising) waitReasons.push("EMA20 belum menanjak, jadi trend pendek belum memberi tailwind yang bersih.");
-  if (!fastEmaBullish) waitReasons.push("EMA9 masih di bawah EMA20; timing cepat belum mengonfirmasi buyer kembali dominan.");
-  if (Number.isFinite(ema60) && !swingEmaBullish) waitReasons.push("EMA20 masih di bawah EMA60; trend swing belum bullish menurut setup 20/60 EMA.");
-  if (!context.fluxBullish || !context.fluxImproving) waitReasons.push(`Flux belum kompak bullish (${context.fluxStatus}); tunggu akumulasi menguat.`);
-  if (!context.momRising) waitReasons.push("Momentum Squeeze masih di bawah/menurun terhadap signal.");
-  if (context.isOverextended && !fastEmaSupportStructure) waitReasons.push(`Harga terlalu jauh dari EMA20 (${formatPct(context.dist20)}%); entry terbaik menunggu pullback ke EMA9/EMA13/EMA20 yang valid.`);
-  if (rsiOverbought) waitReasons.push(`RSI ${formatPct(rsi)} sudah overbought; strategi 20 EMA lebih aman menunggu pullback/retest.`);
-  if (Number.isFinite(rsi) && rsi <= 35 && !priceAboveEma20 && !discountBottom.isActive) waitReasons.push(`RSI ${formatPct(rsi)} oversold; kalau muncul MFI/Flux/Momentum recovery di dekat support, ini bisa berubah jadi peluang bottom reversal.`);
-  if (squeezeActive && !bullishSqueezeTrigger) waitReasons.push(`${context.squeezeState.replace('_', ' ')} masih menyimpan energi, tetapi belum ada trigger release bullish.`);
-
-  if (bearishSqueezeTrigger || (brokeEma20 && bearishMomentum) || (context.isOverextended && context.isMomentumPeaking && (context.isVolumeClimax || context.isMfiExtreme || rsiOverbought))) {
-    return buildPlan({
-      action: "SELL / REDUCE",
-      bias: "BEARISH_REVERSAL",
-      timing: brokeEma20
-        ? "Jual/kurangi saat candle gagal bertahan di atas EMA20."
-        : "Ambil profit bertahap saat momentum Squeeze melemah atau muncul divergence bearish.",
-      entryZone: "-",
-      idealBuy: null,
-      stopLoss: formatIdxPrice(Math.max(swingHigh * 1.01, ema20 * 1.015)),
-      takeProfit: formatIdxPrice(Math.max(currentPrice, pivots?.r1 || currentPrice)),
-      invalidation: `Bullish lagi jika close kembali di atas EMA20 (${formatIdxPrice(ema20)}) dengan Momentum > Signal dan Flux membaik.`,
-      reason: `Squeeze/EMA memberi sinyal distribusi: ${bearishSqueezeTrigger ? "bearish trigger aktif" : "EMA20 ditembus"} sementara momentum tidak menguat.`,
-      waitReasons: []
-    });
-  }
-
-  if (discountBottom.isActive && !bearishSqueezeTrigger && !context.isVolumeClimax && !context.isMfiExtreme) {
-    return buildPlan({
-      action: "BUY",
-      bias: "DISCOUNT_BOTTOM_REVERSAL",
-      stateLabel: discountBottom.confirmation === "CONFIRMED" ? "DISCOUNT BUY - BOTTOM REVERSAL" : "STARTER BUY - EARLY BOTTOM",
-      stateColor: "oklch(0.78 0.2 165)",
-      timing: `Beli bertahap di area discount ${entryLow} - ${entryHigh}. Jangan tunggu sempurna, tapi wajib disiplin: tambah posisi hanya kalau harga bertahan di atas support dan mulai reclaim EMA20 (${formatIdxPrice(ema20)}).`,
-      entryZone: `${entryLow} - ${entryHigh}`,
-      idealBuy: formatIdxPrice(idealEntry),
-      stopLoss,
-      takeProfit: target,
-      invalidation: `Setup bottom gagal kalau close turun di bawah ${riskEmaLabel} (${formatIdxPrice(riskEmaValue)}) atau rebound ditolak lagi dengan volume besar.`,
-      reason: `Harga dekat area hard stop/swing low (${formatIdxPrice(riskEmaValue)}) sehingga risk relatif terukur. Ada ${discountBottom.hints} isyarat recovery: ${discountBottom.rsiRecovery ? "RSI mulai pulih, " : ""}${discountBottom.mfiRecovery ? "MFI membaik, " : ""}${discountBottom.fluxImproving ? "Flux membaik, " : ""}${discountBottom.momentumImproving ? "Momentum naik, " : ""}${discountBottom.obvImproving ? "OBV mendukung, " : ""}${discountBottom.candleRecovery ? "candle mulai bertahan" : "support masih dijaga"}.`,
-      extraSuggestion: "Saran tambahan: entry discount lebih cocok pakai sizing kecil dan average-up saat konfirmasi muncul, bukan average-down kalau support ditembus.",
-      waitReasons: []
-    });
-  }
-
-  if (
-    priceAboveEma20 &&
-    ema20Rising &&
-    longTrendHealthy &&
-    fastEmaBullish &&
-    (swingEmaBullish || !Number.isFinite(ema60)) &&
-    (pullbackZone || reclaimedEma20 || supportPullbackZone || last.isEliteBounce) &&
-    bullishSqueezeTrigger &&
-    !rsiOverbought &&
-    overextensionAllowed
-  ) {
-    return buildPlan({
-      action: "BUY",
-      bias: fastEmaSupportStructure ? `${activeSupportLabel}_SUPPORT_RESPECT` : (fastEmaCrossover ? "EMA9_20_RECLAIM" : "EMA20_SQUEEZE_BOUNCE"),
-      timing: reclaimedEma20
-        ? "Buy valid setelah candle reclaim/close di atas EMA20, dengan EMA9 di atas EMA20."
-        : `Buy terbaik di area ${activeSupportLabel} selama EMA9 > EMA20, EMA20 > EMA60, Momentum > Signal, dan Flux tetap positif.`,
-      entryZone: `${entryLow} - ${entryHigh}`,
-      idealBuy: formatIdxPrice(idealEntry),
-      stopLoss,
-      takeProfit: target,
-      invalidation: `Cut jika close turun di bawah ${riskEmaLabel} (${formatIdxPrice(riskEmaValue)}) atau tembus swing low ${formatIdxPrice(swingLow)}.`,
-      reason: `Harga respect ${activeSupportLabel} (${formatIdxPrice(activeSupportValue)}) dengan risk di ${riskEmaLabel}, EMA9 > EMA20${Number.isFinite(ema60) ? ", EMA20 > EMA60" : ""}, ${context.squeezeState.replace('_', ' ')} didukung trigger Squeeze bullish, RSI ${Number.isFinite(rsi) ? formatPct(rsi) : "N/A"}, dan Flux ${context.fluxStatus}.`,
-      waitReasons: []
-    });
-  }
-
-  if (
-    priceAboveEma20 &&
-    ema20Rising &&
-    emaStackBullish &&
-    context.fluxBullish &&
-    momentumImproving &&
-    !rsiOverbought &&
-    (context.dist20 <= 6 || fastEmaSupportStructure) &&
-    overextensionAllowed
-  ) {
-    return buildPlan({
-      action: "BUY",
-      bias: fastEmaSupportStructure ? `${activeSupportLabel}_TREND_SUPPORT` : "TREND_PULLBACK",
-      timing: `Buy on pullback/retest ${activeSupportLabel}, jangan kejar candle hijau yang sudah jauh dari support dinamis.`,
-      entryZone: `${entryLow} - ${entryHigh}`,
-      idealBuy: formatIdxPrice(idealEntry),
-      stopLoss,
-      takeProfit: target,
-      invalidation: `Setup batal jika close di bawah ${riskEmaLabel} (${formatIdxPrice(riskEmaValue)}) atau Flux turun lagi.`,
-      reason: `Trend pendek${Number.isFinite(ema60) ? " dan swing" : ""} sehat: harga respect ${activeSupportLabel}, risk di ${riskEmaLabel}, EMA9 > EMA20${Number.isFinite(ema60) ? ", EMA20 > EMA60" : ""}, momentum membaik, Flux positif, dan RSI ${rsiRecovering ? "mendukung recovery" : "belum overbought"}.`,
-      waitReasons: []
-    });
-  }
-
-  if (context.isCooldownReset) {
-    const cooldown = context.cooldownSetup || {};
-    return buildPlan({
-      action: "WAIT AND SEE",
-      bias: "EXTENDED_EMA20_COOLDOWN",
-      stateLabel: "ARMED - COOLDOWN RESET",
-      stateColor: "oklch(0.82 0.18 95)",
-      timing: "Setup cooldown aktif. Entry paling bersih menunggu breakout range reset atau pullback kecil mendekati EMA20, bukan mengejar candle ekspansi.",
-      entryZone: `${entryLow} - ${entryHigh}`,
-      idealBuy: formatIdxPrice(Math.min(currentPrice, entryHigh)),
-      stopLoss,
-      takeProfit: target,
-      invalidation: `Setup batal jika close turun di bawah EMA20 (${formatIdxPrice(ema20)}) atau range cooldown ditembus ke bawah.`,
-      reason: `Cooldown valid: extension sebelumnya ${formatPct(Number(cooldown.peakDist20))}% dari EMA20, pullback ${formatPct(Number(cooldown.pullbackPct))}%, range reset ${formatPct(Number(cooldown.cooldownRangePct))}%, volume dan ATR mulai cooling.`,
-      waitReasons: []
-    });
-  }
-
-  if (waitReasons.length === 0) {
-    waitReasons.push("Belum ada kombinasi ideal antara EMA9/20 timing, EMA20/60 swing trend, pullback EMA20, trigger Squeeze bullish, dan risk/reward yang rapi.");
-  }
-
-  return buildPlan({
-    action: "WAIT AND SEE",
-    bias: "NO_CLEAN_TRIGGER",
-    timing: Number.isFinite(ema60)
-      ? `Tunggu close di atas EMA20 (${formatIdxPrice(ema20)}) atau pullback rapi ke ${entryLow} - ${entryHigh} dengan EMA9 > EMA20, EMA20 > EMA60, dan Momentum > Signal.`
-      : `Tunggu close di atas EMA20 (${formatIdxPrice(ema20)}) atau pullback rapi ke ${entryLow} - ${entryHigh} dengan EMA9 > EMA20 dan Momentum > Signal.`,
-    entryZone: `${entryLow} - ${entryHigh}`,
-    idealBuy: formatIdxPrice(ema20 * 1.01),
-    stopLoss,
-    takeProfit: target,
-    invalidation: `Abaikan setup jika harga breakdown di bawah swing low ${formatIdxPrice(swingLow)}.`,
-    reason: waitReasons[0],
-    waitReasons
-  });
-}
-
-function generateUnifiedAnalysis(quotes: any[], pivots?: any, timeframe = "1d") {
-  const last = quotes[quotes.length - 1];
-  const prev = quotes[quotes.length - 2] || last;
-  const prev5 = quotes[quotes.length - 6] || quotes[0] || last;
-  const prev2 = quotes[quotes.length - 3] || quotes[0] || last;
-
-  const dist20 = Number.isFinite(last.ema20) ? ((last.close - last.ema20) / last.ema20) * 100 : 0;
-  const consolidation = last.close ? (Math.abs(last.close - prev2.close) / last.close) * 100 : 0;
-  const ema20Rising = Number(last.ema20) >= Number(prev.ema20);
-
-  const volDetails = {
-    mfi: last.mfi > prev.mfi || last.mfi < 25,
-    obv: last.obv > prev.obv,
-    vwap: last.close > last.vwap,
-    cmf: last.cmf > 0,
-    ad: last.ad > prev.ad,
-    force: last.forceIndex > 0
-  };
-
-  let volumeWeight = 0;
-  if (volDetails.mfi) volumeWeight += 1;
-  if (volDetails.obv) volumeWeight += 1;
-  if (volDetails.vwap) volumeWeight += 2;
-  if (volDetails.cmf) volumeWeight += 2;
-  if (volDetails.ad) volumeWeight += 1;
-  if (volDetails.force) volumeWeight += 1;
-  const volumeStrength = (volumeWeight / 8) * 100;
-
-  const sqz = last.squeezeDeluxe;
-  let squeezeState = "NO_SQUEEZE";
+  const inSqueeze = sqz?.squeeze?.low || sqz?.squeeze?.mid || sqz?.squeeze?.high;
   let squeezeIntensity = 0;
-  if (sqz.squeeze.high) { squeezeState = "HIGH_COMPRESSION"; squeezeIntensity = 3; }
-  else if (sqz.squeeze.mid) { squeezeState = "NORMAL_COMPRESSION"; squeezeIntensity = 2; }
-  else if (sqz.squeeze.low) { squeezeState = "LOW_COMPRESSION"; squeezeIntensity = 1; }
-
-  let squeezeDuration = 0;
-  if (squeezeIntensity > 0) {
-    for (let i = quotes.length - 1; i >= 0; i--) {
-      const s = quotes[i].squeezeDeluxe.squeeze;
-      if (s.high || s.mid || s.low) squeezeDuration++;
-      else break;
-    }
+  if (sqz?.squeeze?.high) squeezeIntensity = 3;
+  else if (sqz?.squeeze?.mid) squeezeIntensity = 2;
+  else if (sqz?.squeeze?.low) squeezeIntensity = 1;
+  
+  // AO momentum
+  const aoAccelerating = last.aoMomentum?.accelerating || false;
+  const aoDecelerating = last.aoMomentum?.decelerating || false;
+  
+  // Determine if we should generate a report
+  const shouldReport = 
+    hasBullishDivergence || 
+    hasBearishDivergence || 
+    marketStructure.quality === "GOOD" ||
+    emaBounce.isBouncing ||
+    accumulation.isAccumulating;
+  
+  if (!shouldReport) {
+    return {
+      shouldReport: false,
+      verdict: "NO SIGNAL",
+      conviction: 0,
+      details: "No divergence, good structure, EMA bounce, or accumulation detected",
+      color: "var(--text-secondary)"
+    };
   }
-
-  const momRising = sqz.momentum > sqz.signal;
-  const fluxBullish = sqz.flux > 0;
-  const fluxImproving = sqz.flux > prev.squeezeDeluxe.flux;
-  const isStrongVolume = volumeStrength >= 65;
-
-  let fluxStatus = "";
-  let fluxConviction = false;
-  if (fluxBullish && fluxImproving) {
-    fluxStatus = "BULLISH (Strong Accumulation)";
-    fluxConviction = true;
-  } else if (fluxBullish && !fluxImproving) {
-    fluxStatus = "CAUTION (Weakening Flow)";
-  } else if (!fluxBullish && fluxImproving) {
-    fluxStatus = "RECOVERING (Absorption Phase)";
-  } else {
-    fluxStatus = "BEARISH (Strong Distribution)";
-  }
-
-  const priceDown = last.close < prev5.close;
-  const fluxUp = sqz.flux > (quotes[quotes.length - 6]?.squeezeDeluxe.flux || 0);
-  const isSilentAccumulation = priceDown && fluxUp && !fluxBullish && fluxImproving;
-
-  const dynamicEmaSupport = detectDynamicEmaSupport(quotes);
-  const discountBottom = detectDiscountBottomSetup(quotes);
-  const dynamicSupportDistance = Number(dynamicEmaSupport.distancePct);
-  const hasFastEmaSupport = Boolean(
-    dynamicEmaSupport.isRespected &&
-    dynamicEmaSupport.supportLabel !== "EMA20" &&
-    Number.isFinite(dynamicSupportDistance) &&
-    dynamicSupportDistance <= 4.5
-  );
-  const isPriceBullish = last.isUndercutBounce || dist20 > 0;
-  const isOverextended = dist20 > 10 && !hasFastEmaSupport && !discountBottom.isActive;
-  const isNearSupport = discountBottom.isActive || hasFastEmaSupport || (dist20 > -1.5 && dist20 < 4.5);
-  const isTight = consolidation < 4.5;
-  const isMixedSignal = isPriceBullish && !fluxBullish;
-  const isPremiumMixed = isMixedSignal && fluxImproving && consolidation < 8;
-
-  const isVolumeClimax = last.volume > (prev.volume * 2.5);
-  const isMfiExtreme = last.mfi > 85;
-  const isMomentumPeaking = sqz.momentum < prev.squeezeDeluxe.momentum && sqz.momentum < (quotes[quotes.length - 3]?.squeezeDeluxe.momentum || 0);
-  const hasTrendStrength = volumeStrength >= 75 && fluxBullish && fluxImproving;
-  const emaBounceConfirmed = Boolean(last.isEliteBounce || (last.close > last.ema20 && last.ema9 > last.ema20 && ema20Rising && isNearSupport));
-  const squeezeBullish = Boolean(sqz.buySignal || sqz.isBullDiv || (momRising && fluxBullish && fluxImproving));
-  const squeezeBearish = Boolean(sqz.sellSignal || sqz.isBearDiv || (sqz.momentum < sqz.signal && !fluxImproving));
-  const isSilentFlyer = squeezeIntensity >= 2 && isNearSupport && fluxBullish && fluxImproving && !isOverextended;
-  const cooldownSetup = detectCooldownSetup(quotes, timeframe);
-  const isCooldownReset = cooldownSetup.isActive;
-
+  
+  // Build conviction score (0-100)
+  let conviction = 0;
+  let signals = [];
   let verdict = "";
   let color = "var(--text-secondary)";
-  let riskLevel = "MEDIUM";
-  let suggestion = "";
-  let squeezeInsight = "";
-
-  if (isOverextended && squeezeIntensity === 0) {
-    squeezeInsight = "Mesin volatilitas lagi fase ekspansi. Energinya sedang keluar cukup agresif.";
-  } else if (isOverextended && squeezeIntensity > 0) {
-    squeezeInsight = `Mesin volatilitas mulai breakout (${squeezeDuration} candle). Tekanan mulai lepas ke atas.`;
-  } else if (squeezeIntensity > 0) {
-    const squeezeLabel = squeezeState.replace("HIGH_COMPRESSION", "kompresi tinggi").replace("NORMAL_COMPRESSION", "kompresi normal").replace("LOW_COMPRESSION", "kompresi ringan").replace(/_/g, " ");
-    squeezeInsight = `Mesin volatilitas: ${squeezeLabel} (${squeezeDuration} candle). `;
-    if (squeezeDuration > 10) squeezeInsight += "Tekanannya sudah cukup lama numpuk. ";
-    squeezeInsight += `Flux lagi ${fluxStatus}. `;
-    squeezeInsight += momRising ? "Momentum lagi akselerasi." : "Momentum mulai melambat.";
-  } else {
-    squeezeInsight = "Mesin volatilitas lagi netral. Harga masih cari range baru.";
-  }
-
-  if (isOverextended && squeezeIntensity === 0) {
-    verdict = "POWERFUL RUN (OVEREXTENDED)";
-    color = "oklch(0.7 0.2 150)";
-    riskLevel = "HIGH";
-    let peakAnalysis = "";
-    if (isMomentumPeaking && (isVolumeClimax || isMfiExtreme)) {
-      peakAnalysis = "Indikasi CLIMAX terdeteksi: Volume ekstrim disertai pembalikan momentum. Risiko PEAK jangka pendek sangat tinggi.";
-      color = "oklch(0.7 0.2 40)";
-    } else if (hasTrendStrength) {
-      peakAnalysis = "Trennya masih punya dorongan kuat: tekanan beli dan aliran dana masih naik besar. Masih ada peluang lanjut parabolic sebelum benar-benar jenuh.";
-      riskLevel = "MEDIUM (Trend Following)";
-    } else {
-      peakAnalysis = "Risiko balik ke rata-rata mulai naik. Momentum sudah mulai jenuh, tapi tren belum patah.";
+  
+  // Divergence signals (highest priority)
+  if (hasBullishDivergence) {
+    conviction += 40;
+    if (squeezeDivergence.bullish && aoDivergence.bullish) {
+      signals.push("🔥 DOUBLE BULLISH DIVERGENCE (Squeeze + AO)");
+      conviction += 20;
+    } else if (squeezeDivergence.bullish) {
+      signals.push("📈 Squeeze Bullish Divergence");
+    } else if (aoDivergence.bullish) {
+      signals.push("📈 AO Bullish Divergence");
     }
-    suggestion = `Harga sudah berada di atas rata-rata (${dist20.toFixed(1)}% dari EMA20). ${peakAnalysis} Strategi: jika sudah punya, HOLD dengan trailing stop di low bar sebelumnya. Jika belum punya, tunggu pullback sehat ke area EMA9/EMA13/EMA20.`;
-  } else if (discountBottom.isActive && !(isVolumeClimax && isMomentumPeaking)) {
-    verdict = discountBottom.confirmation === "CONFIRMED"
-      ? "DISCOUNT ZONE: BOTTOM REVERSAL"
-      : "EARLY BOTTOM REVERSAL WATCH";
-    color = "oklch(0.78 0.2 165)";
-    riskLevel = discountBottom.confirmation === "CONFIRMED" ? "MEDIUM" : "MEDIUM-HIGH";
-    suggestion = `Harga sedang dekat area hard stop/swing low (${formatIdxPrice(discountBottom.riskValue)}), jadi ini bukan otomatis warning. Kalau support tetap dijaga, area ini bisa jadi peluang discount/bottom reversal. Ada ${discountBottom.hints} isyarat pemulihan; pakai stop ketat di bawah support dan tambah posisi hanya kalau reclaim EMA20/volume mulai mendukung.`;
-  } else if (isVolumeClimax || (isMfiExtreme && isMomentumPeaking)) {
-    verdict = "BEARISH REVERSAL: CLIMAX RISK";
-    color = "oklch(0.6 0.2 20)";
-    riskLevel = "VERY HIGH";
-    suggestion = "Volume ekstrem dan momentum mulai habis. Prioritasnya kurangi risiko dan tunggu konfirmasi pullback yang bersih.";
-  } else if (isCooldownReset) {
-    verdict = "COOLDOWN RESET: WATCHLIST ACTIVE";
-    color = "oklch(0.82 0.18 95)";
-    riskLevel = "MEDIUM";
-    suggestion = `Harga sudah reset setelah extension EMA20: pullback ${formatPct(Number(cooldownSetup.pullbackPct))}%, range ${formatPct(Number(cooldownSetup.cooldownRangePct))}%, ATR cooling ${formatPct(Number(cooldownSetup.atrCompressionRatio) * 100)}%. Ini bukan chase setup; tunggu breakout range atau pullback tertib dekat EMA20.`;
-  } else if (last.isEliteBounce && fluxConviction) {
-    verdict = "HIGH CONVICTION: ELITE BOUNCE";
-    color = "oklch(0.85 0.25 200)";
-    riskLevel = "LOW";
-    suggestion = "Pantulan ELITE terdeteksi dengan Flux positif dan menguat. Konfirmasi kuat dari reclaim EMA20.";
-  } else if (isSilentAccumulation) {
-    verdict = "SILENT ACCUMULATION: BULLISH DIVERGENCE";
-    color = "oklch(0.85 0.2 180)";
-    riskLevel = "LOW";
-    suggestion = "Harga melemah tetapi Flux merangkak naik. Ini indikasi akumulasi senyap.";
-  } else if (squeezeIntensity >= 2 && isNearSupport && isTight && fluxConviction) {
-    verdict = "VOLATILITY EXPLOSION IMMINENT";
+  }
+  
+  if (hasBearishDivergence) {
+    conviction += 30;
+    if (squeezeDivergence.bearish && aoDivergence.bearish) {
+      signals.push("⚠️ DOUBLE BEARISH DIVERGENCE (Squeeze + AO)");
+      conviction += 15;
+    } else if (squeezeDivergence.bearish) {
+      signals.push("📉 Squeeze Bearish Divergence");
+    } else if (aoDivergence.bearish) {
+      signals.push("📉 AO Bearish Divergence");
+    }
+  }
+  
+  // Market structure bonus
+  if (marketStructure.quality === "GOOD") {
+    conviction += 20;
+    signals.push(`✅ Good Market Structure (${marketStructure.score}/100)`);
+  } else if (marketStructure.quality === "FAIR") {
+    conviction += 10;
+    signals.push(`⚡ Fair Market Structure (${marketStructure.score}/100)`);
+  }
+  
+  // EMA bounce
+  if (emaBounce.isBouncing) {
+    conviction += 15;
+    signals.push(`🎯 ${emaBounce.emaLine} Bounce`);
+  }
+  
+  // Accumulation
+  if (accumulation.isAccumulating) {
+    conviction += 15;
+    signals.push(`💰 Accumulation Detected (${accumulation.strength}%)`);
+  }
+  
+  // Squeeze compression bonus
+  if (inSqueeze && hasBullishDivergence) {
+    conviction += 10;
+    signals.push(`⚡ Squeeze Compression (Intensity: ${squeezeIntensity})`);
+  }
+  
+  // RSI/MFI confirmation
+  if (hasBullishDivergence && (rsiOversold || mfiOversold)) {
+    conviction += 10;
+    signals.push(`📊 Oversold Confirmation (RSI: ${rsi.toFixed(0)}, MFI: ${mfi.toFixed(0)})`);
+  }
+  
+  // AO momentum confirmation
+  if (hasBullishDivergence && aoAccelerating) {
+    conviction += 10;
+    signals.push("🚀 AO Accelerating");
+  }
+  
+  if (hasBearishDivergence && aoDecelerating) {
+    conviction += 10;
+    signals.push("⬇️ AO Decelerating");
+  }
+  
+  // Cap conviction at 100
+  conviction = Math.min(100, conviction);
+  
+  // Determine verdict and color
+  if (hasBullishDivergence && conviction >= 70) {
+    verdict = "HIGH CONVICTION BULLISH DIVERGENCE";
     color = "oklch(0.85 0.25 150)";
-    riskLevel = "LOW";
-    suggestion = `Saham dalam kondisi squeeze ketat selama ${squeezeDuration} hari dengan Flux yang kuat dan membaik.`;
-  } else if (isPremiumMixed || (last.isEliteBounce && fluxImproving)) {
-    verdict = "TURNAROUND: EMA BOUNCE (FLUX IMPROVING)";
-    color = "oklch(0.85 0.2 200)";
-    riskLevel = "MEDIUM";
-    suggestion = "Harga memantul di EMA20 dan tren aliran dana meningkat. Ini peluang spekulatif dengan reward tinggi.";
-  } else if (isMixedSignal) {
-    verdict = "MIXED SIGNAL: CAUTION";
+  } else if (hasBullishDivergence && conviction >= 50) {
+    verdict = "BULLISH DIVERGENCE SETUP";
+    color = "oklch(0.78 0.2 165)";
+  } else if (hasBearishDivergence && conviction >= 60) {
+    verdict = "BEARISH DIVERGENCE WARNING";
     color = "oklch(0.7 0.2 40)";
-    riskLevel = "MEDIUM";
-    suggestion = "Ada pantulan teknikal, namun Flux masih belum memberi konfirmasi bersih.";
-  } else if (last.isEliteBounce || (isNearSupport && isStrongVolume && momRising && fluxBullish)) {
-    verdict = "HIGH CONVICTION: BUY ON DIP";
-    color = "oklch(0.85 0.25 200)";
-    riskLevel = "LOW";
-    suggestion = "Sinyal buy on dip terdeteksi di area support struktural dengan volume dan momentum yang pulih.";
-  } else if (dist20 < -5) {
-    verdict = "DEEP DISCOUNT: NEED REVERSAL CONFIRMATION";
-    color = "oklch(0.72 0.17 75)";
-    riskLevel = "HIGH";
-    suggestion = "Harga masih jauh di bawah EMA20, tapi jangan langsung dibuang sebagai warning. Ini bisa jadi watchlist discount kalau mulai muncul higher low, RSI/MFI membaik, dan Flux tidak makin distribusi. Entry baru tetap tunggu support jelas dan stop loss ketat.";
+  } else if (emaBounce.isBouncing && marketStructure.quality === "GOOD") {
+    verdict = "EMA BOUNCE WITH GOOD STRUCTURE";
+    color = "oklch(0.82 0.18 180)";
+  } else if (accumulation.isAccumulating && marketStructure.quality === "GOOD") {
+    verdict = "ACCUMULATION PHASE";
+    color = "oklch(0.80 0.18 200)";
+  } else if (marketStructure.quality === "GOOD") {
+    verdict = "GOOD MARKET STRUCTURE";
+    color = "oklch(0.75 0.15 190)";
   } else {
-    verdict = "CONSOLIDATION: BASE BUILDING";
-    color = "var(--text-secondary)";
-    riskLevel = "LOW";
-    suggestion = "Harga bergerak sideways dalam range sempit. Pantau Flux untuk tanda-tanda akumulasi awal.";
+    verdict = "POTENTIAL SETUP FORMING";
+    color = "oklch(0.72 0.12 180)";
   }
-
-  const tradePlan = buildTradePlan(quotes, pivots, timeframe, {
-    dist20,
-    squeezeIntensity,
-    squeezeDuration,
-    squeezeState,
-    fluxStatus,
-    fluxBullish,
-    fluxImproving,
-    momRising,
-    isOverextended,
-    isMomentumPeaking,
-    isVolumeClimax,
-    isMfiExtreme,
-    isCooldownReset,
-    cooldownSetup
-  });
-
-  const kdjVal = parseFloat(last.kdj?.j ?? "0");
-  const emaFastTrend = last.ema9 > last.ema20 ? "BULLISH (EMA9 > EMA20)" : "BEARISH (EMA9 < EMA20)";
-  const emaSwingTrend = Number.isFinite(last.ema60)
-    ? (last.ema20 > last.ema60 ? "BULLISH (EMA20 > EMA60)" : "BEARISH (EMA20 < EMA60)")
-    : "WARMING_UP";
-
-  const mfiLast3 = quotes.slice(-3).map(q => q.mfi);
-  const mfiAvg = mfiLast3.reduce((a, b) => a + b, 0) / mfiLast3.length;
-  const mfiPrev3 = quotes.slice(-6, -3).map(q => q.mfi);
-  const mfiPrevAvg = mfiPrev3.length > 0 ? mfiPrev3.reduce((a, b) => a + b, 0) / mfiPrev3.length : last.mfi;
-
-  let mfiStatus = "Steady";
-  if (mfiAvg > mfiPrevAvg + 0.5) mfiStatus = "Rising";
-  else if (mfiAvg < mfiPrevAvg - 0.5) mfiStatus = "Falling";
-  else mfiStatus = mfiAvg > 50 ? "Healthy" : "Neutral";
-
-  let setupScore = 50;
-  if (discountBottom.isActive) setupScore = discountBottom.confirmation === "CONFIRMED" ? 88 : 78;
-  else if (dist20 < -5) setupScore = 35;
-  else if (isOverextended) setupScore = 25 + Math.max(0, 15 - dist20);
-  else if (isTight && isNearSupport) setupScore = 95 + (fluxBullish ? 5 : 0);
-  else if (isNearSupport && fluxImproving) setupScore = 85;
-  else if (isNearSupport) setupScore = 75;
-  else if (dist20 > 0 && dist20 <= 10) setupScore = 65;
-
-  if (emaBounceConfirmed && squeezeBullish && !isOverextended) setupScore = Math.max(setupScore, 88);
-  if (isSilentFlyer) setupScore = Math.max(setupScore, 92);
-  if (isCooldownReset) setupScore = Math.max(setupScore, 86);
-  if (squeezeBearish && !emaBounceConfirmed && !discountBottom.isActive) setupScore = Math.min(setupScore, 25);
-
-  const emaSupportText = discountBottom.isActive
-    ? `bottom support valid dekat ${formatIdxPrice(discountBottom.riskValue)} (${discountBottom.hints} recovery hints)`
-    : dynamicEmaSupport.isRespected
-    ? `valid/reclaim area ${dynamicEmaSupport.supportLabel} (risk ${dynamicEmaSupport.riskLabel})`
-    : `belum valid; jarak harga ke EMA20 ${formatPct(dist20)}%`;
-  const supportConfirmed = emaBounceConfirmed || discountBottom.isActive;
-  const technicalFusionInsight = `Trend: ${emaFastTrend}, ${emaSwingTrend}. Squeeze: ${squeezeState.replace('_', ' ')} (${squeezeDuration} bar) dengan Flux ${fluxStatus} dan momentum ${momRising ? "di atas signal" : "belum di atas signal"}. Support: ${supportConfirmed ? emaSupportText : `belum valid; jarak harga ke EMA20 ${formatPct(dist20)}%`}. Volume strength: ${Math.round(volumeStrength)}%.`;
-  const strictSqzDivergence = detectStrictSqueezeDivergence(quotes, timeframe, tradePlan);
-  const cvdDivergence = strictSqzDivergence ? null : detectCvdBullishDivergence(quotes, timeframe, tradePlan);
-  const strictScreener = strictSqzDivergence || cvdDivergence;
-  const strictScreenerLabel = strictScreener
-    ? `${strictScreener.category}/${strictScreener.vector}`
-    : undefined;
-
+  
+  // Build detailed report
+  const details = signals.join(" | ");
+  
+  // Add context
+  let context = `Timeframe: ${timeframe} | `;
+  context += `RSI: ${rsi.toFixed(0)} | MFI: ${mfi.toFixed(0)} | `;
+  context += `Squeeze: ${inSqueeze ? 'Active' : 'None'} | `;
+  context += `AO: ${last.ao?.toFixed(2) || 'N/A'}`;
+  
   return {
-    verdict: strictSqzDivergence
-      ? "STRICT SQUEEZE DIVERGENCE"
-      : (cvdDivergence ? "STRICT CVD DIVERGENCE" : verdict),
+    shouldReport: true,
+    verdict,
+    conviction,
+    details,
+    context,
     color,
-    riskLevel,
-    suggestion: strictSqzDivergence
-      ? `${suggestion} Strict squeeze divergence aktif: momentum masih konstruktif, belum terlalu jauh dari titik divergence, dan risk/reward lolos filter timeframe.`
-      : (cvdDivergence
-        ? `${suggestion} CVD proxy menunjukkan tekanan jual melemah: harga mengetes low, tetapi cumulative volume delta membentuk higher low.`
-        : suggestion),
-    tradePlan,
-    squeezeInsight,
-    technicalFusionInsight,
-    squeezeDuration,
-    cooldownSetup,
-    volDetails,
-    isSilentFlyer,
-    strictDivergence: strictScreener || null,
-    score: {
-      setup: Math.round(strictScreener ? Math.max(setupScore, strictSqzDivergence ? 90 : 84) : setupScore),
-      volume: Math.round(volumeStrength)
+    signals,
+    divergence: {
+      squeeze: squeezeDivergence,
+      ao: aoDivergence
     },
-    details: {
-      mfi: mfiStatus,
-      obv: last.obv > prev.obv ? "Bullish" : "Bearish",
-      vwap: last.close > last.vwap ? "Above" : "Below",
-      vortex: last.vortex.plus > last.vortex.minus ? "Bullish" : "Bearish",
-      kdj: isNaN(kdjVal) ? "0.0" : kdjVal.toFixed(1),
-      rsi: Number.isFinite(last.rsi) ? last.rsi.toFixed(1) : "N/A",
-      emaFast: emaFastTrend,
-      emaSwing: emaSwingTrend,
-      emaBounce: discountBottom.isActive ? "BOTTOM" : (emaBounceConfirmed ? "VALID" : "WAIT"),
-      emaSupport: discountBottom.isActive
-        ? `Discount bottom / risk ${discountBottom.riskLabel}`
-        : (dynamicEmaSupport.isRespected ? `${dynamicEmaSupport.supportLabel} support / risk ${dynamicEmaSupport.riskLabel}` : "WAIT"),
-      bottomReversal: discountBottom.isActive ? `${discountBottom.confirmation} / ${discountBottom.hints} recovery hints` : "WAIT",
-      cooldown: isCooldownReset ? "ACTIVE" : "WAIT",
-      squeeze: squeezeState.replace('_', ' '),
-      flux: fluxStatus,
-      action: tradePlan.action,
-      execution: tradePlan.stateLabel,
-      rewardRisk: `${tradePlan.rewardRisk}R`,
-      maxLoss: `${tradePlan.maxLossPct}%`,
-      timeStop: `${tradePlan.timeStopBars} bars`,
-      atrp: tradePlan.atrPct === null ? "N/A" : `${tradePlan.atrPct}%`,
-      volClimax: isVolumeClimax,
-      mfiExtreme: isMfiExtreme,
-      peakStatus: isVolumeClimax || (isMfiExtreme && isMomentumPeaking) ? "PEAK_POTENTIAL" : (hasTrendStrength && !isMomentumPeaking ? "STRONG_INERTIA" : "MEAN_REVERSION"),
-      ...(strictScreenerLabel ? { screener: strictScreenerLabel, strictScreener: true } : {})
+    marketStructure,
+    emaBounce,
+    accumulation,
+    indicators: {
+      rsi,
+      mfi,
+      ao: last.ao,
+      squeezeIntensity,
+      aoAccelerating,
+      aoDecelerating
     }
-  };
-}
-
-function screenerCategoryLabel(value?: string) {
-  return String(value || "TECHNICAL").replace(/_/g, " ");
-}
-
-function screenerAccentColor(category?: string) {
-  const normalized = String(category || "").toUpperCase();
-  if (normalized === "COOLDOWN") return "oklch(0.82 0.18 95)";
-  if (normalized.includes("SQUEEZE")) return "oklch(0.85 0.25 200)";
-  if (normalized.includes("SILENT")) return "oklch(0.75 0.2 180)";
-  if (normalized.includes("ARAHUNTER")) return "oklch(0.76 0.24 35)";
-  return "oklch(0.75 0.25 150)";
-}
-
-function buildScreenerTradePlan(basePlan: any, screenerContext: ScreenerSignalContext) {
-  const entry = screenerContext.entryPrice;
-  if (entry === null) return null;
-
-  const stop = screenerContext.stopLossPrice ?? basePlan?.hardStop ?? basePlan?.stopLoss ?? null;
-  const target = screenerContext.targetPrice ?? basePlan?.target1 ?? basePlan?.takeProfit ?? null;
-  const riskPerShare = stop !== null && entry > stop ? entry - stop : null;
-  const target1 = target !== null ? formatIdxPrice(target) : basePlan?.target1;
-  const target2 = riskPerShare !== null
-    ? formatIdxPrice(Math.max(Number(target1) || 0, entry + riskPerShare * 2.5))
-    : basePlan?.target2;
-  const rewardRisk = screenerContext.rewardRisk ?? (
-    riskPerShare !== null && target !== null ? Number(((target - entry) / riskPerShare).toFixed(2)) : basePlan?.rewardRisk
-  );
-  const maxLossPct = screenerContext.riskPct ?? (
-    riskPerShare !== null ? Number(((riskPerShare / entry) * 100).toFixed(2)) : basePlan?.maxLossPct
-  );
-  const category = screenerCategoryLabel(screenerContext.category);
-  const isCooldown = screenerContext.category === "COOLDOWN";
-  const stateColor = screenerAccentColor(screenerContext.category);
-
-  return {
-    ...basePlan,
-    screenerSynced: true,
-    screenerCategory: screenerContext.category,
-    screenerVector: screenerContext.vector,
-    action: isCooldown ? "WAIT AND SEE" : (basePlan?.action || "WAIT AND SEE"),
-    bias: screenerContext.vector || basePlan?.bias,
-    state: isCooldown ? "ARMED" : (basePlan?.state || "SETUP"),
-    stateLabel: isCooldown ? "SCREENER: COOLDOWN RESET" : `SCREENER: ${category}`,
-    stateColor,
-    entryLow: formatIdxPrice(entry),
-    entryHigh: formatIdxPrice(entry),
-    entryZone: `${formatIdxPrice(entry)}`,
-    idealBuy: formatIdxPrice(entry),
-    hardStop: stop !== null ? formatIdxPrice(stop) : basePlan?.hardStop,
-    stopLoss: stop !== null ? formatIdxPrice(stop) : basePlan?.stopLoss,
-    earlyExit: basePlan?.earlyExit ?? (stop !== null ? formatIdxPrice(stop) : null),
-    target1,
-    target2,
-    takeProfit: target1,
-    rewardRisk,
-    riskPct: maxLossPct,
-    maxLossPct,
-    shouldEnter: !isCooldown && Boolean(basePlan?.shouldEnter),
-    timing: isCooldown
-      ? "Screener menandai cooldown/reset. Tunggu breakout range atau pullback tertib dekat EMA20 sebelum entry."
-      : `Screener aktif: ${category}. Ikuti entry/stop/target yang tersimpan dan validasi ulang dengan candle terakhir.`,
-    reason: screenerContext.thesis || basePlan?.reason,
-  };
-}
-
-function applyScreenerSync(analysis: any, activeScreenerSignals: ScreenerSignalContext[]) {
-  const screenerContext = activeScreenerSignals[0] || null;
-  if (analysis.details?.strictScreener) {
-    return {
-      ...analysis,
-      screenerContext: screenerContext || null,
-      activeScreenerSignals: activeScreenerSignals || [],
-      screenerTradePlan: null,
-    };
-  }
-
-  if (!screenerContext) {
-    return {
-      ...analysis,
-      screenerContext: null,
-      activeScreenerSignals: [],
-      screenerTradePlan: null,
-    };
-  }
-
-  const screenerTradePlan = buildScreenerTradePlan(analysis.tradePlan, screenerContext);
-  const category = screenerCategoryLabel(screenerContext.category);
-  const liveRiskOff = String(analysis.tradePlan?.action || "").includes("SELL") ||
-    String(analysis.verdict || "").includes("BEARISH REVERSAL");
-  const color = screenerAccentColor(screenerContext.category);
-  const shouldLeadWithScreener = !liveRiskOff && Boolean(screenerTradePlan);
-  const screenerSyncStatus = liveRiskOff
-    ? "BLOCKED_BY_LIVE_RISK"
-    : (screenerTradePlan ? "SYNCED_TO_CHART" : "CONTEXT_ONLY");
-  const screenerStatusText = liveRiskOff
-    ? `Screener aktif (${category}), tetapi chart live risk-off. Gunakan screener sebagai watchlist; jangan eksekusi sampai invalidation/reversal pulih.`
-    : `Screener aktif (${category}) dan sinkron dengan chart. Entry, stop, dan target report memakai data screener terbaru.`;
-
-  return {
-    ...analysis,
-    verdict: shouldLeadWithScreener ? `SCREENER SYNC: ${category}` : analysis.verdict,
-    color: shouldLeadWithScreener ? color : analysis.color,
-    riskLevel: shouldLeadWithScreener && analysis.riskLevel === "VERY HIGH" ? "MEDIUM" : analysis.riskLevel,
-    suggestion: shouldLeadWithScreener
-      ? `${screenerStatusText} ${screenerContext.thesis || analysis.suggestion} Batalkan jika candle terakhir menembus stop/invalidation.`
-      : (liveRiskOff
-        ? `${analysis.suggestion} ${screenerStatusText}`
-        : analysis.suggestion),
-    screenerContext,
-    activeScreenerSignals,
-    screenerTradePlan: liveRiskOff ? null : screenerTradePlan,
-    details: {
-      ...analysis.details,
-      screener: `${screenerContext.category}/${screenerContext.vector}`,
-      screenerSyncStatus,
-      screenerStatusText,
-    },
   };
 }
 
@@ -1327,23 +381,24 @@ export async function GET(req: Request) {
   let interval = searchParams.get("interval") || "1d";
   const originalInterval = interval;
 
-  // Yahoo Finance doesn't support 4h natively, we'll fetch 1h and aggregate
-  if (interval === "4h") interval = "1h";
+  // Yahoo Finance doesn't support 4h and 2h natively
+  if (interval === "4h" || interval === "2h") interval = "1h";
 
   try {
     const period2 = new Date();
     const period1 = new Date();
     
+    // Adjust lookback based on timeframe
     if (originalInterval === "5m") {
-        period1.setDate(period1.getDate() - 7); 
+      period1.setDate(period1.getDate() - 7); 
     } else if (originalInterval === "15m") {
-        period1.setDate(period1.getDate() - 30);
-    } else if (originalInterval === "4h") {
-        period1.setDate(period1.getDate() - 180);
+      period1.setDate(period1.getDate() - 30);
     } else if (originalInterval === "1h") {
-        period1.setDate(period1.getDate() - 90);
+      period1.setDate(period1.getDate() - 90);
+    } else if (originalInterval === "2h" || originalInterval === "4h") {
+      period1.setDate(period1.getDate() - 180);
     } else {
-        period1.setFullYear(period1.getFullYear() - 5);
+      period1.setFullYear(period1.getFullYear() - 5);
     }
 
     const result: any = await yahooFinance.chart(symbol, {
@@ -1370,215 +425,122 @@ export async function GET(req: Request) {
       };
     });
 
-    // Aggregate to 4h if requested
-    if (originalInterval === "4h") {
+    // Aggregate to 2h or 4h if requested
+    if (originalInterval === "2h") {
+      quotes = aggregateWibQuotesByHours(quotes, 2);
+    } else if (originalInterval === "4h") {
       quotes = aggregateWibQuotesByHours(quotes, 4);
     }
 
     const closes = quotes.map((q: any) => q.close);
     
-    const ema9 = calculateEMA(closes, 9);
-    const ema10 = calculateEMA(closes, 10);
-    const ema13 = calculateEMA(closes, 13);
-    const ema20 = calculateEMA(closes, 20);
-    const ema60 = calculateEMA(closes, 60);
-    const ema200 = calculateEMA(closes, 200);
-    const sma50 = calculateSMA(closes, 50);
-    const sma200 = calculateSMA(closes, 200);
-    const atr14 = calculateATR(quotes, 14);
-    const atrp14 = calculateATRP(quotes, 14);
-    const chandelier = calculateChandelierExit(quotes, 22, 3);
-    const keltner = calculateKeltnerChannels(quotes, ema20, 10, 2);
-    const macd = calculateMACD(closes);
-    const bb = calculateBollingerBands(closes);
-    const st = calculateSuperTrend(quotes);
-    const mfi = calculateMFI(quotes);
-    const ad = calculateAD(quotes);
-    const cmf = calculateCMF(quotes);
-    const emv = calculateEMV(quotes);
-    const fi = calculateForceIndex(quotes);
-    const nvi = calculateNVI(quotes);
-    const obv = calculateOBV(quotes);
-    const vpt = calculateVPT(quotes);
-    const vwap = calculateVWAP(quotes);
-    const vortex = calculateVortex(quotes);
-    const kdjResult = calculateKDJ(quotes);
-    const squeezeDeluxe = calculateSqueezeDeluxe(quotes);
-    const RSI_ARR = calculateRSI(closes, 14);  // [NEW] RSI array for Elite Bounce guard
+    // Calculate indicators using technicalindicators (TA-Lib algorithms)
+    // EMA calculations
+    const ema9 = EMA.calculate({ values: closes, period: 9 });
+    const ema20 = EMA.calculate({ values: closes, period: 20 });
+    const ema60 = EMA.calculate({ values: closes, period: 60 });
+    const ema200 = EMA.calculate({ values: closes, period: 200 });
     
-    const prevDay = quotes[quotes.length - 2] || quotes[quotes.length - 1];
-    const pivots = calculatePivotPoints(prevDay);
+    // Pad EMA arrays to match quotes length (technicalindicators returns shorter arrays)
+    const padEMA = (emaValues: number[], period: number) => {
+      const padding = new Array(period - 1).fill(null);
+      return [...padding, ...emaValues];
+    };
+    
+    const ema9Padded = padEMA(ema9, 9);
+    const ema20Padded = padEMA(ema20, 20);
+    const ema60Padded = padEMA(ema60, 60);
+    const ema200Padded = padEMA(ema200, 200);
+    
+    // RSI calculation
+    const rsiValues = RSI.calculate({ values: closes, period: 14 });
+    const rsiPadded = padEMA(rsiValues, 14);
+    
+    // MACD calculation (for future use)
+    const macdValues = MACD.calculate({
+      values: closes,
+      fastPeriod: 12,
+      slowPeriod: 26,
+      signalPeriod: 9,
+      SimpleMAOscillator: false,
+      SimpleMASignal: false
+    });
+    const macdPadded = new Array(33).fill(null).concat(macdValues);
+    
+    // Keep custom implementations for proprietary indicators
+    const mfi = calculateMFI(quotes, 14);
+    const squeezeDeluxe = calculateSqueezeDeluxe(quotes);
+    const ao = calculateAO(quotes);
+    const aoDivergence = detectAODivergence(quotes, ao);
+    const aoMomentum = detectAOMomentumShift(ao);
 
     const data = quotes.map((q: any, i: number) => {
-      const e9 = ema9[i];
-      const e10 = ema10[i];
-      const e13 = ema13[i];
-      const e20 = ema20[i];
-      const e60 = ema60[i];
-      const e200 = ema200[i];
-      const s50 = sma50[i];
-      const s200 = sma200[i];
-      
-      const prevE10 = i > 0 ? ema10[i-1] : e10;
-      const prevE20 = i > 0 ? ema20[i-1] : e20;
-
-      // REFINED 20 EMA Undercut Bounce Logic (Impeccable Version)
-      let undercutDetected = false;
-      const lookback = 3;
-      for (let j = 0; j < lookback; j++) {
-        const idx = i - j;
-        if (idx >= 0) {
-          if (quotes[idx].low <= (ema20[idx] || e20)) {
-            undercutDetected = true;
-            break;
-          }
-        }
-      }
-
-      const isReclaimed = q.close > e20;
-      const hierarchy = e10 > e20 && q.close > s50 && q.close > s200;
-      const uptrend = e10 > prevE10 && e20 > prevE20;
-      
-      const isUndercutBounce = undercutDetected && isReclaimed && hierarchy && uptrend;
-
-      // --- VOLUME FLOW FILTERS (From Screener Logic) ---
-      const m = mfi[i];
-      const prevM = i > 0 ? mfi[i-1] : m;
-      const o = obv[i];
-      const prevO = i > 0 ? obv[i-1] : o;
-      const v = vwap[i];
-      const f = fi[i];
-      const prevF = i > 0 ? fi[i-1] : f;
-      const c = cmf[i];
-      const a = ad[i];
-      const prevA = i > 0 ? ad[i-1] : a;
-
-      let volumeScore = 0;
-      if (m > prevM || m < 25) volumeScore++;
-      if (o > prevO) volumeScore++;
-      if (q.close > v) volumeScore++;
-      if (c > 0) volumeScore++;
-      if (a > prevA) volumeScore++;
-      if (f > 0) volumeScore++;
-
-      const isEliteBounce = isUndercutBounce && volumeScore >= 4 && 
-                            q.close > 50;  // basic price filter
-
-      // [NEW] RSI guard for Elite Bounce — reject overbought bounces
-      const currentRsi = RSI_ARR ? RSI_ARR[i] : null;
-      const rsiValidForBounce = currentRsi == null || (currentRsi >= 40 && currentRsi <= 68);
-      const isEliteBounceQualified = isEliteBounce && rsiValidForBounce;
-
-      // [NEW] Squeeze + Bounce Confluence Detection
-      const sqzState = squeezeDeluxe[i];
-      const prevSqz = i > 0 ? squeezeDeluxe[i - 1] : null;
-      const isInSqueeze = sqzState && (sqzState.squeeze.low || sqzState.squeeze.mid || sqzState.squeeze.high);
-      const isMomRising = sqzState && prevSqz ? sqzState.momentum > prevSqz.momentum : false;
-      const isSqueezeBounce = isEliteBounceQualified && isInSqueeze && isMomRising;
-
-      // --- CONVICTION SCORE (0-100%) --- Enhanced with squeeze confluence
-      const volumeComp = (volumeScore / 6) * 40;
-      const dist20 = ((q.close - e20) / e20) * 100;
-      const proximityComp = Math.max(0, 30 - Math.abs(dist20 - 1.5) * 5); 
-      const range = ((q.high - q.low) / q.close) * 100;
-      const tightnessComp = Math.max(0, 30 - range * 6);
-      const squeezeBonus = isSqueezeBounce ? 15 : 0;  // [NEW] Squeeze+bounce bonus
-
-      const convictionScore = Math.min(100, Math.round(volumeComp + proximityComp + tightnessComp + squeezeBonus));
-
+      const macdData = macdPadded[i];
       return {
         ...q,
-        ema9: e9,
-        ema10: e10,
-        ema13: e13,
-        ema20: e20,
-        ema60: e60,
-        ema200: e200,
-        sma50: s50,
-        sma200: s200,
-        atr14: atr14[i],
-        atrp14: atrp14[i],
-        chandelier: {
-          long: chandelier.long[i],
-          short: chandelier.short[i]
+        ema9: ema9Padded[i],
+        ema20: ema20Padded[i],
+        ema60: ema60Padded[i],
+        ema200: ema200Padded[i],
+        rsi: rsiPadded[i],
+        mfi: mfi[i],
+        macd: macdData ? {
+          macd: macdData.MACD,
+          signal: macdData.signal,
+          histogram: macdData.histogram
+        } : null,
+        squeezeDeluxe: squeezeDeluxe[i],
+        ao: ao[i],
+        aoDivergence: {
+          bullish: aoDivergence.bullishDivergence[i],
+          bearish: aoDivergence.bearishDivergence[i]
         },
-        keltner: {
-          upper: keltner.upper[i],
-          middle: keltner.middle[i],
-          lower: keltner.lower[i]
-        },
-        isUndercutBounce,
-        isEliteBounce: isEliteBounceQualified,
-        isSqueezeBounce,
-        volumeScore,
-        convictionScore,
-        bb: {
-          upper: bb.upper[i],
-          lower: bb.lower[i],
-          sma: bb.sma[i],
-        },
-        superTrend: {
-          value: st.superTrend[i],
-          direction: st.direction[i],
-        },
-        mfi: m,
-        ad: a,
-        cmf: c,
-        emv: emv[i],
-        forceIndex: f,
-        nvi: nvi[i],
-        obv: o,
-        vpt: vpt[i],
-        vwap: v,
-        vortex: {
-          plus: vortex.plus[i],
-          minus: vortex.minus[i]
-        },
-        kdj: {
-          k: kdjResult.k[i],
-          d: kdjResult.d[i],
-          j: kdjResult.j[i]
-        },
-        rsi: currentRsi,
-        macd: {
-          macd: macd.macdLine[i],
-          signal: macd.signalLine[i],
-          histogram: macd.histogram[i],
-        },
-        squeezeDeluxe: squeezeDeluxe[i]
+        aoMomentum: {
+          accelerating: aoMomentum.accelerating[i],
+          decelerating: aoMomentum.decelerating[i]
+        }
       };
     });
-    annotateSqueezeDivergenceLifecycle(data, originalInterval);
 
+    // Calculate pivot points
+    const prevDay = quotes[quotes.length - 2] || quotes[quotes.length - 1];
+    const pivots = {
+      p: (prevDay.high + prevDay.low + prevDay.close) / 3,
+      r1: 2 * ((prevDay.high + prevDay.low + prevDay.close) / 3) - prevDay.low,
+      s1: 2 * ((prevDay.high + prevDay.low + prevDay.close) / 3) - prevDay.high,
+      r2: ((prevDay.high + prevDay.low + prevDay.close) / 3) + (prevDay.high - prevDay.low),
+      s2: ((prevDay.high + prevDay.low + prevDay.close) / 3) - (prevDay.high - prevDay.low),
+      r3: prevDay.high + 2 * (((prevDay.high + prevDay.low + prevDay.close) / 3) - prevDay.low),
+      s3: prevDay.low - 2 * (prevDay.high - ((prevDay.high + prevDay.low + prevDay.close) / 3))
+    };
+
+    // Generate divergence-focused report
+    const divergenceReport = generateDivergenceReport(data, originalInterval);
+
+    // Get screener context
     const activeScreenerSignals = await getActiveScreenerSignals(symbol, 5);
-    const unifiedAnalysis = applyScreenerSync(
-      generateUnifiedAnalysis(data, pivots, originalInterval),
-      activeScreenerSignals
-    );
+
+    // Persist analysis
     const persistence = await persistTechnicalAnalysis({
       symbol,
       timeframe: originalInterval,
       candles: quotes,
       indicators: data,
-      analysis: unifiedAnalysis
+      analysis: divergenceReport
     });
-    const historicalSignals = await getRecentSignalEvents(symbol, originalInterval, 5);
 
-    console.log(`[API] ${symbol} technical analysis ready: verdict=${unifiedAnalysis.verdict}, setup=${unifiedAnalysis.score.setup}`);
+    console.log(`[API] ${symbol} ${originalInterval} divergence analysis: ${divergenceReport.verdict}, conviction=${divergenceReport.conviction}%`);
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       data,
       pivots,
-      unifiedAnalysis,
+      divergenceReport,
       screenerContext: activeScreenerSignals[0] || null,
       activeScreenerSignals,
-      historicalSignals,
       _debug: {
-        setupScore: unifiedAnalysis.score.setup,
-        volumeScore: unifiedAnalysis.score.volume,
-        isSilentFlyer: unifiedAnalysis.isSilentFlyer,
-        riskLevel: unifiedAnalysis.riskLevel,
+        conviction: divergenceReport.conviction,
+        shouldReport: divergenceReport.shouldReport,
         persistence
       },
       ticker: symbol
@@ -1588,3 +550,5 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+// Made with Bob

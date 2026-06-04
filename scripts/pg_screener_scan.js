@@ -1,6 +1,6 @@
 const stocksFile = require("../data/idx_stocks_with_sectors.json");
 
-const DEFAULT_INTERVALS = ["1d", "4h", "1h", "15m"];
+const DEFAULT_INTERVALS = ["1d", "4h", "2h", "1h", "15m", "5m"];
 
 function argValue(name, fallback) {
   const prefix = `--${name}=`;

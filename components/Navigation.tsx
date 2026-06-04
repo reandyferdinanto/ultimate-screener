@@ -205,6 +205,7 @@ export default function Navigation() {
             aria-expanded={isMoreOpen}
             aria-controls="mobile-more-menu"
             onClick={() => setIsMoreOpen(open => !open)}
+            suppressHydrationWarning
           >
             <MoreIcon size={18} />
             <span>More</span>
