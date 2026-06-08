@@ -171,6 +171,106 @@ function assessMarketStructure(quotes: any[]) {
 }
 
 /**
+ * Detect RSI divergences
+ */
+function detectRsiDivergence(quotes: any[], lookback = 14) {
+  const bullish: boolean[] = Array(quotes.length).fill(false);
+  const bearish: boolean[] = Array(quotes.length).fill(false);
+  
+  for (let i = lookback; i < quotes.length; i++) {
+    let prevLowIdx = -1;
+    let prevHighIdx = -1;
+    let prevLowPrice = Infinity;
+    let prevHighPrice = -Infinity;
+    
+    for (let j = i - lookback; j < i - 2; j++) {
+      if (quotes[j].low < prevLowPrice) {
+        prevLowPrice = quotes[j].low;
+        prevLowIdx = j;
+      }
+      if (quotes[j].high > prevHighPrice) {
+        prevHighPrice = quotes[j].high;
+        prevHighIdx = j;
+      }
+    }
+    
+    // Bullish divergence: price makes lower low, but RSI makes higher low
+    if (prevLowIdx >= 0 && 
+        quotes[i].low < prevLowPrice && 
+        Number.isFinite(quotes[i].rsi) && 
+        Number.isFinite(quotes[prevLowIdx].rsi) &&
+        quotes[i].rsi > quotes[prevLowIdx].rsi &&
+        quotes[i].rsi < 50) {
+      bullish[i] = true;
+    }
+    
+    // Bearish divergence: price makes higher high, but RSI makes lower high
+    if (prevHighIdx >= 0 && 
+        quotes[i].high > prevHighPrice && 
+        Number.isFinite(quotes[i].rsi) && 
+        Number.isFinite(quotes[prevHighIdx].rsi) &&
+        quotes[i].rsi < quotes[prevHighIdx].rsi &&
+        quotes[i].rsi > 50) {
+      bearish[i] = true;
+    }
+  }
+  
+  return { bullish, bearish };
+}
+
+/**
+ * Detect MACD divergences
+ */
+function detectMacdDivergence(quotes: any[], lookback = 14) {
+  const bullish: boolean[] = Array(quotes.length).fill(false);
+  const bearish: boolean[] = Array(quotes.length).fill(false);
+  
+  for (let i = lookback; i < quotes.length; i++) {
+    let prevLowIdx = -1;
+    let prevHighIdx = -1;
+    let prevLowPrice = Infinity;
+    let prevHighPrice = -Infinity;
+    
+    for (let j = i - lookback; j < i - 2; j++) {
+      if (quotes[j].low < prevLowPrice) {
+        prevLowPrice = quotes[j].low;
+        prevLowIdx = j;
+      }
+      if (quotes[j].high > prevHighPrice) {
+        prevHighPrice = quotes[j].high;
+        prevHighIdx = j;
+      }
+    }
+    
+    const macdVal = quotes[i].macd?.macd;
+    const prevMacdVal = prevLowIdx >= 0 ? quotes[prevLowIdx].macd?.macd : null;
+    const prevMacdHighVal = prevHighIdx >= 0 ? quotes[prevHighIdx].macd?.macd : null;
+    
+    // Bullish divergence: price makes lower low, but MACD makes higher low
+    if (prevLowIdx >= 0 && 
+        quotes[i].low < prevLowPrice && 
+        macdVal !== null && macdVal !== undefined && Number.isFinite(macdVal) &&
+        prevMacdVal !== null && prevMacdVal !== undefined && Number.isFinite(prevMacdVal) &&
+        macdVal > prevMacdVal &&
+        macdVal < 0) {
+      bullish[i] = true;
+    }
+    
+    // Bearish divergence: price makes higher high, but MACD makes lower high
+    if (prevHighIdx >= 0 && 
+        quotes[i].high > prevHighPrice && 
+        macdVal !== null && macdVal !== undefined && Number.isFinite(macdVal) &&
+        prevMacdHighVal !== null && prevMacdHighVal !== undefined && Number.isFinite(prevMacdHighVal) &&
+        macdVal < prevMacdHighVal &&
+        macdVal > 0) {
+      bearish[i] = true;
+    }
+  }
+  
+  return { bullish, bearish };
+}
+
+/**
  * Generate divergence-focused conviction report
  */
 function generateDivergenceReport(quotes: any[], timeframe: string) {
@@ -187,10 +287,20 @@ function generateDivergenceReport(quotes: any[], timeframe: string) {
     bullish: last.aoDivergence?.bullish || false,
     bearish: last.aoDivergence?.bearish || false
   };
+
+  const rsiDivergence = {
+    bullish: last.rsiDivergence?.bullish || false,
+    bearish: last.rsiDivergence?.bearish || false
+  };
+
+  const macdDivergence = {
+    bullish: last.macdDivergence?.bullish || false,
+    bearish: last.macdDivergence?.bearish || false
+  };
   
   // Check for any divergence
-  const hasBullishDivergence = squeezeDivergence.bullish || aoDivergence.bullish;
-  const hasBearishDivergence = squeezeDivergence.bearish || aoDivergence.bearish;
+  const hasBullishDivergence = squeezeDivergence.bullish || aoDivergence.bullish || rsiDivergence.bullish || macdDivergence.bullish;
+  const hasBearishDivergence = squeezeDivergence.bearish || aoDivergence.bearish || rsiDivergence.bearish || macdDivergence.bearish;
   
   // Market structure
   const marketStructure = assessMarketStructure(quotes);
@@ -234,7 +344,13 @@ function generateDivergenceReport(quotes: any[], timeframe: string) {
       verdict: "NO SIGNAL",
       conviction: 0,
       details: "No divergence, good structure, EMA bounce, or accumulation detected",
-      color: "var(--text-secondary)"
+      color: "var(--text-secondary)",
+      divergence: {
+        squeeze: squeezeDivergence,
+        ao: aoDivergence,
+        rsi: rsiDivergence,
+        macd: macdDivergence
+      }
     };
   }
   
@@ -247,32 +363,40 @@ function generateDivergenceReport(quotes: any[], timeframe: string) {
   // Divergence signals (highest priority)
   if (hasBullishDivergence) {
     conviction += 40;
-    if (squeezeDivergence.bullish && aoDivergence.bullish) {
-      signals.push("🔥 DOUBLE BULLISH DIVERGENCE (Squeeze + AO)");
-      conviction += 20;
-    } else if (squeezeDivergence.bullish) {
-      signals.push("📈 Squeeze Bullish Divergence");
-    } else if (aoDivergence.bullish) {
-      signals.push("📈 AO Bullish Divergence");
+    const activeBullish = [];
+    if (squeezeDivergence.bullish) activeBullish.push("Squeeze");
+    if (aoDivergence.bullish) activeBullish.push("AO");
+    if (rsiDivergence.bullish) activeBullish.push("RSI");
+    if (macdDivergence.bullish) activeBullish.push("MACD");
+    
+    if (activeBullish.length > 1) {
+      signals.push(`🔥 MULTIPLE BULLISH DIVERGENCES (${activeBullish.join(" + ")})`);
+      conviction += 10 * (activeBullish.length - 1);
+    } else {
+      signals.push(`📈 ${activeBullish[0]} Bullish Divergence`);
     }
   }
   
   if (hasBearishDivergence) {
     conviction += 30;
-    if (squeezeDivergence.bearish && aoDivergence.bearish) {
-      signals.push("⚠️ DOUBLE BEARISH DIVERGENCE (Squeeze + AO)");
-      conviction += 15;
-    } else if (squeezeDivergence.bearish) {
-      signals.push("📉 Squeeze Bearish Divergence");
-    } else if (aoDivergence.bearish) {
-      signals.push("📉 AO Bearish Divergence");
+    const activeBearish = [];
+    if (squeezeDivergence.bearish) activeBearish.push("Squeeze");
+    if (aoDivergence.bearish) activeBearish.push("AO");
+    if (rsiDivergence.bearish) activeBearish.push("RSI");
+    if (macdDivergence.bearish) activeBearish.push("MACD");
+    
+    if (activeBearish.length > 1) {
+      signals.push(`⚠️ MULTIPLE BEARISH DIVERGENCES (${activeBearish.join(" + ")})`);
+      conviction += 10 * (activeBearish.length - 1);
+    } else {
+      signals.push(`📉 ${activeBearish[0]} Bearish Divergence`);
     }
   }
   
   // Market structure bonus
   if (marketStructure.quality === "GOOD") {
     conviction += 20;
-    signals.push(`✅ Good Market Structure (${marketStructure.score}/100)`);
+    signals.push(`` + "✅" + ` Good Market Structure (${marketStructure.score}/100)`);
   } else if (marketStructure.quality === "FAIR") {
     conviction += 10;
     signals.push(`⚡ Fair Market Structure (${marketStructure.score}/100)`);
@@ -359,7 +483,9 @@ function generateDivergenceReport(quotes: any[], timeframe: string) {
     signals,
     divergence: {
       squeeze: squeezeDivergence,
-      ao: aoDivergence
+      ao: aoDivergence,
+      rsi: rsiDivergence,
+      macd: macdDivergence
     },
     marketStructure,
     emaBounce,
@@ -375,248 +501,318 @@ function generateDivergenceReport(quotes: any[], timeframe: string) {
   };
 }
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const symbol = searchParams.get("symbol") || "^JKSE";
-  let interval = searchParams.get("interval") || "1d";
-  const originalInterval = interval;
+/**
+ * Fetch quotes and calculate indicators for a given symbol and timeframe
+ */
+async function fetchAndAnalyze(symbol: string, requestedInterval: string) {
+  let interval = requestedInterval;
 
   // Yahoo Finance doesn't support 4h, 2h, 30m natively
   // Map unsupported intervals to supported ones
   if (interval === "4h" || interval === "2h") interval = "1h";
   if (interval === "30m") interval = "15m";
 
+  const period2 = new Date();
+  const period1 = new Date();
+  
+  // Adjust lookback based on timeframe
+  if (requestedInterval === "1m") {
+    period1.setDate(period1.getDate() - 2); // 2 days for 1-minute
+  } else if (requestedInterval === "5m") {
+    period1.setDate(period1.getDate() - 7);
+  } else if (requestedInterval === "15m" || requestedInterval === "30m") {
+    period1.setDate(period1.getDate() - 30);
+  } else if (requestedInterval === "1h") {
+    period1.setDate(period1.getDate() - 90);
+  } else if (requestedInterval === "2h" || requestedInterval === "4h") {
+    period1.setDate(period1.getDate() - 180);
+  } else if (requestedInterval === "1wk") {
+    period1.setFullYear(period1.getFullYear() - 10); // 10 years for weekly
+  } else {
+    period1.setFullYear(period1.getFullYear() - 5);
+  }
+
+  const result: any = await yahooFinance.chart(symbol, {
+    period1,
+    period2,
+    interval: interval as any,
+  });
+
+  if (!result || !result.quotes || result.quotes.length === 0) {
+    throw new Error(`No data found for interval ${requestedInterval}`);
+  }
+
+  let quotes = result.quotes.filter((q: any) => q.close !== null).map((q: any) => {
+    const utcTime = Math.floor(new Date(q.date).getTime() / 1000);
+    const wibTime = utcTime + (7 * 3600);
+    
+    return {
+      time: wibTime,
+      open: q.open,
+      high: q.high,
+      low: q.low,
+      close: q.close,
+      volume: q.volume,
+    };
+  });
+
+  // Aggregate to 30m, 2h or 4h if requested
+  if (requestedInterval === "30m") {
+    quotes = aggregateWibQuotesByHours(quotes, 0.5); // 30 minutes = 0.5 hours
+  } else if (requestedInterval === "2h") {
+    quotes = aggregateWibQuotesByHours(quotes, 2);
+  } else if (requestedInterval === "4h") {
+    quotes = aggregateWibQuotesByHours(quotes, 4);
+  }
+
+  const closes = quotes.map((q: any) => q.close);
+  
+  // Calculate indicators using technicalindicators
+  const ema9 = EMA.calculate({ values: closes, period: 9 });
+  const ema20 = EMA.calculate({ values: closes, period: 20 });
+  const ema60 = EMA.calculate({ values: closes, period: 60 });
+  const ema200 = EMA.calculate({ values: closes, period: 200 });
+  
+  // Pad EMA arrays to match quotes length
+  const padEMA = (emaValues: number[], period: number) => {
+    const padding = new Array(period - 1).fill(null);
+    return [...padding, ...emaValues];
+  };
+  
+  const ema9Padded = padEMA(ema9, 9);
+  const ema20Padded = padEMA(ema20, 20);
+  const ema60Padded = padEMA(ema60, 60);
+  const ema200Padded = padEMA(ema200, 200);
+  
+  // RSI calculation
+  const rsiValues = RSI.calculate({ values: closes, period: 14 });
+  const rsiPadded = padEMA(rsiValues, 14);
+  
+  // MACD calculation
+  const macdValues = MACD.calculate({
+    values: closes,
+    fastPeriod: 12,
+    slowPeriod: 26,
+    signalPeriod: 9,
+    SimpleMAOscillator: false,
+    SimpleMASignal: false
+  });
+  const macdPadded = new Array(33).fill(null).concat(macdValues);
+  
+  // Bollinger Bands calculation
+  let bbPadded: any[] = new Array(quotes.length).fill(null);
   try {
-    const period2 = new Date();
-    const period1 = new Date();
-    
-    // Adjust lookback based on timeframe
-    if (originalInterval === "1m") {
-      period1.setDate(period1.getDate() - 2); // 2 days for 1-minute
-    } else if (originalInterval === "5m") {
-      period1.setDate(period1.getDate() - 7);
-    } else if (originalInterval === "15m" || originalInterval === "30m") {
-      period1.setDate(period1.getDate() - 30);
-    } else if (originalInterval === "1h") {
-      period1.setDate(period1.getDate() - 90);
-    } else if (originalInterval === "2h" || originalInterval === "4h") {
-      period1.setDate(period1.getDate() - 180);
-    } else if (originalInterval === "1wk") {
-      period1.setFullYear(period1.getFullYear() - 10); // 10 years for weekly
-    } else {
-      period1.setFullYear(period1.getFullYear() - 5);
-    }
-
-    const result: any = await yahooFinance.chart(symbol, {
-      period1,
-      period2,
-      interval: interval as any,
-    });
-
-    if (!result || !result.quotes || result.quotes.length === 0) {
-      return NextResponse.json({ success: false, error: "No data found" }, { status: 404 });
-    }
-
-    let quotes = result.quotes.filter((q: any) => q.close !== null).map((q: any) => {
-      const utcTime = Math.floor(new Date(q.date).getTime() / 1000);
-      const wibTime = utcTime + (7 * 3600);
-      
-      return {
-        time: wibTime,
-        open: q.open,
-        high: q.high,
-        low: q.low,
-        close: q.close,
-        volume: q.volume,
-      };
-    });
-
-    // Aggregate to 30m, 2h or 4h if requested
-    if (originalInterval === "30m") {
-      quotes = aggregateWibQuotesByHours(quotes, 0.5); // 30 minutes = 0.5 hours
-    } else if (originalInterval === "2h") {
-      quotes = aggregateWibQuotesByHours(quotes, 2);
-    } else if (originalInterval === "4h") {
-      quotes = aggregateWibQuotesByHours(quotes, 4);
-    }
-
-    const closes = quotes.map((q: any) => q.close);
-    
-    // Calculate indicators using technicalindicators (TA-Lib algorithms)
-    // EMA calculations
-    const ema9 = EMA.calculate({ values: closes, period: 9 });
-    const ema20 = EMA.calculate({ values: closes, period: 20 });
-    const ema60 = EMA.calculate({ values: closes, period: 60 });
-    const ema200 = EMA.calculate({ values: closes, period: 200 });
-    
-    // Pad EMA arrays to match quotes length (technicalindicators returns shorter arrays)
-    const padEMA = (emaValues: number[], period: number) => {
-      const padding = new Array(period - 1).fill(null);
-      return [...padding, ...emaValues];
-    };
-    
-    const ema9Padded = padEMA(ema9, 9);
-    const ema20Padded = padEMA(ema20, 20);
-    const ema60Padded = padEMA(ema60, 60);
-    const ema200Padded = padEMA(ema200, 200);
-    
-    // RSI calculation
-    const rsiValues = RSI.calculate({ values: closes, period: 14 });
-    const rsiPadded = padEMA(rsiValues, 14);
-    
-    // MACD calculation (for future use)
-    const macdValues = MACD.calculate({
+    const bbValues = BollingerBands.calculate({
       values: closes,
-      fastPeriod: 12,
-      slowPeriod: 26,
-      signalPeriod: 9,
-      SimpleMAOscillator: false,
-      SimpleMASignal: false
+      period: 20,
+      stdDev: 2
     });
-    const macdPadded = new Array(33).fill(null).concat(macdValues);
-    
-    // Bollinger Bands calculation with error handling
-    let bbPadded: any[] = new Array(quotes.length).fill(null);
-    try {
-      const bbValues = BollingerBands.calculate({
-        values: closes,
-        period: 20,
-        stdDev: 2
-      });
-      bbPadded = new Array(19).fill(null).concat(bbValues);
-    } catch (error) {
-      console.error('Bollinger Bands calculation error:', error);
-    }
-    
-    // ATR calculation with error handling
-    let atrPadded: any[] = new Array(quotes.length).fill(null);
-    try {
-      const atrValues = ATR.calculate({
-        high: quotes.map((q: any) => q.high),
-        low: quotes.map((q: any) => q.low),
-        close: quotes.map((q: any) => q.close),
-        period: 14
-      });
-      atrPadded = new Array(14).fill(null).concat(atrValues);
-    } catch (error) {
-      console.error('ATR calculation error:', error);
-    }
-    
-    // Stochastic Oscillator calculation with error handling
-    let stochPadded: any[] = new Array(quotes.length).fill(null);
-    try {
-      const stochValues = Stochastic.calculate({
-        high: quotes.map((q: any) => q.high),
-        low: quotes.map((q: any) => q.low),
-        close: quotes.map((q: any) => q.close),
-        period: 14,
-        signalPeriod: 3
-      });
-      stochPadded = new Array(16).fill(null).concat(stochValues);
-    } catch (error) {
-      console.error('Stochastic calculation error:', error);
-    }
-    
-    // ADX calculation with error handling
-    let adxPadded: any[] = new Array(quotes.length).fill(null);
-    try {
-      const adxValues = ADX.calculate({
-        high: quotes.map((q: any) => q.high),
-        low: quotes.map((q: any) => q.low),
-        close: quotes.map((q: any) => q.close),
-        period: 14
-      });
-      adxPadded = new Array(27).fill(null).concat(adxValues);
-    } catch (error) {
-      console.error('ADX calculation error:', error);
-    }
-    
-    // Parabolic SAR calculation with error handling
-    let psarPadded: any[] = new Array(quotes.length).fill(null);
-    try {
-      const psarValues = PSAR.calculate({
-        high: quotes.map((q: any) => q.high),
-        low: quotes.map((q: any) => q.low),
-        step: 0.02,
-        max: 0.2
-      });
-      psarPadded = psarValues.length < quotes.length
-        ? new Array(quotes.length - psarValues.length).fill(null).concat(psarValues)
-        : psarValues;
-    } catch (error) {
-      console.error('PSAR calculation error:', error);
-    }
-    
-    // Keep custom implementations for proprietary indicators
-    const mfi = calculateMFI(quotes, 14);
-    const squeezeDeluxe = calculateSqueezeDeluxe(quotes);
-    const ao = calculateAO(quotes);
-    const aoDivergence = detectAODivergence(quotes, ao);
-    const aoMomentum = detectAOMomentumShift(ao);
-
-    const data = quotes.map((q: any, i: number) => {
-      const macdData = macdPadded[i];
-      const bbData = bbPadded[i];
-      const stochData = stochPadded[i];
-      const adxData = adxPadded[i];
-      
-      return {
-        ...q,
-        ema9: ema9Padded[i],
-        ema20: ema20Padded[i],
-        ema60: ema60Padded[i],
-        ema200: ema200Padded[i],
-        rsi: rsiPadded[i],
-        mfi: mfi[i],
-        macd: macdData ? {
-          macd: macdData.MACD,
-          signal: macdData.signal,
-          histogram: macdData.histogram
-        } : null,
-        bollingerBands: bbData ? {
-          upper: bbData.upper,
-          middle: bbData.middle,
-          lower: bbData.lower,
-          pb: bbData.pb // %B indicator (price position within bands)
-        } : null,
-        atr: atrPadded[i],
-        stochastic: stochData ? {
-          k: stochData.k,
-          d: stochData.d
-        } : null,
-        adx: adxData ? {
-          adx: adxData.adx,
-          pdi: adxData.pdi, // +DI
-          mdi: adxData.mdi  // -DI
-        } : null,
-        psar: psarPadded[i],
-        squeezeDeluxe: squeezeDeluxe[i],
-        ao: ao[i],
-        aoDivergence: {
-          bullish: aoDivergence.bullishDivergence[i],
-          bearish: aoDivergence.bearishDivergence[i]
-        },
-        aoMomentum: {
-          accelerating: aoMomentum.accelerating[i],
-          decelerating: aoMomentum.decelerating[i]
-        }
-      };
+    bbPadded = new Array(19).fill(null).concat(bbValues);
+  } catch (error) {
+    console.error('Bollinger Bands calculation error:', error);
+  }
+  
+  // ATR calculation
+  let atrPadded: any[] = new Array(quotes.length).fill(null);
+  try {
+    const atrValues = ATR.calculate({
+      high: quotes.map((q: any) => q.high),
+      low: quotes.map((q: any) => q.low),
+      close: quotes.map((q: any) => q.close),
+      period: 14
     });
+    atrPadded = new Array(14).fill(null).concat(atrValues);
+  } catch (error) {
+    console.error('ATR calculation error:', error);
+  }
+  
+  // Stochastic Oscillator calculation
+  let stochPadded: any[] = new Array(quotes.length).fill(null);
+  try {
+    const stochValues = Stochastic.calculate({
+      high: quotes.map((q: any) => q.high),
+      low: quotes.map((q: any) => q.low),
+      close: quotes.map((q: any) => q.close),
+      period: 14,
+      signalPeriod: 3
+    });
+    stochPadded = new Array(16).fill(null).concat(stochValues);
+  } catch (error) {
+    console.error('Stochastic calculation error:', error);
+  }
+  
+  // ADX calculation
+  let adxPadded: any[] = new Array(quotes.length).fill(null);
+  try {
+    const adxValues = ADX.calculate({
+      high: quotes.map((q: any) => q.high),
+      low: quotes.map((q: any) => q.low),
+      close: quotes.map((q: any) => q.close),
+      period: 14
+    });
+    adxPadded = new Array(27).fill(null).concat(adxValues);
+  } catch (error) {
+    console.error('ADX calculation error:', error);
+  }
+  
+  // Parabolic SAR calculation
+  let psarPadded: any[] = new Array(quotes.length).fill(null);
+  try {
+    const psarValues = PSAR.calculate({
+      high: quotes.map((q: any) => q.high),
+      low: quotes.map((q: any) => q.low),
+      step: 0.02,
+      max: 0.2
+    });
+    psarPadded = psarValues.length < quotes.length
+      ? new Array(quotes.length - psarValues.length).fill(null).concat(psarValues)
+      : psarValues;
+  } catch (error) {
+    console.error('PSAR calculation error:', error);
+  }
+  
+  // Custom implementations
+  const mfi = calculateMFI(quotes, 14);
+  const squeezeDeluxe = calculateSqueezeDeluxe(quotes);
+  const ao = calculateAO(quotes);
+  const aoDivergence = detectAODivergence(quotes, ao);
+  const aoMomentum = detectAOMomentumShift(ao);
 
-    // Calculate pivot points
-    const prevDay = quotes[quotes.length - 2] || quotes[quotes.length - 1];
-    const pivots = {
-      p: (prevDay.high + prevDay.low + prevDay.close) / 3,
-      r1: 2 * ((prevDay.high + prevDay.low + prevDay.close) / 3) - prevDay.low,
-      s1: 2 * ((prevDay.high + prevDay.low + prevDay.close) / 3) - prevDay.high,
-      r2: ((prevDay.high + prevDay.low + prevDay.close) / 3) + (prevDay.high - prevDay.low),
-      s2: ((prevDay.high + prevDay.low + prevDay.close) / 3) - (prevDay.high - prevDay.low),
-      r3: prevDay.high + 2 * (((prevDay.high + prevDay.low + prevDay.close) / 3) - prevDay.low),
-      s3: prevDay.low - 2 * (prevDay.high - ((prevDay.high + prevDay.low + prevDay.close) / 3))
+  const data = quotes.map((q: any, i: number) => {
+    const macdData = macdPadded[i];
+    const bbData = bbPadded[i];
+    const stochData = stochPadded[i];
+    const adxData = adxPadded[i];
+    
+    return {
+      ...q,
+      ema9: ema9Padded[i],
+      ema20: ema20Padded[i],
+      ema60: ema60Padded[i],
+      ema200: ema200Padded[i],
+      rsi: rsiPadded[i],
+      mfi: mfi[i],
+      macd: macdData ? {
+        macd: macdData.MACD,
+        signal: macdData.signal,
+        histogram: macdData.histogram
+      } : null,
+      bollingerBands: bbData ? {
+        upper: bbData.upper,
+        middle: bbData.middle,
+        lower: bbData.lower,
+        pb: bbData.pb
+      } : null,
+      atr: atrPadded[i],
+      stochastic: stochData ? {
+        k: stochData.k,
+        d: stochData.d
+      } : null,
+      adx: adxData ? {
+        adx: adxData.adx,
+        pdi: adxData.pdi,
+        mdi: adxData.mdi
+      } : null,
+      psar: psarPadded[i],
+      squeezeDeluxe: squeezeDeluxe[i],
+      ao: ao[i],
+      aoDivergence: {
+        bullish: aoDivergence.bullishDivergence[i],
+        bearish: aoDivergence.bearishDivergence[i]
+      },
+      aoMomentum: {
+        accelerating: aoMomentum.accelerating[i],
+        decelerating: aoMomentum.decelerating[i]
+      }
     };
+  });
 
-    // Generate divergence-focused report
-    const divergenceReport = generateDivergenceReport(data, originalInterval);
+  // Calculate and inject RSI & MACD divergences
+  const rsiDivs = detectRsiDivergence(data);
+  const macdDivs = detectMacdDivergence(data);
+
+  data.forEach((item: any, i: number) => {
+    item.rsiDivergence = {
+      bullish: rsiDivs.bullish[i],
+      bearish: rsiDivs.bearish[i]
+    };
+    item.macdDivergence = {
+      bullish: macdDivs.bullish[i],
+      bearish: macdDivs.bearish[i]
+    };
+  });
+
+  const prevDay = quotes[quotes.length - 2] || quotes[quotes.length - 1];
+  const pivots = {
+    p: (prevDay.high + prevDay.low + prevDay.close) / 3,
+    r1: 2 * ((prevDay.high + prevDay.low + prevDay.close) / 3) - prevDay.low,
+    s1: 2 * ((prevDay.high + prevDay.low + prevDay.close) / 3) - prevDay.high,
+    r2: ((prevDay.high + prevDay.low + prevDay.close) / 3) + (prevDay.high - prevDay.low),
+    s2: ((prevDay.high + prevDay.low + prevDay.close) / 3) - (prevDay.high - prevDay.low),
+    r3: prevDay.high + 2 * (((prevDay.high + prevDay.low + prevDay.close) / 3) - prevDay.low),
+    s3: prevDay.low - 2 * (prevDay.high - ((prevDay.high + prevDay.low + prevDay.close) / 3))
+  };
+
+  const divergenceReport = generateDivergenceReport(data, requestedInterval);
+
+  return { data, quotes, pivots, divergenceReport };
+}
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const symbol = searchParams.get("symbol") || "^JKSE";
+  const interval = searchParams.get("interval") || "1d";
+
+  try {
+    // 1. Fetch and analyze the requested main timeframe
+    const { data, quotes, pivots, divergenceReport } = await fetchAndAnalyze(symbol, interval);
+
+    // 2. If daily timeframe, scan lower timeframes in parallel
+    let lowerTimeframeSignals: any[] = [];
+    if (interval === "1d") {
+      const lowerIntervals = ["15m", "30m", "1h", "2h"];
+      const lowerResults = await Promise.all(
+        lowerIntervals.map(async (litv) => {
+          try {
+            const res = await fetchAndAnalyze(symbol, litv);
+            const report = res.divergenceReport;
+            const hasDiv = report.divergence.squeeze.bullish ||
+                           report.divergence.squeeze.bearish ||
+                           report.divergence.ao.bullish ||
+                           report.divergence.ao.bearish ||
+                           report.divergence.rsi.bullish ||
+                           report.divergence.rsi.bearish ||
+                           report.divergence.macd.bullish ||
+                           report.divergence.macd.bearish;
+            
+            if (hasDiv) {
+              const divs: string[] = [];
+              if (report.divergence.squeeze.bullish) divs.push("Squeeze Bullish");
+              if (report.divergence.squeeze.bearish) divs.push("Squeeze Bearish");
+              if (report.divergence.ao.bullish) divs.push("AO Bullish");
+              if (report.divergence.ao.bearish) divs.push("AO Bearish");
+              if (report.divergence.rsi.bullish) divs.push("RSI Bullish");
+              if (report.divergence.rsi.bearish) divs.push("RSI Bearish");
+              if (report.divergence.macd.bullish) divs.push("MACD Bullish");
+              if (report.divergence.macd.bearish) divs.push("MACD Bearish");
+              
+              return {
+                interval: litv,
+                divergences: divs,
+                verdict: report.verdict,
+                conviction: report.conviction,
+                details: report.details
+              };
+            }
+            return null;
+          } catch (err) {
+            console.error(`[API] Failed to fetch lower timeframe ${litv} for ${symbol}:`, err);
+            return null;
+          }
+        })
+      );
+      lowerTimeframeSignals = lowerResults.filter((r) => r !== null);
+    }
 
     // Get screener context
     const activeScreenerSignals = await getActiveScreenerSignals(symbol, 5);
@@ -624,13 +820,13 @@ export async function GET(req: Request) {
     // Persist analysis
     const persistence = await persistTechnicalAnalysis({
       symbol,
-      timeframe: originalInterval,
+      timeframe: interval,
       candles: quotes,
       indicators: data,
       analysis: divergenceReport
     });
 
-    console.log(`[API] ${symbol} ${originalInterval} divergence analysis: ${divergenceReport.verdict}, conviction=${divergenceReport.conviction}%`);
+    console.log(`[API] ${symbol} ${interval} divergence analysis: ${divergenceReport.verdict}, conviction=${divergenceReport.conviction}%`);
 
     return NextResponse.json({
       success: true,
@@ -639,6 +835,7 @@ export async function GET(req: Request) {
       divergenceReport,
       screenerContext: activeScreenerSignals[0] || null,
       activeScreenerSignals,
+      lowerTimeframeSignals,
       _debug: {
         conviction: divergenceReport.conviction,
         shouldReport: divergenceReport.shouldReport,

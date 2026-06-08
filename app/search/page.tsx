@@ -110,6 +110,190 @@ const getReportDetailRows = (details?: Record<string, unknown>) => {
   return rows.filter(([, value]) => value !== undefined && value !== null && value !== "");
 };
 
+const calculatePrecisionAnalysis = (candles: any[]) => {
+  if (!candles || candles.length === 0) return null;
+  const last = candles[candles.length - 1];
+  const prev = candles[candles.length - 2] || last;
+  
+  const rsi = last.rsi;
+  const macd = last.macd;
+  const bb = last.bollingerBands;
+  const adx = last.adx;
+  const ema9 = last.ema9;
+  const ema20 = last.ema20;
+  const ema60 = last.ema60;
+  const ema200 = last.ema200;
+  const close = last.close;
+  
+  let score = 0;
+  const reasons: string[] = [];
+  const indicatorStates: any = {
+    rsi: { value: rsi, label: 'Neutral', color: 'var(--text-muted)' },
+    macd: { label: 'Neutral', color: 'var(--text-muted)' },
+    bb: { label: 'Neutral', color: 'var(--text-muted)' },
+    ema: { label: 'Neutral', color: 'var(--text-muted)' },
+    adx: { value: adx?.adx, label: 'Weak Trend', color: 'var(--text-muted)' }
+  };
+  
+  // 1. RSI Scoring
+  if (typeof rsi === 'number') {
+    if (rsi < 30) {
+      score += 25;
+      reasons.push(`RSI is oversold (${rsi.toFixed(1)}) - buying pressure building`);
+      indicatorStates.rsi = { value: rsi, label: 'OVERSOLD', color: 'var(--accent-emerald)' };
+    } else if (rsi < 45) {
+      score += 10;
+      reasons.push(`RSI is low-neutral (${rsi.toFixed(1)}) - potential value zone`);
+      indicatorStates.rsi = { value: rsi, label: 'BULLISH REVERSION', color: 'var(--accent-cyan)' };
+    } else if (rsi > 70) {
+      score -= 25;
+      reasons.push(`RSI is overbought (${rsi.toFixed(1)}) - distribution risk high`);
+      indicatorStates.rsi = { value: rsi, label: 'OVERBOUGHT', color: 'var(--accent-rose)' };
+    } else if (rsi > 55) {
+      score += 15;
+      reasons.push(`RSI shows bullish momentum (${rsi.toFixed(1)})`);
+      indicatorStates.rsi = { value: rsi, label: 'BULLISH MOMENTUM', color: 'var(--accent-emerald)' };
+    } else {
+      reasons.push(`RSI is neutral (${rsi.toFixed(1)})`);
+      indicatorStates.rsi = { value: rsi, label: 'NEUTRAL', color: 'var(--text-muted)' };
+    }
+  }
+  
+  // 2. MACD Scoring
+  if (macd) {
+    const isCrossover = macd.macd > macd.signal && prev.macd?.macd <= prev.macd?.signal;
+    const isBearCrossover = macd.macd < macd.signal && prev.macd?.macd >= prev.macd?.signal;
+    const histAcc = macd.histogram > (prev.macd?.histogram || 0);
+    
+    if (isCrossover) {
+      score += 20;
+      reasons.push("MACD Bullish Crossover confirmed");
+      indicatorStates.macd = { label: 'BULLISH CROSS', color: 'var(--accent-emerald)' };
+    } else if (isBearCrossover) {
+      score -= 20;
+      reasons.push("MACD Bearish Crossover confirmed");
+      indicatorStates.macd = { label: 'BEARISH CROSS', color: 'var(--accent-rose)' };
+    } else if (macd.macd > macd.signal) {
+      score += 10;
+      reasons.push("MACD is in bullish zone (above signal line)");
+      indicatorStates.macd = { label: 'BULLISH ZONE', color: 'var(--accent-cyan)' };
+    } else {
+      score -= 10;
+      reasons.push("MACD is in bearish zone (below signal line)");
+      indicatorStates.macd = { label: 'BEARISH ZONE', color: 'var(--accent-rose)' };
+    }
+    
+    if (histAcc && macd.histogram > 0) {
+      score += 5;
+    } else if (!histAcc && macd.histogram < 0) {
+      score -= 5;
+    }
+  }
+  
+  // 3. Bollinger Bands Scoring
+  if (bb && typeof close === 'number') {
+    const width = bb.upper - bb.lower;
+    const pb = bb.pb ?? (width > 0 ? ((close - bb.lower) / width) : 0.5);
+    
+    if (pb < 0.15) {
+      score += 15;
+      reasons.push(`Price is at Bollinger Lower Band support (${(pb*100).toFixed(0)}%)`);
+      indicatorStates.bb = { label: 'BAND SUPPORT', color: 'var(--accent-emerald)' };
+    } else if (pb > 0.85) {
+      score -= 15;
+      reasons.push(`Price is at Bollinger Upper Band resistance (${(pb*100).toFixed(0)}%)`);
+      indicatorStates.bb = { label: 'BAND RESISTANCE', color: 'var(--accent-rose)' };
+    } else {
+      reasons.push(`Price is within Bollinger Bands range (${(pb*100).toFixed(0)}%)`);
+      indicatorStates.bb = { label: 'NORMAL RANGE', color: 'var(--text-muted)' };
+    }
+  }
+  
+  // 4. Moving Averages Scoring
+  if (typeof close === 'number') {
+    let emaScore = 0;
+    let aboveCount = 0;
+    
+    if (typeof ema9 === 'number') {
+      if (close > ema9) { emaScore += 5; aboveCount++; } else emaScore -= 5;
+    }
+    if (typeof ema20 === 'number') {
+      if (close > ema20) { emaScore += 5; aboveCount++; } else emaScore -= 5;
+    }
+    if (typeof ema60 === 'number') {
+      if (close > ema60) { emaScore += 10; aboveCount++; } else emaScore -= 10;
+    }
+    if (typeof ema200 === 'number') {
+      if (close > ema200) { emaScore += 15; aboveCount++; } else emaScore -= 15;
+    }
+    
+    score += emaScore;
+    if (aboveCount === 4) {
+      reasons.push("Price is above all key moving averages (EMA9, 20, 60, 200)");
+      indicatorStates.ema = { label: 'BULLISH ALIGNMENT', color: 'var(--accent-emerald)' };
+    } else if (aboveCount === 0) {
+      reasons.push("Price is below all key moving averages (EMA9, 20, 60, 200)");
+      indicatorStates.ema = { label: 'BEARISH ALIGNMENT', color: 'var(--accent-rose)' };
+    } else {
+      reasons.push(`Price is above ${aboveCount}/4 key EMAs`);
+      indicatorStates.ema = { label: 'MIXED TRENDS', color: 'var(--text-muted)' };
+    }
+  }
+  
+  // 5. ADX Trend Strength multiplier
+  if (adx && typeof adx.adx === 'number') {
+    const trendStrength = adx.adx;
+    if (trendStrength > 25) {
+      score = Math.round(score * 1.25);
+      reasons.push(`ADX shows strong trend strength (${trendStrength.toFixed(1)})`);
+      indicatorStates.adx = { value: trendStrength, label: 'STRONG TREND', color: 'var(--accent-cyan)' };
+    } else {
+      score = Math.round(score * 0.85);
+      reasons.push(`ADX shows weak trend/consolidation (${trendStrength.toFixed(1)})`);
+      indicatorStates.adx = { value: trendStrength, label: 'WEAK / RANGE', color: 'var(--text-muted)' };
+    }
+  }
+  
+  // Clamp score
+  score = Math.max(-100, Math.min(100, score));
+  
+  // Determine verdict
+  let verdict = 'HOLD';
+  let color = 'var(--text-muted)';
+  let bgGradient = 'rgba(255, 255, 255, 0.02)';
+  
+  if (score >= 60) {
+    verdict = 'STRONG BUY';
+    color = 'var(--accent-emerald)';
+    bgGradient = 'oklch(0.7 0.2 150 / 0.05)';
+  } else if (score >= 15) {
+    verdict = 'BUY';
+    color = 'var(--accent-cyan)';
+    bgGradient = 'oklch(0.75 0.2 200 / 0.05)';
+  } else if (score <= -60) {
+    verdict = 'STRONG SELL';
+    color = 'var(--accent-rose)';
+    bgGradient = 'oklch(0.6 0.2 25 / 0.05)';
+  } else if (score <= -15) {
+    verdict = 'SELL';
+    color = 'oklch(0.8 0.18 70)';
+    bgGradient = 'oklch(0.8 0.18 70 / 0.05)';
+  } else {
+    verdict = 'NEUTRAL HOLD';
+    color = 'var(--text-muted)';
+    bgGradient = 'rgba(255,255,255,0.01)';
+  }
+  
+  return {
+    score,
+    verdict,
+    color,
+    bgGradient,
+    reasons,
+    states: indicatorStates
+  };
+};
+
 export default function SearchPage() {
   return (
     <Suspense fallback={
@@ -274,6 +458,50 @@ function SearchContent() {
         {data && data.data && (
             <div className="search-grid">
                 <div className="charts-column">
+                    {/* Alert Banner for Lower Timeframe Divergences */}
+                    {interval === '1d' && data.lowerTimeframeSignals && data.lowerTimeframeSignals.length > 0 && (
+                      <div className="mb-4 p-4 border rounded-lg bg-rose-950/15" style={{
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                        padding: '12px 16px',
+                        marginBottom: '16px',
+                        boxShadow: '0 0 15px rgba(239, 68, 68, 0.1)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'oklch(0.7 0.2 40)', fontWeight: 'bold', fontSize: '13px', marginBottom: '6px' }}>
+                          <AlertTriangle size={15} />
+                          <span>Lower Timeframe Divergence Alerts (1d Context)</span>
+                        </div>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginBottom: '8px', lineHeight: '1.4' }}>
+                          Divergences detected on lower timeframes indicate possible momentum shifts before they appear on the daily chart:
+                        </p>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                          {data.lowerTimeframeSignals.map((sig: any, index: number) => (
+                            <div key={index} style={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: '4px',
+                              padding: '8px 10px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--accent-amber)', fontWeight: 'bold', fontSize: '10px' }}>{sig.interval.toUpperCase()} Timeframe</span>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '9px', fontWeight: 'bold' }}>{sig.conviction}% Conv.</span>
+                              </div>
+                              <div style={{ color: 'var(--text-primary)', fontSize: '11px', fontWeight: '500', marginTop: '2px' }}>
+                                {sig.divergences.join(', ')}
+                              </div>
+                              <div style={{ color: 'var(--text-secondary)', fontSize: '10px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
+                                {sig.verdict}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="chart-wrapper main-viz panel" style={{ padding: 0, height: "auto", overflow: "visible" }}>
                         <AdvancedChart
                             key={`main-${symbol}-${interval}-${showEMA9}-${showEMA10}-${showEMA20}-${showEMA50}-${showEMA60}-${showEMA200}-${showSqueezeDeluxe}-${showAO}-${showRSI}-${showBB}-${showMFI}-${showVWAP}-${showOBV}-${showCMF}`}
@@ -392,6 +620,75 @@ function SearchContent() {
 
                   {/* RIGHT COLUMN: ANALYSIS */}
             <div className="analysis-column">
+              {/* Precision Technical Analyzer (UX Upgrade from /stock-analyzer) */}
+              {(() => {
+                const analysis = calculatePrecisionAnalysis(data.data);
+                if (!analysis) return null;
+                return (
+                  <div className="conviction-panel panel mb-4" style={{ '--accent-color': analysis.color } as any}>
+                    <div className="panel-header report-header">
+                      <div>
+                        <span>Precision Technical Analyzer</span>
+                        <small>Multivariate signal scanner integrating RSI, MACD, Bollinger Bands, and EMA alignments.</small>
+                      </div>
+                      <div className="report-sync-pill" style={{ background: analysis.color, color: 'black' }}>
+                        Score: {analysis.score > 0 ? '+' : ''}{analysis.score}
+                      </div>
+                    </div>
+                    
+                    <div className="verdict-hero" style={{ background: analysis.bgGradient }}>
+                      <div className="v-header">
+                        <div className="v-label">TECHNICAL BIAS</div>
+                        <div className="verdict-icon">
+                          {analysis.verdict.includes('BUY') ? (
+                            <TrendingUp size={14} className="text-emerald-400" />
+                          ) : analysis.verdict.includes('SELL') ? (
+                            <TrendingDown size={14} className="text-rose-400" />
+                          ) : (
+                            <Info size={14} className="text-slate-400" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="v-value" style={{ color: analysis.color }}>
+                        {analysis.verdict}
+                      </div>
+                    </div>
+
+                    <div className="divergence-signals-panel" style={{ marginTop: 0, borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+                      <div className="mini-section-title">📊 Indicator states</div>
+                      <div className="indicators-grid my-3">
+                        <div>
+                          <span>RSI (14)</span>
+                          <strong style={{ color: analysis.states.rsi.color }}>{analysis.states.rsi.label}</strong>
+                          <small className="text-[9px] text-slate-500 font-bold">{analysis.states.rsi.value?.toFixed(1) || '-'}</small>
+                        </div>
+                        <div>
+                          <span>MACD</span>
+                          <strong style={{ color: analysis.states.macd.color }}>{analysis.states.macd.label}</strong>
+                        </div>
+                        <div>
+                          <span>Bollinger</span>
+                          <strong style={{ color: analysis.states.bb.color }}>{analysis.states.bb.label}</strong>
+                        </div>
+                        <div>
+                          <span>Trend (EMA)</span>
+                          <strong style={{ color: analysis.states.ema.color }}>{analysis.states.ema.label}</strong>
+                        </div>
+                      </div>
+                      
+                      <div className="mini-section-title mt-4">🎯 Model Logic & Reasoning</div>
+                      <div className="signals-list">
+                        {analysis.reasons.map((reason: string, idx: number) => (
+                          <div key={idx} className="signal-item font-mono text-[11px] leading-relaxed border-l-2 border-slate-700 hover:border-yellow-500" style={{ padding: '8px 12px' }}>
+                            {reason}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {data.divergenceReport && (
                 <div className="conviction-panel panel" style={{ '--accent-color': data.divergenceReport.color } as any}>
                   <div className="panel-header report-header">
