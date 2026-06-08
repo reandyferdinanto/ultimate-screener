@@ -1749,6 +1749,10 @@ export default function ScreenerPage() {
             .signals-table tr.signal-row { display: grid; grid-template-columns: 1fr; border: 1px solid var(--border-tactical); border-radius: 12px; overflow: hidden; background: oklch(0.12 0.015 240); }
             .signals-table td { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; align-items: start; padding: 9px 10px; border-bottom: 1px solid var(--border-tactical); text-align: left !important; }
             .signals-table td:last-child { border-bottom: none; }
+            .signals-table td.hide-tablet,
+            .signals-table td.hide-mobile {
+                display: none !important;
+            }
             .signals-table td::before { color: var(--text-muted); font-size: 0.55rem; font-weight: 1000; letter-spacing: 0.08em; }
             .signals-table td:nth-child(1)::before { content: 'TICKER'; }
             .signals-table td:nth-child(2)::before { content: 'KATEGORI'; }

@@ -153,6 +153,20 @@ export default function SettingsPage() {
 
         .input {
           width: 100%;
+          background: oklch(0.1 0 0);
+          border: 1px solid var(--border-color);
+          padding: 11px 12px;
+          color: white;
+          font-family: inherit;
+          font-size: 0.82rem;
+          border-radius: 6px;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .input:focus {
+          border-color: var(--accent-green);
+          box-shadow: var(--glow-green);
+          outline: none;
         }
 
         .settings-grid {

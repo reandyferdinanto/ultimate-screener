@@ -355,7 +355,7 @@ export default function Navigation() {
             background: oklch(0.82 0.18 145 / 0.09);
           }
           .mobile-hide {
-            display: inline !important;
+            display: none !important;
           }
         }
         @media (max-width: 420px) {
