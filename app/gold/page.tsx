@@ -1400,7 +1400,7 @@ function GoldContent() {
         .pivot-row.base { background: oklch(0.2 0 0); color: var(--accent-cyan); font-weight: 1000; }
 
         @media (max-width: 1024px) {
-            .search-grid { grid-template-columns: 1fr; }
+            .search-grid { grid-template-columns: minmax(0, 1fr); }
             .chart-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .chart-controls-panel { grid-template-columns: 1fr; }
             .chart-guide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1443,6 +1443,7 @@ function GoldContent() {
             .legend-grid, .insight-grid { grid-template-columns: 1fr; }
             .pivots-panel, .historical-signals-section { padding: 14px; }
             .sig-item, .pivot-row, .flow-item { gap: 10px; }
+            .execution-grid { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 420px) {

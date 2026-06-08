@@ -1343,7 +1343,7 @@ function SearchContent() {
                             </div>
                           </div>
 
-                          <div className="execution-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                          <div className="execution-grid" style={{ marginBottom: '10px' }}>
                             <div className="execution-cell" style={{ padding: '6px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '4px' }}>
                               <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Entry Area (FVG)</span>
                               <strong style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
@@ -1356,7 +1356,7 @@ function SearchContent() {
                                 {formatPrice(activeSetup.sl)}
                               </strong>
                             </div>
-                            <div className="execution-cell" style={{ padding: '6px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '4px', gridColumn: 'span 2' }}>
+                            <div className="execution-cell span-2" style={{ padding: '6px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '4px' }}>
                               <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Target Profit (TP)</span>
                               <strong style={{ display: 'block', fontSize: '11px', marginTop: '2px', color: 'var(--accent-emerald)' }}>
                                 {formatPrice(activeSetup.tp)}
@@ -2265,6 +2265,10 @@ function SearchContent() {
             margin-bottom: 12px;
         }
 
+        .span-2 {
+            grid-column: span 2;
+        }
+
         .execution-block-note {
             color: oklch(0.86 0.16 70);
             background: oklch(0.86 0.16 70 / 0.08);
@@ -2477,7 +2481,7 @@ function SearchContent() {
         .pivot-row.base { background: oklch(0.2 0 0); color: var(--accent-cyan); font-weight: 1000; }
 
         @media (max-width: 1024px) {
-            .search-grid { grid-template-columns: 1fr; }
+            .search-grid { grid-template-columns: minmax(0, 1fr); }
             .chart-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .chart-controls-panel { grid-template-columns: 1fr; }
             .chart-guide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2527,6 +2531,8 @@ function SearchContent() {
             .legend-grid, .insight-grid { grid-template-columns: 1fr; }
             .analysis-section, .screener-sync-panel, .historical-signals-section { padding: 14px; }
             .sig-item, .pivot-row, .flow-item { gap: 10px; }
+            .execution-grid { grid-template-columns: 1fr; }
+            .span-2 { grid-column: span 1 !important; }
         }
 
         @media (max-width: 420px) {
