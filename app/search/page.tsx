@@ -294,6 +294,224 @@ const calculatePrecisionAnalysis = (candles: any[]) => {
   };
 };
 
+const calculatePivotsAndSMC = (candles: any[], pivotLength = 5) => {
+  if (!candles || candles.length < pivotLength * 2 + 1) return null;
+
+  const bslSeries: (number | null)[] = Array(candles.length).fill(null);
+  const sslSeries: (number | null)[] = Array(candles.length).fill(null);
+  const bearSweepSeries: boolean[] = Array(candles.length).fill(false);
+  const bullSweepSeries: boolean[] = Array(candles.length).fill(false);
+  const bullFvgSeries: boolean[] = Array(candles.length).fill(false);
+  const bearFvgSeries: boolean[] = Array(candles.length).fill(false);
+
+  let lastBSL: number | null = null;
+  let lastSSL: number | null = null;
+
+  for (let i = 0; i < candles.length; i++) {
+    // 1. Evaluate sweep on the current candle using values from previous bar
+    if (i > 0) {
+      if (lastBSL !== null && 
+          candles[i].high > lastBSL && 
+          candles[i].close < lastBSL && 
+          candles[i].close < candles[i].open &&
+          candles[i - 1].high <= lastBSL) {
+        bearSweepSeries[i] = true;
+        lastBSL = null; // reset liquidity
+      }
+
+      if (lastSSL !== null && 
+          candles[i].low < lastSSL && 
+          candles[i].close > lastSSL && 
+          candles[i].close > candles[i].open &&
+          candles[i - 1].low >= lastSSL) {
+        bullSweepSeries[i] = true;
+        lastSSL = null; // reset liquidity
+      }
+    }
+
+    // 2. Evaluate pivot high/low at index i - pivotLength
+    if (i >= pivotLength * 2) {
+      const targetIdx = i - pivotLength;
+      const targetHigh = candles[targetIdx].high;
+      const targetLow = candles[targetIdx].low;
+      let isPivotHigh = true;
+      let isPivotLow = true;
+
+      for (let k = 1; k <= pivotLength; k++) {
+        if (candles[targetIdx - k].high >= targetHigh || candles[targetIdx + k].high > targetHigh) {
+          isPivotHigh = false;
+        }
+        if (candles[targetIdx - k].low <= targetLow || candles[targetIdx + k].low < targetLow) {
+          isPivotLow = false;
+        }
+      }
+
+      if (isPivotHigh) {
+        lastBSL = targetHigh;
+      }
+      if (isPivotLow) {
+        lastSSL = targetLow;
+      }
+    }
+
+    // 3. FVG Logic
+    if (i >= 2) {
+      if (candles[i].low > candles[i - 2].high && candles[i - 1].close > candles[i - 1].open) {
+        bullFvgSeries[i] = true;
+      }
+      if (candles[i].high < candles[i - 2].low && candles[i - 1].close < candles[i - 1].open) {
+        bearFvgSeries[i] = true;
+      }
+    }
+
+    bslSeries[i] = lastBSL;
+    sslSeries[i] = lastSSL;
+  }
+
+  return {
+    bsl: bslSeries,
+    ssl: sslSeries,
+    bearSweep: bearSweepSeries,
+    bullSweep: bullSweepSeries,
+    bullFvg: bullFvgSeries,
+    bearFvg: bearFvgSeries
+  };
+};
+
+const scanSweepAndShift = (candles: any[], smcData: any) => {
+  if (!candles || !smcData) return null;
+  
+  // Find the latest Bullish Sweep
+  let latestBullSweepIdx = -1;
+  for (let i = candles.length - 1; i >= 0; i--) {
+    if (smcData.bullSweep[i]) {
+      latestBullSweepIdx = i;
+      break;
+    }
+  }
+
+  // Find the latest Bearish Sweep
+  let latestBearSweepIdx = -1;
+  for (let i = candles.length - 1; i >= 0; i--) {
+    if (smcData.bearSweep[i]) {
+      latestBearSweepIdx = i;
+      break;
+    }
+  }
+
+  // Find the latest Bullish FVG after the latest Bullish Sweep
+  let bullSetup = null;
+  if (latestBullSweepIdx !== -1) {
+    const sweepBar = candles[latestBullSweepIdx];
+    let fvgIdx = -1;
+    for (let k = latestBullSweepIdx + 1; k < candles.length; k++) {
+      if (smcData.bullFvg[k]) {
+        fvgIdx = k;
+        break;
+      }
+    }
+    
+    if (fvgIdx !== -1) {
+      const fvgHigh = candles[fvgIdx - 2].high;
+      const fvgLow = candles[fvgIdx].low;
+      const currentPrice = candles[candles.length - 1].close;
+      const isRetesting = currentPrice >= fvgLow && currentPrice <= fvgHigh;
+      
+      bullSetup = {
+        sweepTime: sweepBar.time,
+        sweepPrice: sweepBar.low,
+        fvgTime: candles[fvgIdx].time,
+        fvgRange: { low: fvgLow, high: fvgHigh },
+        sl: sweepBar.low - (sweepBar.high - sweepBar.low) * 0.1, // slightly below low
+        tp: smcData.bsl[fvgIdx] || candles[fvgIdx].high * 1.05, // BSL target
+        isRetesting,
+        barsSinceSweep: candles.length - 1 - latestBullSweepIdx,
+        barsSinceFvg: candles.length - 1 - fvgIdx,
+      };
+    }
+  }
+
+  // Find the latest Bearish FVG after the latest Bearish Sweep
+  let bearSetup = null;
+  if (latestBearSweepIdx !== -1) {
+    const sweepBar = candles[latestBearSweepIdx];
+    let fvgIdx = -1;
+    for (let k = latestBearSweepIdx + 1; k < candles.length; k++) {
+      if (smcData.bearFvg[k]) {
+        fvgIdx = k;
+        break;
+      }
+    }
+    
+    if (fvgIdx !== -1) {
+      const fvgHigh = candles[fvgIdx].high;
+      const fvgLow = candles[fvgIdx - 2].low;
+      const currentPrice = candles[candles.length - 1].close;
+      const isRetesting = currentPrice >= fvgLow && currentPrice <= fvgHigh;
+      
+      bearSetup = {
+        sweepTime: sweepBar.time,
+        sweepPrice: sweepBar.high,
+        fvgTime: candles[fvgIdx].time,
+        fvgRange: { low: fvgLow, high: fvgHigh },
+        sl: sweepBar.high + (sweepBar.high - sweepBar.low) * 0.1, // slightly above high
+        tp: smcData.ssl[fvgIdx] || candles[fvgIdx].low * 0.95, // SSL target
+        isRetesting,
+        barsSinceSweep: candles.length - 1 - latestBearSweepIdx,
+        barsSinceFvg: candles.length - 1 - fvgIdx,
+      };
+    }
+  }
+
+  return { bullSetup, bearSetup, latestBullSweepIdx, latestBearSweepIdx };
+};
+
+const PINE_SCRIPT_SMC = `//@version=5
+indicator("Ultimate Liquidity Sweep + FVG [Custom]", overlay=true, max_labels_count=500, max_boxes_count=500)
+
+// === INPUTS ===
+pivotLength = input.int(5, title="Pivot Lookback (Struktur Harga)")
+showFVG = input.bool(true, title="Tampilkan FVG?")
+
+// === MENDETEKSI PIVOT (LIKUIDITAS) ===
+ph = ta.pivothigh(high, pivotLength, pivotLength)
+pl = ta.pivotlow(low, pivotLength, pivotLength)
+
+var float lastBSL = na // Buyside Liquidity
+var float lastSSL = na // Sellside Liquidity
+
+if not na(ph)
+    lastBSL := ph
+if not na(pl)
+    lastSSL := pl
+
+// === LOGIKA LIQUIDITY SWEEP ===
+// Bearish Sweep: Harga menembus BSL tapi ditutup di bawahnya
+bearSweep = high > lastBSL and close < lastBSL and close < open and high[1] <= lastBSL
+// Bullish Sweep: Harga menembus SSL tapi ditutup di atasnya
+bullSweep = low < lastSSL and close > lastSSL and close > open and low[1] >= lastSSL
+
+// Plot Label Sweep
+if bearSweep
+    label.new(bar_index, high, " SWEEP\\n(Sell)", color=color.new(color.red, 100), textcolor=color.red, style=label.style_label_down, size=size.small)
+    lastBSL := na // Reset liquidity setelah disapu
+
+if bullSweep
+    label.new(bar_index, low, " SWEEP\\n(Buy)", color=color.new(color.green, 100), textcolor=color.green, style=label.style_label_up, size=size.small)
+    lastSSL := na // Reset liquidity setelah disapu
+
+// === LOGIKA FAIR VALUE GAP (FVG) ===
+bullFVG = low > high[2] and close[1] > open[1]
+bearFVG = high < low[2] and close[1] < open[1]
+
+// Warnai Candlestick FVG untuk area Entry
+barcolor(showFVG and bullFVG ? color.new(color.blue, 0) : na, title="Bullish FVG Candle")
+barcolor(showFVG and bearFVG ? color.new(color.orange, 0) : na, title="Bearish FVG Candle")
+
+// Plot Garis BSL & SSL Statis
+plot(lastBSL, color=color.new(color.red, 70), style=plot.style_linebr, title="Buyside Liquidity")
+plot(lastSSL, color=color.new(color.green, 70), style=plot.style_linebr, title="Sellside Liquidity")`;
+
 export default function SearchPage() {
   return (
     <Suspense fallback={
@@ -342,6 +560,8 @@ function SearchContent() {
   const [showSqueezeDeluxe, setShowSqueezeDeluxe] = useState(true);
   const [showAO, setShowAO] = useState(true);
   const [showRSI, setShowRSI] = useState(true);
+  const [activeAnalysisTab, setActiveAnalysisTab] = useState<'precision' | 'smc'>('precision');
+  const [copiedPine, setCopiedPine] = useState(false);
   const screenerContext = data?.screenerContext || data?.unifiedAnalysis?.screenerContext;
   const activeScreenerSignals = Array.isArray(data?.activeScreenerSignals)
     ? data.activeScreenerSignals
@@ -620,312 +840,633 @@ function SearchContent() {
 
                   {/* RIGHT COLUMN: ANALYSIS */}
             <div className="analysis-column">
-              {/* Precision Technical Analyzer (UX Upgrade from /stock-analyzer) */}
-              {(() => {
-                const analysis = calculatePrecisionAnalysis(data.data);
-                if (!analysis) return null;
-                return (
-                  <div className="conviction-panel panel mb-4" style={{ '--accent-color': analysis.color } as any}>
-                    <div className="panel-header report-header">
-                      <div>
-                        <span>Precision Technical Analyzer</span>
-                        <small>Multivariate signal scanner integrating RSI, MACD, Bollinger Bands, and EMA alignments.</small>
-                      </div>
-                      <div className="report-sync-pill" style={{ background: analysis.color, color: 'black' }}>
-                        Score: {analysis.score > 0 ? '+' : ''}{analysis.score}
-                      </div>
-                    </div>
-                    
-                    <div className="verdict-hero" style={{ background: analysis.bgGradient }}>
-                      <div className="v-header">
-                        <div className="v-label">TECHNICAL BIAS</div>
-                        <div className="verdict-icon">
-                          {analysis.verdict.includes('BUY') ? (
-                            <TrendingUp size={14} className="text-emerald-400" />
-                          ) : analysis.verdict.includes('SELL') ? (
-                            <TrendingDown size={14} className="text-rose-400" />
-                          ) : (
-                            <Info size={14} className="text-slate-400" />
-                          )}
-                        </div>
-                      </div>
-                      <div className="v-value" style={{ color: analysis.color }}>
-                        {analysis.verdict}
-                      </div>
-                    </div>
+              {/* Tab Selector */}
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--border-tactical)', marginBottom: '16px', gap: '8px' }}>
+                <button 
+                  className="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-center transition-all"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: activeAnalysisTab === 'precision' ? '2px solid var(--accent-emerald)' : '2px solid transparent',
+                    color: activeAnalysisTab === 'precision' ? 'var(--accent-emerald)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: activeAnalysisTab === 'precision' ? 'bold' : 'normal',
+                    paddingBottom: '8px'
+                  }}
+                  onClick={() => setActiveAnalysisTab('precision')}
+                >
+                  📊 Technical Bias
+                </button>
+                <button 
+                  className="flex-1 py-3 text-xs font-bold uppercase tracking-wider text-center transition-all"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: activeAnalysisTab === 'smc' ? '2px solid var(--accent-gold, #fbbf24)' : '2px solid transparent',
+                    color: activeAnalysisTab === 'smc' ? 'var(--accent-gold, #fbbf24)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: activeAnalysisTab === 'smc' ? 'bold' : 'normal',
+                    paddingBottom: '8px'
+                  }}
+                  onClick={() => setActiveAnalysisTab('smc')}
+                >
+                  ⚡ Smart Money (SMC)
+                </button>
+              </div>
 
-                    <div className="divergence-signals-panel" style={{ marginTop: 0, borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
-                      <div className="mini-section-title">📊 Indicator states</div>
-                      <div className="indicators-grid my-3">
-                        <div>
-                          <span>RSI (14)</span>
-                          <strong style={{ color: analysis.states.rsi.color }}>{analysis.states.rsi.label}</strong>
-                          <small className="text-[9px] text-slate-500 font-bold">{analysis.states.rsi.value?.toFixed(1) || '-'}</small>
+              {/* TAB 1: PRECISION TECHNICAL ANALYSIS */}
+              {activeAnalysisTab === 'precision' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Precision Technical Analyzer (UX Upgrade from /stock-analyzer) */}
+                  {(() => {
+                    const analysis = calculatePrecisionAnalysis(data.data);
+                    if (!analysis) return null;
+                    return (
+                      <div className="conviction-panel panel mb-0" style={{ '--accent-color': analysis.color } as any}>
+                        <div className="panel-header report-header">
+                          <div>
+                            <span>Precision Technical Analyzer</span>
+                            <small>Multivariate signal scanner integrating RSI, MACD, Bollinger Bands, and EMA alignments.</small>
+                          </div>
+                          <div className="report-sync-pill" style={{ background: analysis.color, color: 'black' }}>
+                            Score: {analysis.score > 0 ? '+' : ''}{analysis.score}
+                          </div>
                         </div>
-                        <div>
-                          <span>MACD</span>
-                          <strong style={{ color: analysis.states.macd.color }}>{analysis.states.macd.label}</strong>
+                        
+                        <div className="verdict-hero" style={{ background: analysis.bgGradient }}>
+                          <div className="v-header">
+                            <div className="v-label">TECHNICAL BIAS</div>
+                            <div className="verdict-icon">
+                              {analysis.verdict.includes('BUY') ? (
+                                <TrendingUp size={14} className="text-emerald-400" />
+                              ) : analysis.verdict.includes('SELL') ? (
+                                <TrendingDown size={14} className="text-rose-400" />
+                              ) : (
+                                <Info size={14} className="text-slate-400" />
+                              )}
+                            </div>
+                          </div>
+                          <div className="v-value" style={{ color: analysis.color }}>
+                            {analysis.verdict}
+                          </div>
                         </div>
-                        <div>
-                          <span>Bollinger</span>
-                          <strong style={{ color: analysis.states.bb.color }}>{analysis.states.bb.label}</strong>
+
+                        <div className="divergence-signals-panel" style={{ marginTop: 0, borderTop: 'none', borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
+                          <div className="mini-section-title">📊 Indicator states</div>
+                          <div className="indicators-grid my-3">
+                            <div>
+                              <span>RSI (14)</span>
+                              <strong style={{ color: analysis.states.rsi.color }}>{analysis.states.rsi.label}</strong>
+                              <small className="text-[9px] text-slate-500 font-bold">{analysis.states.rsi.value?.toFixed(1) || '-'}</small>
+                            </div>
+                            <div>
+                              <span>MACD</span>
+                              <strong style={{ color: analysis.states.macd.color }}>{analysis.states.macd.label}</strong>
+                            </div>
+                            <div>
+                              <span>Bollinger</span>
+                              <strong style={{ color: analysis.states.bb.color }}>{analysis.states.bb.label}</strong>
+                            </div>
+                            <div>
+                              <span>Trend (EMA)</span>
+                              <strong style={{ color: analysis.states.ema.color }}>{analysis.states.ema.label}</strong>
+                            </div>
+                          </div>
+                          
+                          <div className="mini-section-title mt-4">🎯 Model Logic & Reasoning</div>
+                          <div className="signals-list">
+                            {analysis.reasons.map((reason: string, idx: number) => (
+                              <div key={idx} className="signal-item font-mono text-[11px] leading-relaxed border-l-2 border-slate-700 hover:border-yellow-500" style={{ padding: '8px 12px' }}>
+                                {reason}
+                              </div>
+                            ))}
+                          </div>
                         </div>
+                      </div>
+                    );
+                  })()}
+
+                  {data.divergenceReport && (
+                    <div className="conviction-panel panel" style={{ '--accent-color': data.divergenceReport.color } as any}>
+                      <div className="panel-header report-header">
                         <div>
-                          <span>Trend (EMA)</span>
-                          <strong style={{ color: analysis.states.ema.color }}>{analysis.states.ema.label}</strong>
+                          <span>Divergence Report</span>
+                          <small>Divergence-focused analysis with market structure, EMA bounces, and accumulation detection.</small>
+                        </div>
+                        <div className={`report-sync-pill ${data.divergenceReport.conviction >= 70 ? "ok" : data.divergenceReport.conviction >= 50 ? "warn" : "neutral"}`}>
+                          Conviction: {data.divergenceReport.conviction}%
                         </div>
                       </div>
                       
-                      <div className="mini-section-title mt-4">🎯 Model Logic & Reasoning</div>
-                      <div className="signals-list">
-                        {analysis.reasons.map((reason: string, idx: number) => (
-                          <div key={idx} className="signal-item font-mono text-[11px] leading-relaxed border-l-2 border-slate-700 hover:border-yellow-500" style={{ padding: '8px 12px' }}>
-                            {reason}
+                      <div className="verdict-hero">
+                        <div className="v-header">
+                          <div className="v-label">Current verdict</div>
+                          <div className="verdict-icon">
+                            {data.divergenceReport.verdict.includes('BULLISH') ? (
+                              <TrendingUp size={20} />
+                            ) : data.divergenceReport.verdict.includes('BEARISH') ? (
+                              <TrendingDown size={20} />
+                            ) : (
+                              <AlertTriangle size={20} />
+                            )}
                           </div>
-                        ))}
+                        </div>
+                        <div className="v-value" style={{ color: data.divergenceReport.color }}>
+                          {data.divergenceReport.verdict}
+                        </div>
+                        <div className="v-meta">
+                          <span>Conviction: <strong>{data.divergenceReport.conviction}%</strong></span>
+                        </div>
+                      </div>
+
+                      {data.divergenceReport.shouldReport && (
+                        <div className="divergence-signals-panel">
+                          <div className="mini-section-title">🎯 Detected Signals</div>
+                          <div className="signals-list">
+                            {data.divergenceReport.signals?.map((signal: string, idx: number) => (
+                              <div key={idx} className="signal-item">{signal}</div>
+                            ))}
+                          </div>
+                          
+                          {data.divergenceReport.details && (
+                            <div className="divergence-details">
+                              <div className="mini-section-title">📊 Analysis Details</div>
+                              <p>{data.divergenceReport.details}</p>
+                            </div>
+                          )}
+
+                          {data.divergenceReport.context && (
+                            <div className="divergence-context">
+                              <div className="mini-section-title">📈 Context</div>
+                              <p>{data.divergenceReport.context}</p>
+                            </div>
+                          )}
+
+                          {data.divergenceReport.marketStructure && (
+                            <div className="market-structure-panel">
+                              <div className="mini-section-title">🏗️ Market Structure</div>
+                              <div className="structure-grid">
+                                <div><span>Quality</span><strong>{data.divergenceReport.marketStructure.quality}</strong></div>
+                                <div><span>Score</span><strong>{data.divergenceReport.marketStructure.score}/100</strong></div>
+                                <div><span>Details</span><strong>{data.divergenceReport.marketStructure.details}</strong></div>
+                              </div>
+                            </div>
+                          )}
+
+                          {data.divergenceReport.emaBounce?.isBouncing && (
+                            <div className="ema-bounce-panel">
+                              <div className="mini-section-title">🎯 EMA Bounce</div>
+                              <p>{data.divergenceReport.emaBounce.details}</p>
+                            </div>
+                          )}
+
+                          {data.divergenceReport.accumulation?.isAccumulating && (
+                            <div className="accumulation-panel">
+                              <div className="mini-section-title">💰 Accumulation</div>
+                              <p>{data.divergenceReport.accumulation.details}</p>
+                              <div className="accumulation-strength">
+                                <span>Strength</span>
+                                <div className="strength-bar">
+                                  <div className="strength-fill" style={{ width: `${data.divergenceReport.accumulation.strength}%` }}></div>
+                                </div>
+                                <strong>{data.divergenceReport.accumulation.strength}%</strong>
+                              </div>
+                            </div>
+                          )}
+
+                          {data.divergenceReport.indicators && (
+                            <div className="indicators-panel">
+                              <div className="mini-section-title">📊 Key Indicators</div>
+                              <div className="indicators-grid">
+                                <div><span>RSI</span><strong>{data.divergenceReport.indicators.rsi?.toFixed(1) || 'N/A'}</strong></div>
+                                <div><span>MFI</span><strong>{data.divergenceReport.indicators.mfi?.toFixed(1) || 'N/A'}</strong></div>
+                                <div><span>AO</span><strong>{data.divergenceReport.indicators.ao?.toFixed(2) || 'N/A'}</strong></div>
+                                <div><span>Squeeze</span><strong>{data.divergenceReport.indicators.squeezeIntensity > 0 ? `Active (${data.divergenceReport.indicators.squeezeIntensity})` : 'None'}</strong></div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {screenerContext && (
+                        <div className={`screener-sync-panel ${isScreenerBlocked ? "blocked" : "synced"}`}>
+                          <div className="sync-title-row">
+                             <div className="sync-title"><Info size={14} /> Screener sync</div>
+                            <div className="sync-badge">{formatSignalLabel(screenerContext.category)}</div>
+                          </div>
+                          {screenerSyncStatus === "BLOCKED_BY_LIVE_RISK" ? (
+                            <div className="sync-warning">Active screener signal exists, but live chart is risk-off. Treat it as watchlist until invalidation recovers.</div>
+                          ) : screenerSyncStatus === "SYNCED_TO_CHART" ? (
+                            <div className="sync-ok">Chart and report use the same screener entry, stop, and target.</div>
+                          ) : null}
+                          <div className="sync-vector">Screener reason: {formatReportCopy(screenerContext.vector || screenerContext.signalSource || "-")}</div>
+                          <div className="sync-grid">
+                            <div><span>Appeared</span><strong>{formatDateTime(screenerContext.appearedAt || screenerContext.entryDate)}</strong></div>
+                            <div><span>Last update</span><strong>{formatDateTime(screenerContext.lastScannedAt || screenerContext.updatedAt)}</strong></div>
+                            <div><span>Screener entry</span><strong>{formatPrice(screenerContext.entryPrice)}</strong></div>
+                            <div><span>Stop loss</span><strong>{formatPrice(screenerContext.stopLossPrice)}</strong></div>
+                            <div><span>Initial target</span><strong>{formatPrice(screenerContext.targetPrice)}</strong></div>
+                            <div><span>RR / Delta</span><strong>{screenerContext.rewardRisk ?? "-"}R / {formatPct(screenerContext.deltaPct)}</strong></div>
+                          </div>
+                          {screenerContext.thesis && <p className="sync-thesis">{formatReportCopy(screenerContext.thesis)}</p>}
+                          {activeScreenerSignals.length > 0 && (
+                            <div className="sync-stack-list">
+                              <div className="mini-section-title">Other active signals</div>
+                              {activeScreenerSignals.slice(0, 5).map((signal: any) => (
+                                <div className="sync-signal-card" key={`${signal.category}-${signal.vector}-${signal.lastScannedAt || signal.appearedAt}`}>
+                                  <div>
+                                    <strong>{formatSignalLabel(signal.category)}</strong>
+                                    <span>{formatReportCopy(signal.vector || signal.signalSource || "-")}</span>
+                                  </div>
+                                  <div>
+                                    <small>Entry {formatPrice(signal.entryPrice)}</small>
+                                    <small>Delta {formatPct(signal.deltaPct)}</small>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {executionPlan && (() => {
+                        const plan = executionPlan;
+                        const planRows = [
+                          ["Area entry", plan.entryZone],
+                          ["Support aktif", plan.supportLabel ? `${plan.supportLabel} ${formatPrice(plan.supportValue)}` : "-"],
+                          ["Risk guard", plan.riskEmaLabel ? `${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}` : "-"],
+                          ["Beli ideal", plan.idealBuy ?? "-"],
+                          ["Batas waspada", plan.earlyExit ?? "-"],
+                          ["Stop batal", plan.hardStop ?? plan.stopLoss ?? "-"],
+                          ["Target 1", plan.target1 ?? plan.takeProfit ?? "-"],
+                          ["Target 2", plan.target2 ?? "-"],
+                        ];
+
+                        return (
+                          <div className="execution-plan" style={{ '--plan-color': plan.stateColor || data.unifiedAnalysis.color } as any}>
+                            <div className="execution-header">
+                              <div>
+                                <div className="execution-kicker">Rencana aksi</div>
+                                <div className="execution-state">{formatExecutionState(plan.stateLabel || plan.action)}</div>
+                              </div>
+                              <div className="execution-rr">
+                                <span>{plan.rewardRisk ?? "-"}R</span>
+                                <small>Maks. rugi {plan.maxLossPct ?? "-"}%</small>
+                              </div>
+                            </div>
+
+                            {isScreenerBlocked && (
+                              <div className="execution-block-note">Screener belum jadi lampu hijau karena chart live masih risk-off. Pakai rencana chart di bawah dulu.</div>
+                            )}
+
+                            <div className="execution-grid">
+                              {planRows.map(([label, value]) => (
+                                <div className="execution-cell" key={label}>
+                                  <span>{label}</span>
+                                  <strong>{formatPlanValue(value)}</strong>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="execution-rule">
+                              <strong>Batas waktu</strong>
+                              <span>{formatReportCopy(plan.timeStopRule)}</span>
+                            </div>
+
+                            <div className="execution-rule">
+                              <strong>Ukuran posisi</strong>
+                              <span>{formatReportCopy(plan.positionSizing)}</span>
+                            </div>
+
+                            {plan.extraSuggestion && (
+                              <div className="execution-rule">
+                                <strong>Saran tambahan</strong>
+                                <span>{formatReportCopy(plan.extraSuggestion)}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {data.historicalSignals && data.historicalSignals.length > 0 && (
+                        <div className="historical-signals-section">
+                          <div className="section-title">Historical alerts</div>
+                          <div className="signals-mini-list">
+                            {data.historicalSignals.slice(0, 3).map((sig: any, idx: number) => (
+                              <div key={idx} className="sig-item">
+                                <span className="sig-date">{new Date(sig.createdAt).toLocaleDateString('id-ID')}</span>
+                                <span className="sig-range">{Number(sig.entryPrice || 0).toFixed(0)} to {Number(sig.targetPrice || 0).toFixed(0)}</span>
+                                <span className={`sig-status ${String(sig.status).toLowerCase()}`}>{String(sig.status).toUpperCase()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {data.divergenceReport?.context && (
+                        <div className="analysis-section">
+                          <div className="section-title">Analysis Context</div>
+                          <p className="suggestion-text">{data.divergenceReport.context}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Pivot Targets Panel */}
+                  <div className="pivots-panel panel">
+                    <div className="panel-header">Pivot Targets</div>
+                    <div className="pivots-list">
+                      <div className="pivot-row pos"><span>R3 Resistance</span><strong>{data.pivots.r3.toFixed(0)}</strong></div>
+                      <div className="pivot-row pos"><span>R2 Resistance</span><strong>{data.pivots.r2.toFixed(0)}</strong></div>
+                      <div className="pivot-row base"><span>Base Pivot</span><strong>{data.pivots.p.toFixed(0)}</strong></div>
+                      <div className="pivot-row neg"><span>S1 Support</span><strong>{data.pivots.s1.toFixed(0)}</strong></div>
+                      <div className="pivot-row neg"><span>S2 Support</span><strong>{data.pivots.s2.toFixed(0)}</strong></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: SMART MONEY CONCEPTS (SMC) */}
+              {(() => {
+                if (activeAnalysisTab !== 'smc') return null;
+                const smcData = calculatePivotsAndSMC(data.data);
+                const scan = scanSweepAndShift(data.data, smcData);
+                if (!smcData || !scan) {
+                  return (
+                    <div className="panel text-center py-6 text-slate-500 text-xs">
+                      Not enough historical data to compute SMC pivots.
+                    </div>
+                  );
+                }
+
+                const { bullSetup, bearSetup } = scan;
+                let activeSetup: any = null;
+                let setupType: 'BULL' | 'BEAR' | 'NONE' = 'NONE';
+                
+                if (bullSetup && bearSetup) {
+                  if (bullSetup.barsSinceFvg <= bearSetup.barsSinceFvg) {
+                    activeSetup = bullSetup;
+                    setupType = 'BULL';
+                  } else {
+                    activeSetup = bearSetup;
+                    setupType = 'BEAR';
+                  }
+                } else if (bullSetup) {
+                  activeSetup = bullSetup;
+                  setupType = 'BULL';
+                } else if (bearSetup) {
+                  activeSetup = bearSetup;
+                  setupType = 'BEAR';
+                }
+
+                // Scan historical sweeps (last 5 sweeps)
+                const historicalList = [];
+                for (let i = data.data.length - 1; i >= 0 && historicalList.length < 5; i--) {
+                  if (smcData.bullSweep[i]) {
+                    historicalList.push({
+                      type: 'BULLISH SWEEP (Buy)',
+                      price: data.data[i].low,
+                      time: data.data[i].time,
+                      barsAgo: data.data.length - 1 - i
+                    });
+                  }
+                  if (smcData.bearSweep[i]) {
+                    historicalList.push({
+                      type: 'BEARISH SWEEP (Sell)',
+                      price: data.data[i].high,
+                      time: data.data[i].time,
+                      barsAgo: data.data.length - 1 - i
+                    });
+                  }
+                }
+
+                const handleCopyPine = () => {
+                  navigator.clipboard.writeText(PINE_SCRIPT_SMC);
+                  setCopiedPine(true);
+                  setTimeout(() => setCopiedPine(false), 2000);
+                };
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* SMC Bias Panel */}
+                    <div className="conviction-panel panel" style={{ '--accent-color': setupType === 'BULL' ? 'var(--accent-emerald)' : setupType === 'BEAR' ? 'var(--accent-rose)' : 'var(--text-muted)' } as any}>
+                      <div className="panel-header report-header">
+                        <div>
+                          <span>SMC Strategy Scan</span>
+                          <small>Detects Liquidity Sweeps, Market Structure Shifts (MSS), and Fair Value Gaps (FVG).</small>
+                        </div>
+                        <div className="report-sync-pill" style={{ background: setupType === 'BULL' ? 'var(--accent-emerald)' : setupType === 'BEAR' ? 'var(--accent-rose)' : 'var(--bg-hover)', color: setupType === 'NONE' ? 'var(--text-muted)' : 'black' }}>
+                          {setupType === 'BULL' ? 'LONG BIAS' : setupType === 'BEAR' ? 'SHORT BIAS' : 'NO SETUP'}
+                        </div>
+                      </div>
+
+                      {/* Verdict Hero */}
+                      <div className="verdict-hero" style={{ 
+                        background: setupType === 'BULL' 
+                          ? 'rgba(16, 185, 129, 0.05)' 
+                          : setupType === 'BEAR' 
+                            ? 'rgba(244, 63, 94, 0.05)' 
+                            : 'rgba(255, 255, 255, 0.01)',
+                        border: '1px solid var(--border-tactical)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        margin: '12px 0'
+                      }}>
+                        <div className="v-header">
+                          <div className="v-label">STRATEGY VERDICT</div>
+                        </div>
+                        <div className="v-value" style={{ 
+                          color: setupType === 'BULL' 
+                            ? 'var(--accent-emerald)' 
+                            : setupType === 'BEAR' 
+                              ? 'var(--accent-rose)' 
+                              : 'var(--text-muted)',
+                          fontSize: '16px',
+                          fontWeight: 'bold',
+                          margin: '8px 0'
+                        }}>
+                          {setupType === 'BULL' 
+                            ? 'SWEEP & SHIFT: LONG INITIATED' 
+                            : setupType === 'BEAR' 
+                              ? 'SWEEP & SHIFT: SHORT INITIATED' 
+                              : 'WAITING FOR LIQUIDITY SWEEP'}
+                        </div>
+                        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4', margin: '6px 0 0 0' }}>
+                          {setupType === 'BULL' 
+                            ? `Harga telah menyapu Sellside Liquidity di level ${formatPrice(activeSetup.sweepPrice)} (${activeSetup.barsSinceSweep} bars ago) dan membentuk bullish FVG pada level ${formatPrice(activeSetup.fvgRange.low)} - ${formatPrice(activeSetup.fvgRange.high)}.`
+                            : setupType === 'BEAR' 
+                              ? `Harga telah menyapu Buyside Liquidity di level ${formatPrice(activeSetup.sweepPrice)} (${activeSetup.barsSinceSweep} bars ago) dan membentuk bearish FVG pada level ${formatPrice(activeSetup.fvgRange.low)} - ${formatPrice(activeSetup.fvgRange.high)}.`
+                              : 'Menunggu pergerakan harga menembus Swing High (BSL) atau Swing Low (SSL) sebelumnya untuk menyapu likuiditas ritel.'}
+                        </p>
+                        {activeSetup && activeSetup.isRetesting && (
+                          <div style={{
+                            marginTop: '10px',
+                            padding: '6px 10px',
+                            background: setupType === 'BULL' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+                            border: `1px solid ${setupType === 'BULL' ? 'var(--accent-emerald)' : 'var(--accent-rose)'}`,
+                            color: setupType === 'BULL' ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: 'bold',
+                            textAlign: 'center',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}>
+                            {setupType === 'BULL' ? '🔥 Price is Retesting Bullish FVG (Ideal Entry Area)!' : '⚠️ Price is Retesting Bearish FVG (Ideal Entry Area)!'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Trade Plan if Setup is Active */}
+                      {activeSetup && (
+                        <div className="execution-plan" style={{ 
+                          '--plan-color': setupType === 'BULL' ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+                          marginTop: '12px',
+                          border: '1px solid var(--border-tactical)',
+                          borderRadius: '8px',
+                          padding: '12px'
+                        } as any}>
+                          <div className="execution-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <div>
+                              <div className="execution-kicker">SMC Trade Setup</div>
+                              <div className="execution-state" style={{ color: setupType === 'BULL' ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+                                {setupType === 'BULL' ? 'Buy Limit' : 'Sell Limit'}
+                              </div>
+                            </div>
+                            <div className="execution-rr" style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                                {((activeSetup.tp - (setupType === 'BULL' ? activeSetup.fvgRange.low : activeSetup.fvgRange.high)) / Math.abs((setupType === 'BULL' ? activeSetup.fvgRange.low : activeSetup.fvgRange.high) - activeSetup.sl)).toFixed(2)}R
+                              </span>
+                              <small style={{ display: 'block', fontSize: '9px', color: 'var(--text-muted)' }}>Est. Reward/Risk</small>
+                            </div>
+                          </div>
+
+                          <div className="execution-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                            <div className="execution-cell" style={{ padding: '6px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '4px' }}>
+                              <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Entry Area (FVG)</span>
+                              <strong style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
+                                {formatPrice(activeSetup.fvgRange.low)} - {formatPrice(activeSetup.fvgRange.high)}
+                              </strong>
+                            </div>
+                            <div className="execution-cell" style={{ padding: '6px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '4px' }}>
+                              <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Stop Loss (SL)</span>
+                              <strong style={{ display: 'block', fontSize: '11px', marginTop: '2px', color: 'var(--accent-rose)' }}>
+                                {formatPrice(activeSetup.sl)}
+                              </strong>
+                            </div>
+                            <div className="execution-cell" style={{ padding: '6px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '4px', gridColumn: 'span 2' }}>
+                              <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Target Profit (TP)</span>
+                              <strong style={{ display: 'block', fontSize: '11px', marginTop: '2px', color: 'var(--accent-emerald)' }}>
+                                {formatPrice(activeSetup.tp)}
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Historical Sweeps Panel */}
+                    <div className="panel" style={{ border: '1px solid var(--border-tactical)', padding: '16px', borderRadius: '12px' }}>
+                      <div className="mini-section-title">📊 Recent Liquidity Sweeps</div>
+                      <div className="historical-signals-section" style={{ marginTop: '8px' }}>
+                        {historicalList.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {historicalList.map((item, idx) => (
+                              <div key={idx} style={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center',
+                                padding: '8px 10px',
+                                background: 'rgba(255, 255, 255, 0.01)',
+                                border: '1px solid var(--border-tactical)',
+                                borderRadius: '6px',
+                                fontSize: '11px'
+                              }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <strong style={{ color: item.type.includes('BULLISH') ? 'var(--accent-emerald)' : 'var(--accent-rose)' }}>
+                                    {item.type}
+                                  </strong>
+                                  <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                                    {item.barsAgo} bars ago
+                                  </span>
+                                </div>
+                                <div style={{ fontWeight: 'bold' }}>
+                                  {formatPrice(item.price)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center', margin: '10px 0' }}>
+                            No sweeps detected in the recent lookback window.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Pine Script Copy Block */}
+                    <div className="panel" style={{ border: '1px solid var(--border-tactical)', padding: '16px', borderRadius: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div className="mini-section-title" style={{ margin: 0 }}>💻 TradingView Pine Script</div>
+                        <button 
+                          onClick={handleCopyPine}
+                          style={{
+                            background: copiedPine ? 'var(--accent-emerald)' : 'var(--bg-hover)',
+                            color: copiedPine ? 'black' : 'white',
+                            border: '1px solid var(--border-tactical)',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: '9px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            textTransform: 'uppercase',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {copiedPine ? 'Copied!' : 'Copy Script'}
+                        </button>
+                      </div>
+                      <p style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '8px' }}>
+                        Salin kode kustom ini ke TradingView Pine Editor untuk melihat label *Liquidity Sweep* dan FVG secara otomatis di chart Anda.
+                      </p>
+                      <pre style={{
+                        background: '#020202',
+                        border: '1px solid var(--border-tactical)',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        fontSize: '9px',
+                        overflowX: 'auto',
+                        maxHeight: '120px',
+                        color: 'oklch(0.85 0.1 100)',
+                        fontFamily: 'var(--font-mono)'
+                      }}>
+                        {PINE_SCRIPT_SMC}
+                      </pre>
+                    </div>
+
+                    {/* SMC Rules Panel */}
+                    <div className="panel" style={{ border: '1px solid var(--border-tactical)', padding: '16px', borderRadius: '12px' }}>
+                      <div className="mini-section-title">💡 "Sweep & Shift" Rules</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div>
+                          <strong style={{ color: 'white', display: 'block', marginBottom: '2px' }}>1. The Sweep (Manipulasi)</strong>
+                          Harga menyapu swing low/high sebelumnya untuk mengambil stop-loss ritel, lalu ditarik kembali ke dalam range (wick panjang).
+                        </div>
+                        <div>
+                          <strong style={{ color: 'white', display: 'block', marginBottom: '2px' }}>2. The Shift (MSS/Konfirmasi)</strong>
+                          Terjadi dorongan balik yang kuat hingga menembus swing level terdekat sebagai sinyal pembalikan struktur pasar.
+                        </div>
+                        <div>
+                          <strong style={{ color: 'white', display: 'block', marginBottom: '2px' }}>3. The Entry (FVG Area)</strong>
+                          Dorongan kuat tadi meninggalkan Fair Value Gap (ruang kosong/ketidakseimbangan). Letakkan limit order di zona FVG ini saat terjadi retest.
+                        </div>
                       </div>
                     </div>
                   </div>
                 );
               })()}
-
-              {data.divergenceReport && (
-                <div className="conviction-panel panel" style={{ '--accent-color': data.divergenceReport.color } as any}>
-                  <div className="panel-header report-header">
-                    <div>
-                      <span>Divergence Report</span>
-                      <small>Divergence-focused analysis with market structure, EMA bounces, and accumulation detection.</small>
-                    </div>
-                    <div className={`report-sync-pill ${data.divergenceReport.conviction >= 70 ? "ok" : data.divergenceReport.conviction >= 50 ? "warn" : "neutral"}`}>
-                      Conviction: {data.divergenceReport.conviction}%
-                    </div>
-                  </div>
-                  
-                  <div className="verdict-hero">
-                    <div className="v-header">
-                      <div className="v-label">Current verdict</div>
-                      <div className="verdict-icon">
-                        {data.divergenceReport.verdict.includes('BULLISH') ? (
-                          <TrendingUp size={20} />
-                        ) : data.divergenceReport.verdict.includes('BEARISH') ? (
-                          <TrendingDown size={20} />
-                        ) : (
-                          <AlertTriangle size={20} />
-                        )}
-                      </div>
-                    </div>
-                    <div className="v-value" style={{ color: data.divergenceReport.color }}>
-                      {data.divergenceReport.verdict}
-                    </div>
-                    <div className="v-meta">
-                      <span>Conviction: <strong>{data.divergenceReport.conviction}%</strong></span>
-                    </div>
-                  </div>
-
-                  {data.divergenceReport.shouldReport && (
-                    <div className="divergence-signals-panel">
-                      <div className="mini-section-title">🎯 Detected Signals</div>
-                      <div className="signals-list">
-                        {data.divergenceReport.signals?.map((signal: string, idx: number) => (
-                          <div key={idx} className="signal-item">{signal}</div>
-                        ))}
-                      </div>
-                      
-                      {data.divergenceReport.details && (
-                        <div className="divergence-details">
-                          <div className="mini-section-title">📊 Analysis Details</div>
-                          <p>{data.divergenceReport.details}</p>
-                        </div>
-                      )}
-
-                      {data.divergenceReport.context && (
-                        <div className="divergence-context">
-                          <div className="mini-section-title">📈 Context</div>
-                          <p>{data.divergenceReport.context}</p>
-                        </div>
-                      )}
-
-                      {data.divergenceReport.marketStructure && (
-                        <div className="market-structure-panel">
-                          <div className="mini-section-title">🏗️ Market Structure</div>
-                          <div className="structure-grid">
-                            <div><span>Quality</span><strong>{data.divergenceReport.marketStructure.quality}</strong></div>
-                            <div><span>Score</span><strong>{data.divergenceReport.marketStructure.score}/100</strong></div>
-                            <div><span>Details</span><strong>{data.divergenceReport.marketStructure.details}</strong></div>
-                          </div>
-                        </div>
-                      )}
-
-                      {data.divergenceReport.emaBounce?.isBouncing && (
-                        <div className="ema-bounce-panel">
-                          <div className="mini-section-title">🎯 EMA Bounce</div>
-                          <p>{data.divergenceReport.emaBounce.details}</p>
-                        </div>
-                      )}
-
-                      {data.divergenceReport.accumulation?.isAccumulating && (
-                        <div className="accumulation-panel">
-                          <div className="mini-section-title">💰 Accumulation</div>
-                          <p>{data.divergenceReport.accumulation.details}</p>
-                          <div className="accumulation-strength">
-                            <span>Strength</span>
-                            <div className="strength-bar">
-                              <div className="strength-fill" style={{ width: `${data.divergenceReport.accumulation.strength}%` }}></div>
-                            </div>
-                            <strong>{data.divergenceReport.accumulation.strength}%</strong>
-                          </div>
-                        </div>
-                      )}
-
-                      {data.divergenceReport.indicators && (
-                        <div className="indicators-panel">
-                          <div className="mini-section-title">📊 Key Indicators</div>
-                          <div className="indicators-grid">
-                            <div><span>RSI</span><strong>{data.divergenceReport.indicators.rsi?.toFixed(1) || 'N/A'}</strong></div>
-                            <div><span>MFI</span><strong>{data.divergenceReport.indicators.mfi?.toFixed(1) || 'N/A'}</strong></div>
-                            <div><span>AO</span><strong>{data.divergenceReport.indicators.ao?.toFixed(2) || 'N/A'}</strong></div>
-                            <div><span>Squeeze</span><strong>{data.divergenceReport.indicators.squeezeIntensity > 0 ? `Active (${data.divergenceReport.indicators.squeezeIntensity})` : 'None'}</strong></div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {screenerContext && (
-                    <div className={`screener-sync-panel ${isScreenerBlocked ? "blocked" : "synced"}`}>
-                      <div className="sync-title-row">
-                         <div className="sync-title"><Info size={14} /> Screener sync</div>
-                        <div className="sync-badge">{formatSignalLabel(screenerContext.category)}</div>
-                      </div>
-                      {screenerSyncStatus === "BLOCKED_BY_LIVE_RISK" ? (
-                        <div className="sync-warning">Active screener signal exists, but live chart is risk-off. Treat it as watchlist until invalidation recovers.</div>
-                      ) : screenerSyncStatus === "SYNCED_TO_CHART" ? (
-                        <div className="sync-ok">Chart and report use the same screener entry, stop, and target.</div>
-                      ) : null}
-                      <div className="sync-vector">Screener reason: {formatReportCopy(screenerContext.vector || screenerContext.signalSource || "-")}</div>
-                      <div className="sync-grid">
-                        <div><span>Appeared</span><strong>{formatDateTime(screenerContext.appearedAt || screenerContext.entryDate)}</strong></div>
-                        <div><span>Last update</span><strong>{formatDateTime(screenerContext.lastScannedAt || screenerContext.updatedAt)}</strong></div>
-                        <div><span>Screener entry</span><strong>{formatPrice(screenerContext.entryPrice)}</strong></div>
-                        <div><span>Stop loss</span><strong>{formatPrice(screenerContext.stopLossPrice)}</strong></div>
-                        <div><span>Initial target</span><strong>{formatPrice(screenerContext.targetPrice)}</strong></div>
-                        <div><span>RR / Delta</span><strong>{screenerContext.rewardRisk ?? "-"}R / {formatPct(screenerContext.deltaPct)}</strong></div>
-                      </div>
-                      {screenerContext.thesis && <p className="sync-thesis">{formatReportCopy(screenerContext.thesis)}</p>}
-                      {activeScreenerSignals.length > 0 && (
-                        <div className="sync-stack-list">
-                          <div className="mini-section-title">Other active signals</div>
-                          {activeScreenerSignals.slice(0, 5).map((signal: any) => (
-                            <div className="sync-signal-card" key={`${signal.category}-${signal.vector}-${signal.lastScannedAt || signal.appearedAt}`}>
-                              <div>
-                                <strong>{formatSignalLabel(signal.category)}</strong>
-                                <span>{formatReportCopy(signal.vector || signal.signalSource || "-")}</span>
-                              </div>
-                              <div>
-                                <small>Entry {formatPrice(signal.entryPrice)}</small>
-                                <small>Delta {formatPct(signal.deltaPct)}</small>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {executionPlan && (() => {
-                    const plan = executionPlan;
-                      const planRows = [
-                        ["Area entry", plan.entryZone],
-                        ["Support aktif", plan.supportLabel ? `${plan.supportLabel} ${formatPrice(plan.supportValue)}` : "-"],
-                        ["Risk guard", plan.riskEmaLabel ? `${plan.riskEmaLabel} ${formatPrice(plan.riskEmaValue)}` : "-"],
-                        ["Beli ideal", plan.idealBuy ?? "-"],
-                        ["Batas waspada", plan.earlyExit ?? "-"],
-                        ["Stop batal", plan.hardStop ?? plan.stopLoss ?? "-"],
-                        ["Target 1", plan.target1 ?? plan.takeProfit ?? "-"],
-                        ["Target 2", plan.target2 ?? "-"],
-                      ];
-
-                      return (
-                        <div className="execution-plan" style={{ '--plan-color': plan.stateColor || data.unifiedAnalysis.color } as any}>
-                          <div className="execution-header">
-                            <div>
-                              <div className="execution-kicker">Rencana aksi</div>
-                              <div className="execution-state">{formatExecutionState(plan.stateLabel || plan.action)}</div>
-                            </div>
-                            <div className="execution-rr">
-                              <span>{plan.rewardRisk ?? "-"}R</span>
-                              <small>Maks. rugi {plan.maxLossPct ?? "-"}%</small>
-                            </div>
-                          </div>
-
-                          {isScreenerBlocked && (
-                            <div className="execution-block-note">Screener belum jadi lampu hijau karena chart live masih risk-off. Pakai rencana chart di bawah dulu.</div>
-                          )}
-
-                          <div className="execution-grid">
-                            {planRows.map(([label, value]) => (
-                              <div className="execution-cell" key={label}>
-                                <span>{label}</span>
-                                <strong>{formatPlanValue(value)}</strong>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="execution-rule">
-                            <strong>Batas waktu</strong>
-                            <span>{formatReportCopy(plan.timeStopRule)}</span>
-                          </div>
-
-                          <div className="execution-rule">
-                            <strong>Ukuran posisi</strong>
-                            <span>{formatReportCopy(plan.positionSizing)}</span>
-                          </div>
-
-                          {plan.extraSuggestion && (
-                            <div className="execution-rule">
-                              <strong>Saran tambahan</strong>
-                              <span>{formatReportCopy(plan.extraSuggestion)}</span>
-                            </div>
-                          )}
-
-                      </div>
-                    );
-                  })()}
-
-                  {data.historicalSignals && data.historicalSignals.length > 0 && (
-                    <div className="historical-signals-section">
-                    <div className="section-title">Historical alerts</div>
-                        <div className="signals-mini-list">
-                            {data.historicalSignals.slice(0, 3).map((sig: any, idx: number) => (
-                                <div key={idx} className="sig-item">
-                                    <span className="sig-date">{new Date(sig.createdAt).toLocaleDateString('id-ID')}</span>
-                                    <span className="sig-range">{Number(sig.entryPrice || 0).toFixed(0)} to {Number(sig.targetPrice || 0).toFixed(0)}</span>
-                                    <span className={`sig-status ${String(sig.status).toLowerCase()}`}>{String(sig.status).toUpperCase()}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                  )}
-
-                  {data.divergenceReport?.context && (
-                    <div className="analysis-section">
-                      <div className="section-title">Analysis Context</div>
-                      <p className="suggestion-text">{data.divergenceReport.context}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="pivots-panel panel">
-                <div className="panel-header">Pivot Targets</div>
-                <div className="pivots-list">
-                  <div className="pivot-row pos"><span>R3 Resistance</span><strong>{data.pivots.r3.toFixed(0)}</strong></div>
-                  <div className="pivot-row pos"><span>R2 Resistance</span><strong>{data.pivots.r2.toFixed(0)}</strong></div>
-                  <div className="pivot-row base"><span>Base Pivot</span><strong>{data.pivots.p.toFixed(0)}</strong></div>
-                  <div className="pivot-row neg"><span>S1 Support</span><strong>{data.pivots.s1.toFixed(0)}</strong></div>
-                  <div className="pivot-row neg"><span>S2 Support</span><strong>{data.pivots.s2.toFixed(0)}</strong></div>
-                </div>
-              </div>
             </div>
           </div>
         )}
